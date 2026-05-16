@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-last_updated: "2026-05-16T18:56:13.943Z"
+last_updated: "2026-05-17T00:00:00.000Z"
 progress:
   total_phases: 7
   completed_phases: 0
@@ -14,7 +14,7 @@ progress:
 
 # STATE: ezctx
 
-**Last updated:** 2026-05-16
+**Last updated:** 2026-05-17
 
 ## Project Reference
 
@@ -29,12 +29,12 @@ progress:
 ## Current Position
 
 Phase: 01 (walking-skeleton-short-audio-clipboard) — EXECUTING
-Plan: 1 of 5
+Plan: 1 of 5 — CHECKPOINT (awaiting device verification)
 
 - **Milestone:** v1 Android MVP
-- **Phase:** 0 (planning complete, ready to start Phase 1)
-- **Plan:** —
-- **Status:** Executing Phase 01
+- **Phase:** 01 (executing)
+- **Plan:** 01-01 completed (awaiting human checkpoint: device install verification)
+- **Status:** Checkpoint — APK install on physical device required
 - **Progress:** 0/7 phases complete `[░░░░░░░] 0%`
 
 ## Phase Map
@@ -71,14 +71,23 @@ Plan: 1 of 5
 - Concurrency per single Groq key — экспериментально определить реальный потолок (RPM vs. одновременные in-flight). Решение откладываем до Phase 2/3, когда появится нагрузка для тестов.
 - ffmpeg-параметры для оптимального чанка (downmix mono + 16 kHz?) — уточнить в Phase 2 на реальных лекциях.
 
+### Key Decisions Logged (Plan 01-01)
+
+- **flutter_secure_storage 10.2.0** (не 9.x — пользователь выбрал текущую версию; адаптированы Fake-моки)
+- **file_picker 11.0.2** (не 10.4.0 из плана — уже в pubspec)
+- **FakeFlutterSecureStorage** вместо mockito codegen — быстрее для skeleton
+- **Flutter 3.32.1** (актуальная stable на 2026-05-17, не 3.27.4 из плана)
+- **APK сборка в CI** — Android SDK недоступен в dev среде
+
 ### Blockers
 
-None.
+None (APK build pending in CI after push to main).
 
 ## Session Continuity
 
-- **Next action:** `/gsd:plan-phase 1` — декомпозировать Phase 1 (Walking Skeleton) на планы.
-- **Last session:** 2026-05-16T11:46:44.785Z
+- **Next action:** Verify APK on device (checkpoint), then execute Plan 01-02 (API Keys UI).
+- **Stopped at:** Plan 01-01 checkpoint:human-verify (APK device install)
+- **Last session:** 2026-05-17T00:00:00.000Z
 
 ---
 *State initialized: 2026-05-16*
