@@ -29,7 +29,13 @@
   3. Пользователь может выбрать `.mp3`/`.m4a`/`.wav` файл < 19 MB через системный file_picker; файлы с неподдерживаемым расширением отклоняются с понятным сообщением.
   4. После нажатия «Транскрибировать» приложение отправляет файл одним запросом в Groq Whisper (`verbose_json`, `large-v3`) и показывает расшифрованный текст на экране результата.
   5. Кнопка «Скопировать txt» помещает полный текст в системный буфер обмена; вставка в стороннее приложение (например, Telegram) даёт ту же строку.
-**Plans:** TBD
+**Plans:** 5 plans
+Plans:
+- [ ] 01-01-PLAN.md — Walking Skeleton: Flutter init + design tokens + 5 экранов-навигация + CI + skeleton secure_storage read/write
+- [ ] 01-02-PLAN.md — API Keys: ApiKeyRepository + полноценный ApiKeysScreen (add/list/remove + маскирование) + счётчик в SettingsScreen
+- [ ] 01-03-PLAN.md — File Import: FileValidator + FilePickerService + HomeScreen preview + активация кнопки
+- [ ] 01-04-PLAN.md — Groq Transcription: GroqApiService + TranscriptionController + ProcessingScreen (pipeline, shimmer, errors)
+- [ ] 01-05-PLAN.md — Result Screen: Clipboard + SelectableText + transcript.txt save + E2E чекпоинт на устройстве
 **UI hint:** yes
 
 ### Phase 2: Real Lectures (Chunking & Progress)
@@ -116,7 +122,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Walking Skeleton (Short Audio → Clipboard) | 0/? | Not started | - |
+| 1. Walking Skeleton (Short Audio → Clipboard) | 0/5 | Not started | - |
 | 2. Real Lectures (Chunking & Progress) | 0/? | Not started | - |
 | 3. Multi-Key Pool & Rate-Limit UI | 0/? | Not started | - |
 | 4. Model & Language Controls | 0/? | Not started | - |
