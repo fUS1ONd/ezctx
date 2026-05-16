@@ -2,14 +2,39 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/design_tokens.dart';
+import '../../core/storage/secure_storage_service.dart';
+import '../../features/settings/api_key_repository.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_icon_btn.dart';
 import '../widgets/gradient_background.dart';
 
 /// Экран настроек.
-/// В Plan 01 — список из одной строки «API-ключи».
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  int _keyCount = 0;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final keys = await ApiKeyRepository(SecureStorageServiceImpl()).listKeys();
+    if (mounted) {
+      setState(() {
+        _keyCount = keys.length;
+        _loading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +63,6 @@ class SettingsScreen extends StatelessWidget {
                 const SizedBox(height: AppSpacing.xl),
                 const Text('Настройки', style: AppTextStyles.display),
                 const SizedBox(height: AppSpacing.lg),
-                // Список настроек
                 GlassCard(
                   padding: EdgeInsets.zero,
                   child: Column(
@@ -53,17 +77,24 @@ class SettingsScreen extends StatelessWidget {
                           style: AppTextStyles.body,
                         ),
                         subtitle: Text(
-                          'Нет ключей', // Plan 02 заменит на актуальный count
+                          _loading
+                              ? '...'
+                              : (_keyCount == 0
+                                    ? 'Нет ключей'
+                                    : '$_keyCount активен'),
                           style: AppTextStyles.label,
                         ),
                         trailing: Icon(
                           Icons.chevron_right,
                           color: AppColors.inkTertiary,
                         ),
-                        onTap: () => Navigator.pushNamed(
-                          context,
-                          AppConstants.routeApiKeys,
-                        ),
+                        onTap: () async {
+                          await Navigator.pushNamed(
+                            context,
+                            AppConstants.routeApiKeys,
+                          );
+                          _load();
+                        },
                       ),
                     ],
                   ),

@@ -6,10 +6,19 @@ import '../constants/app_constants.dart';
 
 /// Контракт для работы с защищённым хранилищем API-ключей.
 abstract interface class SecureStorageService {
-  // Низкоуровневый API — для skeleton-кнопки в ApiKeysScreen.
-  // Будет удалён в Plan 02, заменён на addApiKey/listApiKeys/removeApiKey.
+  @Deprecated(
+    'Skeleton API — использовать addApiKey/listApiKeys/removeApiKey через ApiKeyRepository',
+  )
   Future<void> writeRawKey(String value);
+
+  @Deprecated(
+    'Skeleton API — использовать addApiKey/listApiKeys/removeApiKey через ApiKeyRepository',
+  )
   Future<String?> readRawKey();
+
+  @Deprecated(
+    'Skeleton API — использовать addApiKey/listApiKeys/removeApiKey через ApiKeyRepository',
+  )
   Future<void> deleteRawKey();
 
   // Высокоуровневый API — multi-key ready (Phase 3).
