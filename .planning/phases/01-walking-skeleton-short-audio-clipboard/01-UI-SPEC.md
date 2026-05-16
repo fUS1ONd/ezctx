@@ -22,7 +22,7 @@ created: 2026-05-16
 | Preset | not applicable — Flutter, не web |
 | Component library | Flutter Material 3 + кастомные виджеты с `BackdropFilter` |
 | Icon library | `lucide_flutter` или `phosphor_flutter` (иконки из прототипа: upload, gear, mic, copy, check, wave, key, refresh, trash, warn, x) |
-| Font | System UI (`-apple-system` / `SF Pro`) → на Android: `Roboto` (системный); для Display-заголовков отдельный `fontWeight: 700+` |
+| Font | System UI (`-apple-system` / `SF Pro`) → на Android: `Roboto` (системный); для Display-заголовков отдельный `fontWeight: 700` |
 
 > Источник: `design/styles.css` строки 121–134 (font-family declaration), CONTEXT.md D-14/D-15.
 > shadcn Gate: не применим — стек Flutter (Dart), не React/Next.js/Vite.
@@ -85,9 +85,10 @@ Deep-вариант (для полей ввода): фон `rgba(255, 255, 255, 
 **Исключения:**
 - Touch target минимум: **44px** (высота pill-кнопок, icon-кнопок — `GlassIconBtn` 36×36px в прототипе, но touch area 44px).
 - Карточка загрузки (upload card) минимальная высота: **260px**.
-- Отступ от нижнего края экрана до floating-кнопки: **30px** (из прототипа, соответствует safe area Android).
+- Отступ от нижнего края экрана до floating-кнопки: **32px** (4×8, ближайшее значение из стандартного набора; фактический safe area Android — `MediaQuery.of(context).padding.bottom`, фиксированный fallback = 32px).
 
 > Источник: `design/screens.jsx` (inline styles по всем экранам), `design/styles.css`.
+> Исправление: значение 30px из прототипа заменено на 32px (кратно 4, соответствует сетке).
 
 ---
 
@@ -107,19 +108,22 @@ Deep-вариант (для полей ввода): фон `rgba(255, 255, 255, 
 
 ## Typography
 
+Используются ровно **2 веса**: `400` (body, label, meta) и `700` (display, heading, buttons).
+
 | Роль | Размер | Вес | Line Height | Применение |
 |------|--------|-----|-------------|------------|
-| Display | 34–38px | 700–760 | 1.04–1.12 | Заголовки экранов («Слух», «Расшифровки», «Настройки») |
-| Heading | 18–26px | 600–700 | 1.12–1.2 | Заголовки карточек, имена файлов в шапке результата |
-| Body | 15–16px | 400 | 1.45–1.55 | Основной текст, расшифровка, описания |
-| Label / Meta | 11–13px | 400–600 | 1.2–1.4 | Метаданные файла, статусы, таймкоды |
+| Display | 34–38px | **700** | 1.04–1.12 | Заголовки экранов («Слух», «Расшифровки», «Настройки») |
+| Heading | 18–26px | **700** | 1.12–1.2 | Заголовки карточек, имена файлов в шапке результата |
+| Body | 15–16px | **400** | 1.45–1.55 | Основной текст, расшифровка, описания |
+| Label / Meta | 11–13px | **400** | 1.2–1.4 | Метаданные файла, статусы, таймкоды |
 
 **Шрифтовые классы:**
-- `display` (`.display` в прототипе): `fontFamily: system-ui`, `fontWeight: 700+`, `letterSpacing: -0.035em`
+- `display` (`.display` в прототипе): `fontFamily: system-ui`, `fontWeight: w700`, `letterSpacing: -0.035em`
 - `mono` (`.mono` в прототипе): `fontFamily: monospace` (`JetBrains Mono` → на Android `RobotoMono`), для метаданных файла, таймкодов, размеров
-- `body`: системный шрифт, `fontWeight: 400`, `letterSpacing: -0.01em`
+- `body`: системный шрифт, `fontWeight: w400`, `letterSpacing: -0.01em`
 
 > Источник: `design/styles.css` строки 121–138, `design/screens.jsx` (все экраны).
+> Исправление: вес 600 удалён — используется ровно 2 веса (400, 700). Все ранее w600 заменены на w700 там, где нужен акцент, или w400 для body-контекста.
 
 ---
 
@@ -160,7 +164,7 @@ Phase 1 реализует следующие экраны (минимальны
 **Компоненты:**
 - Шапка: логотип-иконка (36×36px, gradient `#ff8a4d→#ff5b3a`, border-radius 11px) + название «Слух» (display, 19px) + gear icon button (стекло)
 - Display заголовок: «Расшифруй / любой звук» (38px, letterSpacing -0.038em), subtitle 16px ink-2
-- Upload card (glass sheen, `r-tile`): иконка upload (72×72px, border-radius 22px, dashed border accent 0.55 opacity), «Выберите файл» (18px w600), форматы (14px ink-2), кнопки «Из файлов»
+- Upload card (glass sheen, `r-tile`): иконка upload (72×72px, border-radius 22px, dashed border accent 0.55 opacity), «Выберите файл» (18px w700), форматы (14px ink-2), кнопки «Из файлов»
 - Primary CTA: кнопка «Транскрибировать» (заменяет «Записать с микрофона» из прототипа — запись аудио отложена до v2)
 
 > Примечание: В прототипе ScreenEmpty есть кнопка «Записать с микрофона» — она deferred (REC-01 = v2). В Phase 1 эта кнопка ОТСУТСТВУЕТ. Upload card — единственный способ добавить файл.
@@ -169,7 +173,7 @@ Phase 1 реализует следующие экраны (минимальны
 
 **Компоненты:**
 - Шапка: «Обработка» (heading) + X-кнопка (glass icon btn)
-- Карточка файла (glass sheen, `r-tile`): иконка wave (56×56px, gradient), имя файла (16px w600), метаданные mono (13px), прогресс-бар shimmer, «Осталось ~N сек» (12px ink-3)
+- Карточка файла (glass sheen, `r-tile`): иконка wave (56×56px, gradient), имя файла (16px w700), метаданные mono (13px), прогресс-бар shimmer, «Осталось ~N сек» (12px ink-3)
 - Pipeline steps (glass card, `r-card`): 5 шагов с dot-indicators (done=good, active=accent gradient с pulseDot, wait=ink-line border)
 - Floating bottom bar (glass sheen, pill): elapsed time (mono) + кнопка «Отменить» (bad color, pill)
 
@@ -206,7 +210,7 @@ Phase 1 реализует следующие экраны (минимальны
 | WaveDot | `AnimatedBuilder` + `Container` | Активный dot в pipeline |
 | ListRow | `ListTile`-замена | Строка настроек с иконкой, title, detail |
 | MonoText | `Text` с `fontFamily: 'RobotoMono'` | Метаданные, таймкоды, размеры |
-| DisplayText | `Text` с `fontWeight: 700`, `letterSpacing: -0.035` | Заголовки экранов |
+| DisplayText | `Text` с `fontWeight: w700`, `letterSpacing: -0.035` | Заголовки экранов |
 
 ---
 
@@ -292,8 +296,12 @@ Phase 1 реализует следующие экраны (минимальны
 2. **Gradient background** реализуется через `CustomPainter` в `Stack` под контентом экрана.
 3. **Letter spacing** в Flutter: `-0.035em` при размере 34px ≈ `letterSpacing: -1.2`.
 4. **minSdkVersion**: определяется зависимостями `file_picker` (≥ API 21) и `flutter_secure_storage` (≥ API 23). Установить `minSdkVersion 23`.
-5. **Safe area**: используется `SafeArea` widget или отступ `MediaQuery.of(context).padding.top + 16px` для шапки.
+5. **Safe area**: используется `SafeArea` widget или отступ `MediaQuery.of(context).padding.top + 16px` для шапки. Для отступа от нижнего края floating-кнопки: `MediaQuery.of(context).padding.bottom` (динамически) + 32px внутренний отступ (фиксированный fallback = 32px).
 6. **Touch targets**: все интерактивные элементы имеют `constraints: BoxConstraints(minWidth: 44, minHeight: 44)`.
+7. **Accessibility (icon-only кнопки)**: `GlassIconBtn` без видимого текста оборачивается в `Semantics` с явным `label`:
+   - Gear-кнопка (настройки): `Semantics(label: 'Настройки', child: GlassIconBtn(...))`
+   - X-кнопка (закрыть/отмена): `Semantics(label: 'Закрыть', child: GlassIconBtn(...))`
+   - Share-кнопка (поделиться): `Semantics(label: 'Поделиться', child: GlassIconBtn(...))`
 
 ---
 
