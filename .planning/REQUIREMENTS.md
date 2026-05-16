@@ -107,40 +107,40 @@
 
 ## Traceability
 
-Карта «требование → фаза». Заполнено при создании ROADMAP.md.
+Карта «требование → фаза». Перебалансирована для vertical MVP: Phase 1 содержит минимальный сквозной слайс (FOUND + минимум KEYS/IMPORT/TRANS/OUT), а не только инфраструктуру.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | FOUND-01 | Phase 1 | Pending |
 | FOUND-02 | Phase 1 | Pending |
 | FOUND-03 | Phase 1 | Pending |
-| KEYS-01 | Phase 2 | Pending |
-| KEYS-02 | Phase 2 | Pending |
-| KEYS-03 | Phase 2 | Pending |
-| KEYS-04 | Phase 2 | Pending |
-| KEYS-05 | Phase 2 | Pending |
-| IMPORT-01 | Phase 3 | Pending |
-| IMPORT-02 | Phase 3 | Pending |
-| IMPORT-03 | Phase 3 | Pending |
-| IMPORT-04 | Phase 3 | Pending |
-| TRANS-01 | Phase 4 | Pending |
-| TRANS-02 | Phase 4 | Pending |
-| TRANS-03 | Phase 4 | Pending |
-| TRANS-04 | Phase 4 | Pending |
-| TRANS-05 | Phase 4 | Pending |
-| TRANS-06 | Phase 4 | Pending |
-| TRANS-07 | Phase 4 | Pending |
-| TRANS-08 | Phase 4 | Pending |
-| TRANS-09 | Phase 4 | Pending |
-| TRANS-10 | Phase 4 | Pending |
+| KEYS-01 | Phase 1 | Pending |
+| KEYS-02 | Phase 1 | Pending |
+| KEYS-03 | Phase 3 | Pending |
+| KEYS-04 | Phase 3 | Pending |
+| KEYS-05 | Phase 3 | Pending |
+| IMPORT-01 | Phase 1 | Pending |
+| IMPORT-02 | Phase 1 | Pending |
+| IMPORT-03 | Phase 2 | Pending |
+| IMPORT-04 | Phase 2 | Pending |
+| TRANS-01 | Phase 3 | Pending |
+| TRANS-02 | Phase 3 | Pending |
+| TRANS-03 | Phase 1 | Pending |
+| TRANS-04 | Phase 2 | Pending |
+| TRANS-05 | Phase 2 | Pending |
+| TRANS-06 | Phase 2 | Pending |
+| TRANS-07 | Phase 1 | Pending |
+| TRANS-08 | Phase 2 | Pending |
+| TRANS-09 | Phase 2 | Pending |
+| TRANS-10 | Phase 2 | Pending |
 | OPTS-01 | Phase 4 | Pending |
 | OPTS-02 | Phase 4 | Pending |
 | OPTS-03 | Phase 4 | Pending |
 | OUT-01 | Phase 5 | Pending |
-| OUT-02 | Phase 5 | Pending |
-| OUT-03 | Phase 5 | Pending |
+| OUT-02 | Phase 1 | Pending |
+| OUT-03 | Phase 1 | Pending |
 | OUT-04 | Phase 5 | Pending |
-| OUT-05 | Phase 5 | Pending |
+| OUT-05 | Phase 1 | Pending |
 | HIST-01 | Phase 6 | Pending |
 | HIST-02 | Phase 6 | Pending |
 | HIST-03 | Phase 6 | Pending |
@@ -154,6 +154,15 @@
 - Mapped to phases: 36
 - Unmapped: 0 ✓
 
+**Phase distribution:**
+- Phase 1 (Walking Skeleton): 12 req
+- Phase 2 (Real Lectures): 8 req
+- Phase 3 (Multi-Key Pool): 5 req
+- Phase 4 (Model & Language): 3 req
+- Phase 5 (Output & Share): 2 req
+- Phase 6 (History): 4 req
+- Phase 7 (Error Polish): 3 req
+
 ---
 *Requirements defined: 2026-05-16*
-*Last updated: 2026-05-16 after initial definition*
+*Last updated: 2026-05-16 — Traceability rebalanced for vertical MVP*
