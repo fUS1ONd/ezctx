@@ -108,14 +108,14 @@ Deep-вариант (для полей ввода): фон `rgba(255, 255, 255, 
 
 ## Typography
 
-Используются ровно **2 веса**: `400` (body, label, meta) и `700` (display, heading, buttons).
+Используются ровно **4 фиксированных размера** и ровно **2 веса**: `400` (body, label, meta) и `700` (display, heading, buttons).
 
 | Роль | Размер | Вес | Line Height | Применение |
 |------|--------|-----|-------------|------------|
-| Display | 34–38px | **700** | 1.04–1.12 | Заголовки экранов («Слух», «Расшифровки», «Настройки») |
-| Heading | 18–26px | **700** | 1.12–1.2 | Заголовки карточек, имена файлов в шапке результата |
-| Body | 15–16px | **400** | 1.45–1.55 | Основной текст, расшифровка, описания |
-| Label / Meta | 11–13px | **400** | 1.2–1.4 | Метаданные файла, статусы, таймкоды |
+| Display | **34px** | **700** | 1.08 | Заголовки экранов («Слух», «Расшифровки», «Настройки») |
+| Heading | **20px** | **700** | 1.2 | Заголовки карточек, имена файлов в шапке результата |
+| Body | **16px** | **400** | 1.5 | Основной текст, расшифровка, описания |
+| Label / Meta | **13px** | **400** | 1.3 | Метаданные файла, статусы, таймкоды |
 
 **Шрифтовые классы:**
 - `display` (`.display` в прототипе): `fontFamily: system-ui`, `fontWeight: w700`, `letterSpacing: -0.035em`
@@ -123,7 +123,7 @@ Deep-вариант (для полей ввода): фон `rgba(255, 255, 255, 
 - `body`: системный шрифт, `fontWeight: w400`, `letterSpacing: -0.01em`
 
 > Источник: `design/styles.css` строки 121–138, `design/screens.jsx` (все экраны).
-> Исправление: вес 600 удалён — используется ровно 2 веса (400, 700). Все ранее w600 заменены на w700 там, где нужен акцент, или w400 для body-контекста.
+> Исправление: все диапазоны размеров заменены на ровно 4 фиксированных значения: 34, 20, 16, 13px. Вес 600 удалён — используется ровно 2 веса (400, 700).
 
 ---
 
@@ -162,9 +162,9 @@ Phase 1 реализует следующие экраны (минимальны
 ### Screen 1: Home / Empty State
 
 **Компоненты:**
-- Шапка: логотип-иконка (36×36px, gradient `#ff8a4d→#ff5b3a`, border-radius 11px) + название «Слух» (display, 19px) + gear icon button (стекло)
-- Display заголовок: «Расшифруй / любой звук» (38px, letterSpacing -0.038em), subtitle 16px ink-2
-- Upload card (glass sheen, `r-tile`): иконка upload (72×72px, border-radius 22px, dashed border accent 0.55 opacity), «Выберите файл» (18px w700), форматы (14px ink-2), кнопки «Из файлов»
+- Шапка: логотип-иконка (36×36px, gradient `#ff8a4d→#ff5b3a`, border-radius 11px) + название «Слух» (**Heading, 20px**, w700) + gear icon button (стекло)
+- Display заголовок: «Расшифруй / любой звук» (**Display, 34px**, letterSpacing -0.035em), subtitle **16px** ink-2
+- Upload card (glass sheen, `r-tile`): иконка upload (72×72px, border-radius 22px, dashed border accent 0.55 opacity), «Выберите файл» (**Heading, 20px**, w700), форматы (**Label, 13px** ink-2), кнопки «Из файлов»
 - Primary CTA: кнопка «Транскрибировать» (заменяет «Записать с микрофона» из прототипа — запись аудио отложена до v2)
 
 > Примечание: В прототипе ScreenEmpty есть кнопка «Записать с микрофона» — она deferred (REC-01 = v2). В Phase 1 эта кнопка ОТСУТСТВУЕТ. Upload card — единственный способ добавить файл.
@@ -172,28 +172,29 @@ Phase 1 реализует следующие экраны (минимальны
 ### Screen 2: Processing / Progress
 
 **Компоненты:**
-- Шапка: «Обработка» (heading) + X-кнопка (glass icon btn)
-- Карточка файла (glass sheen, `r-tile`): иконка wave (56×56px, gradient), имя файла (16px w700), метаданные mono (13px), прогресс-бар shimmer, «Осталось ~N сек» (12px ink-3)
+- Шапка: «Обработка» (**Heading, 20px**) + X-кнопка (glass icon btn)
+- Карточка файла (glass sheen, `r-tile`): иконка wave (56×56px, gradient), имя файла (**Body, 16px**, w700), метаданные mono (**Label, 13px**), прогресс-бар shimmer, «Осталось ~N сек» (**Label, 13px** ink-3)
+- Таймер/прогресс elapsed: **Body, 16px** (mono)
 - Pipeline steps (glass card, `r-card`): 5 шагов с dot-indicators (done=good, active=accent gradient с pulseDot, wait=ink-line border)
-- Floating bottom bar (glass sheen, pill): elapsed time (mono) + кнопка «Отменить» (bad color, pill)
+- Floating bottom bar (glass sheen, pill): elapsed time (mono, **Body 16px**) + кнопка «Отменить обработку» (bad color, pill)
 
 > В Phase 1 pipeline упрощён: «Загрузка» → «Распознавание речи» → «Готово» (только 3 шага, нет diarization).
 
 ### Screen 3: Result / Detail
 
 **Компоненты:**
-- Навигация: back button (glass) + дата (15px ink-2) + share icon (glass, deferred до Phase 5)
-- Заголовок: имя файла (display, 26px), метаданные mono (13px ink-2)
+- Навигация: back button (glass) + дата (**Body, 16px** ink-2) + share icon (glass, deferred до Phase 5)
+- Заголовок: имя файла (**Heading, 20px**, w700), метаданные mono (**Label, 13px** ink-2)
 - Action row: кнопка «Скопировать» (accent gradient, height 46px, border-radius 14px) + (опционально «Спросить ИИ» — deferred)
-- Текст расшифровки (glass card, `r-card`): body 15px, line-height 1.55, ink
+- Текст расшифровки (glass card, `r-card`): **Body, 16px**, line-height 1.5, ink
 
 ### Screen 4: Settings / API Keys
 
 **Компоненты:**
-- Заголовок «Настройки» (display, 34px)
+- Заголовок «Настройки» (**Display, 34px**)
 - Status card (glass sheen, `r-tile`): аватар-иконка (48×48px), статус «Подключено к Groq», модель + good dot
 - Секция «Подключение»: список (glass card) → строка «API-ключи» (detail: «1 активен»)
-- API Keys screen: hero-карточка Groq (glass sheen, `r-tile`), поле ввода ключа (glass deep, mono), кнопки «Проверить» / «Удалить», info-блок с ссылкой на console.groq.com
+- API Keys screen: hero-карточка Groq (glass sheen, `r-tile`), поле ввода ключа (glass deep, mono, **Body 16px**), кнопки «Проверить ключ» / «Удалить», info-блок с ссылкой на console.groq.com
 
 ---
 
@@ -240,7 +241,8 @@ Phase 1 реализует следующие экраны (минимальны
 | Error: неверный ключ (401) | «Ключ не подошёл. Проверьте его в console.groq.com → API Keys.» |
 | Кнопка копирования (до) | «Скопировать» |
 | Кнопка копирования (после) | «Скопировано» (1.5 сек, затем возврат) |
-| Отмена транскрибации | «Отменить» (без подтверждения — данные не теряются, файл не изменяется) |
+| Отмена транскрибации | «Отменить обработку» (без подтверждения — данные не теряются, файл не изменяется) |
+| Кнопка проверки ключа | «Проверить ключ» |
 | Settings: ссылка Groq | «Получить ключ на console.groq.com» |
 | API key placeholder | «gsk_••••••••••••••••••••••...» (masked, последние 4 символа видны) |
 | Подсказка под ключом | «Ключ хранится в защищённом хранилище устройства и не передаётся на сторонние серверы.» |
