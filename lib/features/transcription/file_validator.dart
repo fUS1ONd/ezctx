@@ -21,7 +21,7 @@ class FileValidator {
     required String path,
     required int sizeBytes,
   }) {
-    final ext = _extractExtension(path);
+    final ext = FileValidator.extractExtension(path);
     if (!AppConstants.supportedAudioExtensions.contains(ext)) {
       return const FileValidationResult._error(
         'Формат файла не поддерживается. Выберите mp3, wav, m4a, ogg или flac.',
@@ -37,7 +37,8 @@ class FileValidator {
 
   /// Извлекает расширение из пути в нижнем регистре.
   /// Берёт только последний сегмент после последней точки в имени файла.
-  String _extractExtension(String path) {
+  /// Вынесен как static, чтобы избежать дублирования в FilePickerService.
+  static String extractExtension(String path) {
     final fileName = path.split('/').last;
     final dotIndex = fileName.lastIndexOf('.');
     if (dotIndex < 0 || dotIndex == fileName.length - 1) return '';

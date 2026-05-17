@@ -58,7 +58,8 @@ class FilePickerService {
       throw ValidationException(validation.errorMessage!);
     }
 
-    final ext = _extractExtension(path);
+    // Переиспользуем статический метод из FileValidator — единая точка логики.
+    final ext = FileValidator.extractExtension(path);
 
     return FilePickPicked(SelectedAudioFile(
       path: path,
@@ -66,12 +67,5 @@ class FilePickerService {
       sizeBytes: platformFile.size,
       extension: ext,
     ));
-  }
-
-  String _extractExtension(String path) {
-    final fileName = path.split('/').last;
-    final dotIndex = fileName.lastIndexOf('.');
-    if (dotIndex < 0 || dotIndex == fileName.length - 1) return '';
-    return fileName.substring(dotIndex + 1).toLowerCase();
   }
 }
