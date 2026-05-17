@@ -43,11 +43,12 @@ Phase: 02 (real-lectures-chunking-progress) — COMPLETE (4/4 plans done, verifi
 |---|-------|--------|-------|
 | 1 | Walking Skeleton (Short Audio → Clipboard) | Complete | 5 plans |
 | 2 | Real Lectures (Chunking & Progress) | Complete | 4 plans |
-| 3 | Multi-Key Pool & Rate-Limit UI | Not started | TBD |
-| 4 | Model & Language Controls | Not started | TBD |
-| 5 | Output Formats & Sharing | Not started | TBD |
-| 6 | History | Not started | TBD |
-| 7 | Error Handling & Onboarding Polish | Not started | TBD |
+| 3 | Audio Normalization (Pre-Transcription) | Complete (minor issues) | 3 plans |
+| 4 | Multi-Key Pool & Rate-Limit UI | Context ready | TBD |
+| 5 | Model & Language Controls | Not started | TBD |
+| 6 | Output Formats & Sharing | Not started | TBD |
+| 7 | History | Not started | TBD |
+| 8 | Error Handling & Onboarding Polish | Not started | TBD |
 
 ## Performance Metrics
 
@@ -91,10 +92,10 @@ None (APK build pending in CI after push to main).
 
 ## Session Continuity
 
-- **Next action:** Execute Phase 03 — `/gsd:execute-phase 3` (Multi-Key Pool & Rate-Limit UI)
-- **Stopped at:** Phase 02 полностью выполнена и верифицирована (5/5 criteria); APK push pending CI
+- **Next action:** Plan Phase 04 — `/gsd:plan-phase 4` (Multi-Key Pool & Rate-Limit UI)
+- **Stopped at:** Phase 04 context gathered (04-CONTEXT.md ready); planning not yet started
 - **Last session:** 2026-05-17
-- **Last activity:** 2026-05-17 - Completed Phase 02: chunking, parallel upload, progress UI (4 plans, 16 tests)
+- **Last activity:** 2026-05-17 - discuss-phase 4 завершён: GroqKeyPool ChangeNotifier, blackbox ротация на 429, статус-only UI
 
 ---
 *State initialized: 2026-05-16*
