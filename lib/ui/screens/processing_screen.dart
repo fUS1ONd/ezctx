@@ -12,6 +12,7 @@ import '../../features/transcription/selected_audio_file.dart';
 import '../../features/transcription/transcription_controller.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_icon_btn.dart';
+import '../widgets/glass_tile.dart';
 import '../widgets/gradient_background.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/shimmer_bar.dart';
@@ -24,12 +25,22 @@ class ProcessingScreen extends StatefulWidget {
   State<ProcessingScreen> createState() => _ProcessingScreenState();
 }
 
-class _ProcessingScreenState extends State<ProcessingScreen> {
+class _ProcessingScreenState extends State<ProcessingScreen>
+    with SingleTickerProviderStateMixin {
   late final TranscriptionController _controller;
   SelectedAudioFile? _file;
   DateTime? _startedAt;
   Timer? _ticker;
   Duration _elapsed = Duration.zero;
+
+  /// Контроллер для пульс-анимации активной точки pipeline.
+  late final AnimationController _pulseController;
+
+  /// Анимация масштаба: 1.0 → 1.25.
+  late final Animation<double> _scaleAnimation;
+
+  /// Анимация прозрачности: 0.6 → 1.0.
+  late final Animation<double> _opacityAnimation;
 
   @override
   void initState() {
@@ -39,6 +50,20 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
       apiService: GroqApiService(),
     );
     _controller.addListener(_onStateChange);
+
+    // Инициализация пульс-анимации активной точки pipeline (1200 мс, зацикленная).
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+
+    final curved = CurvedAnimation(
+      parent: _pulseController,
+      curve: Curves.easeInOut,
+    );
+
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.25).animate(curved);
+    _opacityAnimation = Tween<double>(begin: 0.6, end: 1.0).animate(curved);
   }
 
   @override
@@ -100,6 +125,7 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
   @override
   void dispose() {
     _ticker?.cancel();
+    _pulseController.dispose();
     _controller.removeListener(_onStateChange);
     _controller.dispose();
     super.dispose();
@@ -143,9 +169,9 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
                 ),
                 const SizedBox(height: AppSpacing.xl),
 
-                // Карточка файла
+                // Карточка файла: GlassTile (r=30px) вместо GlassCard (r=22px)
                 if (_file != null)
-                  GlassCard(
+                  GlassTile(
                     child: Row(
                       children: [
                         Container(
@@ -227,7 +253,8 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
                 // Нижняя панель: loading / error / missingKey
                 _buildBottomBar(state),
 
-                const SizedBox(height: AppSpacing.lg),
+                // Безопасный нижний отступ с учётом системной панели навигации
+                SizedBox(height: MediaQuery.of(context).padding.bottom + 32),
               ],
             ),
           ),
@@ -258,19 +285,37 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
         icon = null;
     }
 
+    // Активная точка получает пульс-анимацию масштаба и прозрачности.
+    final dotWidget = Container(
+      width: 20,
+      height: 20,
+      decoration: BoxDecoration(
+        color: dotColor,
+        shape: BoxShape.circle,
+      ),
+      child: icon != null
+          ? Icon(icon, color: Colors.white, size: 14)
+          : null,
+    );
+
     return Row(
       children: [
-        Container(
-          width: 20,
-          height: 20,
-          decoration: BoxDecoration(
-            color: dotColor,
-            shape: BoxShape.circle,
-          ),
-          child: icon != null
-              ? Icon(icon, color: Colors.white, size: 14)
-              : null,
-        ),
+        if (status == _PipelineStatus.active)
+          AnimatedBuilder(
+            animation: _pulseController,
+            builder: (context, child) {
+              return Transform.scale(
+                scale: _scaleAnimation.value,
+                child: Opacity(
+                  opacity: _opacityAnimation.value,
+                  child: child,
+                ),
+              );
+            },
+            child: dotWidget,
+          )
+        else
+          dotWidget,
         const SizedBox(width: AppSpacing.md),
         Text(label, style: AppTextStyles.body),
       ],
@@ -279,18 +324,27 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
 
   Widget _buildBottomBar(TranscriptionState state) {
     if (state is TranscriptionLoading) {
-      return Column(
-        children: [
-          Text(_formatElapsed(_elapsed), style: AppTextStyles.mono),
-          const SizedBox(height: AppSpacing.sm),
-          TextButton(
-            onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
-            child: Text(
-              'Отменить обработку',
-              style: AppTextStyles.label.copyWith(color: AppColors.bad),
+      // Floating glass pill с таймером и кнопкой отмены
+      return GlassCard(
+        borderRadius: AppRadius.pill,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // Elapsed time в формате mm:ss
+            Text(_formatElapsed(_elapsed), style: AppTextStyles.mono),
+            TextButton(
+              onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
+              child: Text(
+                'Отменить обработку',
+                style: AppTextStyles.label.copyWith(color: AppColors.bad),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       );
     }
 
