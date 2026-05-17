@@ -45,10 +45,20 @@ class TranscriptionController extends ChangeNotifier {
   final ApiKeyRepository _keys;
   final GroqApiService _api;
 
+  bool _disposed = false;
+
   TranscriptionState _state = const TranscriptionIdle();
   TranscriptionState get state => _state;
 
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
   void _set(TranscriptionState s) {
+    // Защита от вызова notifyListeners() после dispose() при отмене пользователем.
+    if (_disposed) return;
     _state = s;
     notifyListeners();
   }
