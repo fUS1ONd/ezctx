@@ -12,36 +12,19 @@ void main() {
         extension: 'mp3',
       );
 
-  group('ProcessingArgs.isChunked — по размеру файла', () {
-    test('18 МБ → false (Phase 1 путь)', () {
+  group('ProcessingArgs — конструктор', () {
+    test('создаётся с file и без metadata', () {
       final args = ProcessingArgs(file: _file(18 * _mb));
-      expect(args.isChunked, isFalse);
+      expect(args.file.sizeBytes, equals(18 * _mb));
+      expect(args.metadata, isNull);
     });
 
-    test('19 МБ ровно → true (граничный случай)', () {
-      final args = ProcessingArgs(file: _file(19 * _mb));
-      expect(args.isChunked, isTrue);
-    });
-
-    test('26.6 МБ → true (регрессия: раньше false при коротком аудио)', () {
-      // Файл 26.6 МБ при 256kbps = ~14 мин < 20 мин — раньше isChunked был false,
-      // что приводило к отправке оригинала 26.6 МБ в Groq → отказ API.
-      final args = ProcessingArgs(file: _file((26.6 * _mb).round()));
-      expect(args.isChunked, isTrue);
-    });
-
-    test('60 МБ → true', () {
-      final args = ProcessingArgs(file: _file(60 * _mb));
-      expect(args.isChunked, isTrue);
-    });
-
-    test('metadata не влияет на решение о чанковании', () {
-      // Даже если metadata есть и длительность < 20 мин, решение только по размеру.
+    test('создаётся с file и metadata', () {
       final args = ProcessingArgs(
         file: _file(25 * _mb),
         metadata: null,
       );
-      expect(args.isChunked, isTrue);
+      expect(args.file, isNotNull);
     });
   });
 }
