@@ -28,6 +28,13 @@ class AppConstants {
     'webm',
   };
 
+  /// Порог для isChunked: длительность нормализованного mp3 > 75 мин = 4500 с (per D3).
+  static const int kChunkThresholdSeconds = 4500;
+
+  /// Длительность одного чанка при нарезке нормализованного mp3 (per D3).
+  /// 75 мин × 240 КБ/мин ≈ 17.6 МБ < 19 МБ лимита Groq.
+  static const double kChunkDurationSeconds = 4500.0;
+
   // Secure storage keys
   static const String storageKeyApiKeys = 'groq_api_keys_v1';
 

@@ -11,8 +11,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:ezctx/core/error/app_exception.dart';
 import 'audio_metadata.dart';
 
-/// Длительность одного чанка в секундах (1200s = 20 мин, ~19 МБ при 128k).
-const double kChunkDurationSeconds = 1200.0;
+/// Длительность одного чанка в секундах (4500s = 75 мин, ~17.6 МБ при 32k нормализованного mp3).
+const double kChunkDurationSeconds = 4500.0;
 
 /// Сервис для получения метаданных аудиофайла и его разбивки на чанки.
 ///
@@ -82,10 +82,10 @@ class AudioChunkingService {
             '/ezctx_chunks_${DateTime.now().millisecondsSinceEpoch}';
     await Directory(tmpBase).create(recursive: true);
 
-    // Команда ffmpeg: сегментация по времени, mp3 128k mono 16kHz
+    // Команда ffmpeg: сегментация по времени, -c:a copy (файл уже нормализован)
     final command =
         '-i "$filePath" -f segment -segment_time ${kChunkDurationSeconds.toInt()}'
-        ' -c:a libmp3lame -b:a 128k -ac 1 -ar 16000'
+        ' -c:a copy'
         ' "$tmpBase/chunk_%03d.mp3"';
 
     if (_ffmpegOverride != null) {
