@@ -666,22 +666,16 @@ lib/
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Возвращает ли Groq verbose_json сегменты без явного `timestamp_granularities[]=segment`?**
-   - Что знаем: Phase 1 запрашивает только `word`-granularity. Groq документация говорит что `segments[]` присутствует при `verbose_json` [ASSUMED].
-   - Что неясно: гарантировано ли поле `segments[]` или только при `segment` granularity?
-   - Рекомендация: добавить `timestamp_granularities[]=segment` в запросы Phase 2 для гарантии. Можно добавить оба: `word` и `segment`.
+   **RESOLVED:** План 02-02 Task 2 явно добавляет `timestamp_granularities[]=segment` в `transcribeChunk()` наряду с `word`. Таким образом `segments[]` гарантированно присутствует в ответе вне зависимости от поведения API по умолчанию.
 
 2. **Точный RPM лимит Groq whisper-large-v3 на free tier**
-   - Что знаем: 2000 RPD, 7200 аудиосекунд/час [CITED: community.groq.com]
-   - Что неясно: RPM-лимит конкретно для whisper (отдельный от 30 RPM text-моделей?)
-   - Рекомендация: стартовать с 3 параллельными, наблюдать 429-ответы и корректировать
+   **RESOLVED:** Используем консервативный лимит 3 параллельных запроса. При получении 429 `RateLimitException` вызывается retry с задержкой 5s→10s→20s. Executor должен логировать 429-ответы для последующей корректировки константы `maxConcurrent`.
 
 3. **ffmpegKit версия 4.1.0 vs актуальная**
-   - Что знаем: pubspec.yaml содержит `^4.1.0`, pub.dev подтверждает существование
-   - Что неясно: является ли 4.1.0 последней стабильной или есть 4.2.x+?
-   - Рекомендация: Wave 0 задача — проверить `flutter pub outdated` и обновить если нужно
+   **RESOLVED:** Используем `^4.1.0` (уже в pubspec). Dart pub resolver подберёт последнюю совместимую minor-версию. Executor запускает `flutter pub get` — этого достаточно.
 
 ---
 
