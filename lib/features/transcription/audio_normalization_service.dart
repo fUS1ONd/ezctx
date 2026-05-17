@@ -17,20 +17,30 @@ class AudioNormalizationService {
   /// Сервис получения метаданных — нужен для чтения длительности нормализованного файла.
   final AudioChunkingService _chunkingService;
 
+  /// Переопределение выходного пути — инжектируется только в тестах.
+  final String? _outputPathOverride;
+
   const AudioNormalizationService({
     Future<void> Function(String command)? ffmpegOverride,
     AudioChunkingService? chunkingService,
+    String? outputPathOverride,
   })  : _ffmpegOverride = ffmpegOverride,
-        _chunkingService = chunkingService ?? const AudioChunkingService();
+        _chunkingService = chunkingService ?? const AudioChunkingService(),
+        _outputPathOverride = outputPathOverride;
 
   /// Нормализует аудиофайл [inputPath] в mp3 32k/16kHz/Mono во временную директорию.
   ///
   /// Возвращает [NormalizedAudioFile] с путём и длительностью нормализованного файла.
   /// Бросает [InternalException] при ошибке ffmpeg.
   Future<NormalizedAudioFile> normalize(String inputPath) async {
-    final tmpDir = (await getTemporaryDirectory()).path;
-    final outPath =
-        '$tmpDir/ezctx_norm_${DateTime.now().millisecondsSinceEpoch}.mp3';
+    final String outPath;
+    if (_outputPathOverride != null) {
+      // В тестах используем переданный путь вместо getTemporaryDirectory
+      outPath = _outputPathOverride;
+    } else {
+      final tmpDir = (await getTemporaryDirectory()).path;
+      outPath = '$tmpDir/ezctx_norm_${DateTime.now().millisecondsSinceEpoch}.mp3';
+    }
 
     // Конвертация в mp3 32k/16kHz/Mono: оптимальный баланс качества и размера для ASR
     final command =

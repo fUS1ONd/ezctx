@@ -130,7 +130,7 @@ void main() {
       expect(chunks.length, equals(1));
     });
 
-    test('ffmpeg-команда содержит правильные параметры кодирования', () async {
+    test('ffmpeg-команда содержит -c:a copy и segment_time 4500 (нормализованный вход)', () async {
       final outDir = await _tmpDir();
       addTearDown(() => outDir.deleteSync(recursive: true));
 
@@ -143,11 +143,8 @@ void main() {
 
       expect(capturedCommand, isNotNull);
       expect(capturedCommand, contains('-f segment'));
-      expect(capturedCommand, contains('-segment_time 1200'));
-      expect(capturedCommand, contains('-c:a libmp3lame'));
-      expect(capturedCommand, contains('-b:a 128k'));
-      expect(capturedCommand, contains('-ac 1'));
-      expect(capturedCommand, contains('-ar 16000'));
+      expect(capturedCommand, contains('-segment_time 4500'));
+      expect(capturedCommand, contains('-c:a copy'));
       expect(capturedCommand, contains('chunk_%03d.mp3'));
     });
 
