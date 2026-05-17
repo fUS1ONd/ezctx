@@ -60,12 +60,6 @@ class _ResultScreenState extends State<ResultScreen> {
     Future.delayed(const Duration(milliseconds: 1500), () {
       if (mounted) setState(() => _copied = false);
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Скопировано'),
-        duration: Duration(seconds: 1),
-      ),
-    );
   }
 
   @override

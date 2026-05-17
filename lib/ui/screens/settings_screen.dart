@@ -64,8 +64,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       semanticLabel: 'Назад',
                       onPressed: () => Navigator.pop(context),
                     ),
-                    const SizedBox(width: AppSpacing.sm),
-                    const Text('Настройки', style: AppTextStyles.heading),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.xl),

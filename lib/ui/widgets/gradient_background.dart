@@ -10,6 +10,7 @@ class GradientBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Stack(
+      fit: StackFit.expand,
       children: [
         // Базовый линейный градиент (нижний слой)
         Positioned.fill(

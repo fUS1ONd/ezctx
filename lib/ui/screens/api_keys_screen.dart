@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants/design_tokens.dart';
 import '../../core/error/app_exception.dart';
@@ -61,10 +62,6 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
       await _repository.addKey(_inputController.text);
       _inputController.clear();
       await _loadKeys();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ключ сохранён')),
-      );
     } on ValidationException catch (e) {
       setState(() => _errorMessage = e.message);
     } catch (_) {
@@ -244,17 +241,16 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
                 const SizedBox(height: AppSpacing.md),
                 // Footer
                 GestureDetector(
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Откройте https://console.groq.com/keys в браузере'),
-                      ),
-                    );
-                  },
+                  onTap: () => launchUrl(
+                    Uri.parse('https://console.groq.com/keys'),
+                    mode: LaunchMode.externalApplication,
+                  ),
                   child: Text(
                     'Получить ключ на console.groq.com',
                     style: AppTextStyles.label.copyWith(
                       color: AppColors.accent,
+                      decoration: TextDecoration.underline,
+                      decorationColor: AppColors.accent,
                     ),
                   ),
                 ),

@@ -134,7 +134,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: AppSpacing.xxl),
                 // Upload card / file preview
-                GestureDetector(
+                SizedBox(
+                  width: double.infinity,
+                  child: GestureDetector(
                   onTap: _picking ? null : _onUploadTap,
                   child: GlassTile(
                     padding: const EdgeInsets.all(AppSpacing.lg),
@@ -142,6 +144,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ? _buildEmptyCard()
                         : _buildFilePreview(_selectedFile!),
                   ),
+                ),
                 ),
                 // Сообщение об ошибке
                 if (_errorMessage != null) ...[
