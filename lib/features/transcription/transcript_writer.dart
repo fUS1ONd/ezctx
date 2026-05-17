@@ -27,6 +27,10 @@ class TranscriptWriter {
     var n = name;
     final dotIdx = n.lastIndexOf('.');
     if (dotIdx > 0) n = n.substring(0, dotIdx);
-    return n.replaceAll(RegExp(r'[^\w\-\. ]+'), '_').trim();
+    // Заменяем небезопасные символы (в том числе точки, которые могут создать скрытые файлы).
+    n = n.replaceAll(RegExp(r'[^\w\- ]+'), '_').trim();
+    // Если имя после очистки пустое — используем имя по умолчанию.
+    if (n.isEmpty) n = 'transcript';
+    return n;
   }
 }
