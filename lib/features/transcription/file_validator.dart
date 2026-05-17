@@ -13,7 +13,9 @@ class FileValidationResult {
 }
 
 /// Чистая функция валидации аудиофайла.
-/// Проверяет whitelist расширений и размер. Нет I/O, нет state.
+/// Проверяет whitelist расширений и минимальный размер (> 0 байт).
+/// Ограничение максимального размера снято в Phase 2: chunking-пайплайн
+/// обрабатывает файлы любого размера через нарезку на чанки ≤ 19 МБ.
 class FileValidator {
   const FileValidator();
 
@@ -27,9 +29,10 @@ class FileValidator {
         'Формат файла не поддерживается. Выберите mp3, wav, m4a, ogg или flac.',
       );
     }
-    if (sizeBytes > AppConstants.maxFileSizeBytes) {
+    // Минимальный размер: файл не должен быть пустым.
+    if (sizeBytes <= 0) {
       return const FileValidationResult._error(
-        'Файл слишком большой (максимум 19 МБ). Поддержка больших файлов — в следующем обновлении.',
+        'Файл пустой или недоступен. Выберите другой файл.',
       );
     }
     return const FileValidationResult._ok();

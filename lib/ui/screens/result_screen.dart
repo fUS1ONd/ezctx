@@ -105,7 +105,7 @@ class _ResultScreenState extends State<ResultScreen> {
                 Text(file.name, style: AppTextStyles.heading),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
-                  '${file.sizeFormatted} · ${file.extension.toUpperCase()} · ${r.duration.toStringAsFixed(1)} сек',
+                  '${file.sizeFormatted} · ${file.extension.toUpperCase()} · ${_formatDuration(r.duration)}',
                   style: AppTextStyles.mono,
                 ),
                 const SizedBox(height: AppSpacing.lg),
@@ -163,5 +163,18 @@ class _ResultScreenState extends State<ResultScreen> {
     final hh = n.hour.toString().padLeft(2, '0');
     final mm = n.minute.toString().padLeft(2, '0');
     return 'Сегодня · $hh:$mm';
+  }
+
+  /// Форматирует секунды в человекочитаемую строку.
+  /// Для chunked-результата duration — сумма длительностей чанков.
+  /// Примеры: 45.2 → «45с», 125.0 → «2мин 5с», 3725.0 → «1ч 2мин».
+  String _formatDuration(double seconds) {
+    final total = seconds.toInt();
+    final h = total ~/ 3600;
+    final m = (total % 3600) ~/ 60;
+    final s = total % 60;
+    if (h > 0) return '${h}ч ${m}мин';
+    if (m > 0) return '${m}мин ${s}с';
+    return '${s}с';
   }
 }
