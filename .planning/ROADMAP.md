@@ -10,11 +10,12 @@
 
 - [ ] **Phase 1: Walking Skeleton (Short Audio → Clipboard)** — Минимальный end-to-end слайс: пользователь импортирует короткий (<19 MB) аудиофайл, получает текст на экране и копирует в буфер.
 - [ ] **Phase 2: Real Lectures (Chunking & Progress)** — Большие файлы (>19 MB) режутся ffmpeg-ом, отправляются параллельно, пользователь видит прогресс.
-- [ ] **Phase 3: Multi-Key Pool & Rate-Limit UI** — Пул из нескольких Groq-ключей с round-robin, авто-блокировкой и видимым в UI статусом/квотой.
-- [ ] **Phase 4: Model & Language Controls** — Переключатель large-v3 / turbo и селектор языка распознавания.
-- [ ] **Phase 5: Output Formats & Sharing** — SRT с таймкодами + share intent в Telegram/GPT/заметки.
-- [ ] **Phase 6: History** — Локальный список ранее расшифрованных лекций с возможностью повторного открытия и удаления.
-- [ ] **Phase 7: Error Handling & Onboarding Polish** — Onboarding без ключей, понятные сетевые ошибки с retry, ожидание разблокировки ключей с обратным отсчётом.
+- [ ] **Phase 3: Audio Normalization (Pre-Transcription)** — Любой аудиоформат конвертируется в 32 kbps / 16 kHz / Mono mp3 перед чанкованием; isChunked определяется по длительности нормализованного файла.
+- [ ] **Phase 4: Multi-Key Pool & Rate-Limit UI** — Пул из нескольких Groq-ключей с round-robin, авто-блокировкой и видимым в UI статусом/квотой.
+- [ ] **Phase 5: Model & Language Controls** — Переключатель large-v3 / turbo и селектор языка распознавания.
+- [ ] **Phase 6: Output Formats & Sharing** — SRT с таймкодами + share intent в Telegram/GPT/заметки.
+- [ ] **Phase 7: History** — Локальный список ранее расшифрованных лекций с возможностью повторного открытия и удаления.
+- [ ] **Phase 8: Error Handling & Onboarding Polish** — Onboarding без ключей, понятные сетевые ошибки с retry, ожидание разблокировки ключей с обратным отсчётом.
 
 ## Phase Details
 
@@ -82,11 +83,29 @@ Plans:
 
 **UI hint:** yes
 
-### Phase 3: Multi-Key Pool & Rate-Limit UI
+### Phase 3: Audio Normalization (Pre-Transcription)
+
+**Goal:** Любой аудиоформат (mp3, m4a, ogg, wav, flac, webm, mp4, mpeg, mpga) нормализуется в 32 kbps / 16 kHz / Mono mp3 перед чанкованием; isChunked определяется по длительности нормализованного файла; UI показывает «Подготовка аудио…» во время конвертации.
+**Mode:** mvp
+**Depends on:** Phase 2
+**Requirements:** TRANS-04, TRANS-05
+
+**Success Criteria** (what must be TRUE):
+
+  1. Любой файл из поддерживаемых форматов (mp3/m4a/ogg/wav/flac/webm/mp4/mpeg/mpga) успешно конвертируется в 32 kbps / 16 kHz / Mono mp3 через ffmpeg без ошибок.
+  2. isChunked вычисляется на основе **длительности** нормализованного файла (порог ≈ 80 мин = ~19 MB при 32 kbps), а не по исходному размеру файла.
+  3. Нормализация выполняется **всегда** (и для коротких, и для длинных файлов) как первый шаг pipeline до определения пути (single-shot / chunked).
+  4. UI показывает индикатор «Подготовка аудио…» пока идёт ffmpeg-конвертация; после завершения переходит к прогрессу чанков (или single-shot).
+  5. 35 MB OGG-лекция длительностью < 80 мин успешно разбивается на корректные чанки и полностью расшифровывается через Groq.
+
+**Plans:** TBD
+**UI hint:** yes
+
+### Phase 4: Multi-Key Pool & Rate-Limit UI
 
 **Goal:** Пользователь добавляет несколько Groq-ключей и видит, какие из них активны / заблокированы / сколько квоты осталось; пул сам ротирует ключи и переживает 429.
 **Mode:** mvp
-**Depends on:** Phase 2
+**Depends on:** Phase 3
 **Requirements:** KEYS-03, KEYS-04, KEYS-05, TRANS-01, TRANS-02
 **Success Criteria** (what must be TRUE):
 
@@ -99,11 +118,11 @@ Plans:
 **Plans:** TBD
 **UI hint:** yes
 
-### Phase 4: Model & Language Controls
+### Phase 5: Model & Language Controls
 
 **Goal:** Пользователь может выбрать между качеством (`large-v3`) и скоростью (`large-v3-turbo`) и явно задать язык распознавания для повышения точности на русском.
 **Mode:** mvp
-**Depends on:** Phase 3
+**Depends on:** Phase 4
 **Requirements:** OPTS-01, OPTS-02, OPTS-03
 **Success Criteria** (what must be TRUE):
 
@@ -115,11 +134,11 @@ Plans:
 **Plans:** TBD
 **UI hint:** yes
 
-### Phase 5: Output Formats & Sharing
+### Phase 6: Output Formats & Sharing
 
 **Goal:** Кроме сырого txt пользователь получает субтитровый файл `transcript.srt` и может отправить расшифровку в Telegram/GPT/заметки одним тапом.
 **Mode:** mvp
-**Depends on:** Phase 4
+**Depends on:** Phase 5
 **Requirements:** OUT-01, OUT-04
 **Success Criteria** (what must be TRUE):
 
@@ -131,11 +150,11 @@ Plans:
 **Plans:** TBD
 **UI hint:** yes
 
-### Phase 6: History
+### Phase 7: History
 
 **Goal:** Пользователь возвращается к ранее расшифрованным лекциям из главного экрана без повторного прогона через Groq.
 **Mode:** mvp
-**Depends on:** Phase 5
+**Depends on:** Phase 6
 **Requirements:** HIST-01, HIST-02, HIST-03, HIST-04
 **Success Criteria** (what must be TRUE):
 
@@ -147,11 +166,11 @@ Plans:
 **Plans:** TBD
 **UI hint:** yes
 
-### Phase 7: Error Handling & Onboarding Polish
+### Phase 8: Error Handling & Onboarding Polish
 
 **Goal:** Приложение ведёт нового пользователя за руку и понятно объясняет любую ошибку — APK готов к раздаче через Firebase App Distribution.
 **Mode:** mvp
-**Depends on:** Phase 6
+**Depends on:** Phase 7
 **Requirements:** ERR-01, ERR-02, ERR-03
 **Success Criteria** (what must be TRUE):
 
@@ -167,13 +186,14 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Walking Skeleton (Short Audio → Clipboard) | 0/5 | Not started | - |
-| 2. Real Lectures (Chunking & Progress) | 0/? | Not started | - |
-| 3. Multi-Key Pool & Rate-Limit UI | 0/? | Not started | - |
-| 4. Model & Language Controls | 0/? | Not started | - |
-| 5. Output Formats & Sharing | 0/? | Not started | - |
-| 6. History | 0/? | Not started | - |
-| 7. Error Handling & Onboarding Polish | 0/? | Not started | - |
+| 1. Walking Skeleton (Short Audio → Clipboard) | 5/5 | Complete | 2026-05-17 |
+| 2. Real Lectures (Chunking & Progress) | 4/4 | Complete | 2026-05-17 |
+| 3. Audio Normalization (Pre-Transcription) | 0/? | Not started | - |
+| 4. Multi-Key Pool & Rate-Limit UI | 0/? | Not started | - |
+| 5. Model & Language Controls | 0/? | Not started | - |
+| 6. Output Formats & Sharing | 0/? | Not started | - |
+| 7. History | 0/? | Not started | - |
+| 8. Error Handling & Onboarding Polish | 0/? | Not started | - |
 
 ## Rebalancing Notes
 
