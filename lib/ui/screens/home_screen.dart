@@ -7,7 +7,10 @@ import '../../core/constants/design_tokens.dart';
 import '../../core/error/app_exception.dart';
 import '../../core/storage/secure_storage_service.dart';
 import '../../features/settings/api_key_repository.dart';
+import '../../features/transcription/audio_chunking_service.dart';
+import '../../features/transcription/audio_metadata.dart';
 import '../../features/transcription/file_picker_service.dart';
+import '../../features/transcription/processing_args.dart';
 import '../../features/transcription/selected_audio_file.dart';
 import '../widgets/glass_icon_btn.dart';
 import '../widgets/glass_tile.dart';
@@ -27,6 +30,8 @@ class _HomeScreenState extends State<HomeScreen> {
   final ApiKeyRepository _repository = ApiKeyRepository(SecureStorageServiceImpl());
 
   SelectedAudioFile? _selectedFile;
+  AudioMetadata? _metadata;
+  bool _loadingMetadata = false;
   String? _errorMessage;
   bool _picking = false;
 
@@ -40,7 +45,14 @@ class _HomeScreenState extends State<HomeScreen> {
       final result = await const FilePickerService().pickAudioFile();
       switch (result) {
         case FilePickPicked(file: final f):
-          if (mounted) setState(() => _selectedFile = f);
+          if (mounted) {
+            setState(() {
+              _selectedFile = f;
+              _metadata = null;
+              _loadingMetadata = false;
+            });
+            _loadMetadata(f);
+          }
         case FilePickCancelled():
           break;
       }
@@ -50,6 +62,21 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) setState(() => _errorMessage = 'Не удалось открыть файл');
     } finally {
       if (mounted) setState(() => _picking = false);
+    }
+  }
+
+  /// Асинхронно загружает метаданные файла через ffprobe.
+  /// Тихо обрабатывает ошибки — карточка показывается без длительности.
+  Future<void> _loadMetadata(SelectedAudioFile file) async {
+    if (!mounted) return;
+    setState(() => _loadingMetadata = true);
+    try {
+      final meta = await AudioChunkingService().getMetadata(file.path);
+      if (mounted) setState(() => _metadata = meta);
+    } catch (_) {
+      // Тихо: если ffprobe не удался, метаданные показываем без длительности.
+    } finally {
+      if (mounted) setState(() => _loadingMetadata = false);
     }
   }
 
@@ -87,7 +114,7 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.pushNamed(
       context,
       AppConstants.routeProcessing,
-      arguments: _selectedFile,
+      arguments: ProcessingArgs(file: _selectedFile!, metadata: _metadata),
     );
   }
 
@@ -262,10 +289,32 @@ class _HomeScreenState extends State<HomeScreen> {
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: AppSpacing.xs),
-              Text(
-                '${file.sizeFormatted} · ${file.extension.toUpperCase()}',
-                style: AppTextStyles.label,
-              ),
+              // Подстрока с размером и длительностью / индикатором загрузки.
+              if (_loadingMetadata)
+                Row(
+                  children: [
+                    Text(
+                      '${file.sizeFormatted} · ${file.extension.toUpperCase()}',
+                      style: AppTextStyles.label,
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    const SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(strokeWidth: 1.5),
+                    ),
+                  ],
+                )
+              else if (_metadata != null)
+                Text(
+                  '${_metadata!.sizeFormatted} · ${_metadata!.durationFormatted}',
+                  style: AppTextStyles.label,
+                )
+              else
+                Text(
+                  '${file.sizeFormatted} · ${file.extension.toUpperCase()}',
+                  style: AppTextStyles.label,
+                ),
             ],
           ),
         ),

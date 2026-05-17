@@ -6,10 +6,14 @@ import '../../core/constants/app_constants.dart';
 import '../../core/constants/design_tokens.dart';
 import '../../core/storage/secure_storage_service.dart';
 import '../../features/settings/api_key_repository.dart';
+import '../../features/transcription/audio_chunking_service.dart';
+import '../../features/transcription/chunked_transcription_controller.dart';
 import '../../features/transcription/groq_api_service.dart';
+import '../../features/transcription/processing_args.dart';
 import '../../features/transcription/result_args.dart';
 import '../../features/transcription/selected_audio_file.dart';
 import '../../features/transcription/transcription_controller.dart';
+import '../widgets/chunk_tile.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_icon_btn.dart';
 import '../widgets/glass_tile.dart';
@@ -28,6 +32,13 @@ class ProcessingScreen extends StatefulWidget {
 class _ProcessingScreenState extends State<ProcessingScreen>
     with SingleTickerProviderStateMixin {
   late final TranscriptionController _controller;
+
+  /// Контроллер для chunked-режима (большие файлы ≥ 19 МБ).
+  ChunkedTranscriptionController? _chunkedController;
+
+  /// true — файл ≥ 19 МБ, используется chunked-режим.
+  bool _isChunked = false;
+
   SelectedAudioFile? _file;
   DateTime? _startedAt;
   Timer? _ticker;
@@ -71,21 +82,66 @@ class _ProcessingScreenState extends State<ProcessingScreen>
     super.didChangeDependencies();
     if (_file == null) {
       final args = ModalRoute.of(context)?.settings.arguments;
-      if (args is SelectedAudioFile) {
-        _file = args;
+
+      SelectedAudioFile? file;
+      if (args is ProcessingArgs) {
+        file = args.file;
+        _isChunked = args.isChunked;
+      } else if (args is SelectedAudioFile) {
+        // Обратная совместимость — старый путь без ProcessingArgs.
+        file = args;
+        _isChunked = false;
+      }
+
+      if (file != null) {
+        _file = file;
         _startedAt = DateTime.now();
         _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
           if (mounted) {
             setState(() => _elapsed = DateTime.now().difference(_startedAt!));
           }
         });
-        _controller.start(_file!);
+
+        if (_isChunked) {
+          // Chunked-режим: создаём ChunkedTranscriptionController.
+          _chunkedController = ChunkedTranscriptionController(
+            keyRepository: ApiKeyRepository(SecureStorageServiceImpl()),
+            apiService: GroqApiService(),
+            chunkingService: AudioChunkingService(),
+          );
+          _chunkedController!.addListener(_onChunkedStateChange);
+          _chunkedController!.start(_file!);
+        } else {
+          // Стандартный режим: TranscriptionController (Phase 1 путь).
+          _controller.start(_file!);
+        }
       } else {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) Navigator.popUntil(context, (r) => r.isFirst);
         });
       }
     }
+  }
+
+  /// Callback при изменении состояния ChunkedTranscriptionController.
+  void _onChunkedStateChange() {
+    final s = _chunkedController?.state;
+    if (s is ChunkedSuccess) {
+      _ticker?.cancel();
+      if (mounted) {
+        setState(() {});
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (mounted) {
+            Navigator.pushReplacementNamed(
+              context,
+              AppConstants.routeResult,
+              arguments: ResultArgs(file: _file!, result: s.result),
+            );
+          }
+        });
+      }
+    }
+    if (mounted) setState(() {});
   }
 
   void _onStateChange() {
@@ -128,6 +184,8 @@ class _ProcessingScreenState extends State<ProcessingScreen>
     _pulseController.dispose();
     _controller.removeListener(_onStateChange);
     _controller.dispose();
+    _chunkedController?.removeListener(_onChunkedStateChange);
+    _chunkedController?.dispose();
     super.dispose();
   }
 
@@ -139,6 +197,12 @@ class _ProcessingScreenState extends State<ProcessingScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Chunked-режим: показываем отдельный экран прогресса по чанкам.
+    if (_isChunked && _chunkedController != null) {
+      return _buildChunkedScaffold(_chunkedController!.state);
+    }
+
+    // Стандартный режим (Phase 1 путь).
     final state = _controller.state;
     final isLoading = state is TranscriptionLoading;
     final isError = state is TranscriptionError;
@@ -261,6 +325,180 @@ class _ProcessingScreenState extends State<ProcessingScreen>
         ),
       ),
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Chunked-режим UI
+  // ---------------------------------------------------------------------------
+
+  /// Scaffold для chunked-режима (файл ≥ 19 МБ).
+  Widget _buildChunkedScaffold(ChunkedState state) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: GradientBackground(
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: AppSpacing.md),
+                // Шапка
+                Row(
+                  children: [
+                    GlassIconBtn(
+                      icon: Icons.close,
+                      semanticLabel: 'Закрыть',
+                      onPressed: () =>
+                          Navigator.popUntil(context, (r) => r.isFirst),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    const Text('Обработка', style: AppTextStyles.heading),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xl),
+
+                // Карточка файла
+                if (_file != null) _buildFileCard(_file!),
+
+                const SizedBox(height: AppSpacing.lg),
+
+                // Тело по состоянию chunked-контроллера
+                Expanded(child: _buildChunkedBody(state)),
+
+                // Безопасный нижний отступ
+                SizedBox(height: MediaQuery.of(context).padding.bottom + 32),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Карточка файла (общая для chunked и single режима).
+  Widget _buildFileCard(SelectedAudioFile file) {
+    return GlassTile(
+      child: Row(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              gradient: AppGradients.accent,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(Icons.audiotrack, color: Colors.white, size: 28),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  file.name,
+                  style: AppTextStyles.heading,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  '${file.sizeFormatted} · ${file.extension.toUpperCase()}',
+                  style: AppTextStyles.label,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Тело chunked-экрана в зависимости от [state].
+  Widget _buildChunkedBody(ChunkedState state) {
+    return switch (state) {
+      ChunkedIdle() => const SizedBox.shrink(),
+
+      ChunkedSplitting() => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const ShimmerBar(),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              'Разбиваем на чанки...',
+              style: AppTextStyles.body.copyWith(color: AppColors.inkSecondary),
+            ),
+          ],
+        ),
+
+      ChunkedProcessing(:final chunks, :final completedCount, :final totalCount) =>
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Прогресс-бар
+            ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+              child: LinearProgressIndicator(
+                value: totalCount == 0 ? 0.0 : completedCount / totalCount,
+                minHeight: 6,
+                backgroundColor: AppColors.inkDivider,
+                color: AppColors.accent,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              '$completedCount из $totalCount чанков готово',
+              style: AppTextStyles.label,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            // Список плиток чанков — shrinkWrap, т.к. Column уже внутри Expanded
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: chunks.length,
+              itemBuilder: (context, i) => ChunkTile(state: chunks[i]),
+            ),
+          ],
+        ),
+
+      ChunkedSuccess() => const SizedBox.shrink(), // навигация выполняется в _onChunkedStateChange
+
+      ChunkedError(:final message, :final retryable) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              message,
+              style: AppTextStyles.label.copyWith(color: AppColors.bad),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            if (retryable && _file != null)
+              PrimaryButton(
+                label: 'Повторить',
+                onPressed: () => _chunkedController?.start(_file!),
+              ),
+            const SizedBox(height: AppSpacing.sm),
+            TextButton(
+              onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
+              child: const Text('Назад'),
+            ),
+          ],
+        ),
+
+      ChunkedMissingKey() => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Добавьте API-ключ Groq для начала транскрибации',
+              style: AppTextStyles.label.copyWith(color: AppColors.bad),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            PrimaryButton(
+              label: 'Перейти в настройки',
+              onPressed: () =>
+                  Navigator.pushNamed(context, AppConstants.routeApiKeys),
+            ),
+          ],
+        ),
+    };
   }
 
   Widget _buildPipelineStep({
