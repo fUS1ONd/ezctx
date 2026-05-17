@@ -46,8 +46,9 @@ class AudioNormalizationService {
     final command =
         '-i "$inputPath" -b:a 32k -ac 1 -ar 16000 -codec:a libmp3lame -y "$outPath"';
 
-    if (_ffmpegOverride != null) {
-      await _ffmpegOverride!(command);
+    final ffmpegOverride = _ffmpegOverride;
+    if (ffmpegOverride != null) {
+      await ffmpegOverride(command);
     } else {
       // Оборачиваем асинхронный executeAsync в Completer
       final completer = Completer<void>();
