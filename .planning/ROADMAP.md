@@ -115,7 +115,21 @@ Plans:
   4. Для каждого ключа в UI видны: статус (активен / заблокирован до HH:MM:SS) и остаток квоты, если он есть в заголовках Groq; индикатор обновляется в реальном времени.
   5. Часовая лекция, которая упёрлась бы в лимит одного ключа, успешно расшифровывается на двух ключах без вмешательства пользователя.
 
-**Plans:** TBD
+**Plans:** 3 plans
+Plans:
+
+**Wave 1** *(параллельно)*
+
+- [ ] 04-01-PLAN.md — GroqKeyPool core: test stubs + AllKeysBlockedException + RateLimitException.retryAfterSeconds + GroqKeyPool ChangeNotifier + парсинг заголовков в GroqApiService
+
+**Wave 2** *(заблокировано до Wave 1)*
+
+- [ ] 04-02-PLAN.md — Controller migration: ChunkedTranscriptionController + TranscriptionController на pool.acquireKey() + wire-up в main.dart
+
+**Wave 3** *(заблокировано до Wave 2)*
+
+- [ ] 04-03-PLAN.md — UI: KeyStatusTile + ApiKeysScreen ListenableBuilder + pool sync + checkpoint на устройстве
+
 **UI hint:** yes
 
 ### Phase 5: Model & Language Controls
@@ -189,7 +203,7 @@ Plans:
 | 1. Walking Skeleton (Short Audio → Clipboard) | 5/5 | Complete | 2026-05-17 |
 | 2. Real Lectures (Chunking & Progress) | 4/4 | Complete | 2026-05-17 |
 | 3. Audio Normalization (Pre-Transcription) | 0/? | Not started | - |
-| 4. Multi-Key Pool & Rate-Limit UI | 0/? | Not started | - |
+| 4. Multi-Key Pool & Rate-Limit UI | 0/3 | Planned | - |
 | 5. Model & Language Controls | 0/? | Not started | - |
 | 6. Output Formats & Sharing | 0/? | Not started | - |
 | 7. History | 0/? | Not started | - |
