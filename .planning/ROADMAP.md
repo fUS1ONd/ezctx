@@ -67,7 +67,19 @@ Plans:
   4. Транзиентные сетевые ошибки и 524 от Groq автоматически ретраятся с экспоненциальной задержкой без потери чанка.
   5. По завершении расшифровка собирается из всех чанков с корректными таймкодами (offset = `index * chunk_duration`); промежуточные mp3-чанки удаляются из tmp.
 
-**Plans:** TBD
+**Plans:** 4 plans
+Plans:
+
+**Wave 1** *(параллельно)*
+
+- [ ] 02-01-PLAN.md — AudioChunkingService: ffprobe-метаданные + ffmpeg-разбивка на чанки
+- [ ] 02-02-PLAN.md — ChunkedTranscriptionController: параллельность + retry + сборка таймкодов
+
+**Wave 2** *(заблокировано до Wave 1)*
+
+- [ ] 02-03-PLAN.md — UI: карточка метаданных + ChunkedProcessingScreen с прогрессом по чанкам
+- [ ] 02-04-PLAN.md — Интеграция: маршрутизация + ResultScreen таймкоды + e2e тест
+
 **UI hint:** yes
 
 ### Phase 3: Multi-Key Pool & Rate-Limit UI
