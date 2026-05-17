@@ -24,6 +24,64 @@ class GroqApiService {
   static const _networkErrorMessage =
       'Не удалось подключиться к Groq. Проверьте интернет и попробуйте снова.';
 
+  /// Транскрибация одного чанка из байт. Используется в Phase 2 чанкованием.
+  /// Бросает [AuthException] / [NetworkException] / [RateLimitException] / [InternalException].
+  Future<TranscriptionResult> transcribeChunk({
+    required List<int> bytes,
+    required String filename,
+    required String apiKey,
+  }) async {
+    final client = _clientFactory();
+    try {
+      final uri = Uri.parse(AppConstants.groqApiUrl);
+      final request = http.MultipartRequest('POST', uri)
+        ..headers['Authorization'] = 'Bearer $apiKey'
+        ..fields['model'] = AppConstants.groqDefaultModel
+        ..fields['response_format'] = AppConstants.groqResponseFormat
+        // Запрашиваем word-level и segment-level таймкоды для сборки по чанкам.
+        ..fields['timestamp_granularities[]'] =
+            AppConstants.groqTimestampGranularity
+        ..fields['timestamp_granularities[1]'] = 'segment'
+        ..files.add(
+          http.MultipartFile.fromBytes('file', bytes, filename: filename),
+        );
+
+      final streamed = await client.send(request).timeout(
+        const Duration(minutes: 5),
+        onTimeout: () {
+          client.close();
+          throw const NetworkException('Превышено время ожидания ответа от Groq');
+        },
+      );
+      final response = await http.Response.fromStream(streamed);
+
+      if (response.statusCode == 200) {
+        try {
+          final json = jsonDecode(response.body) as Map<String, dynamic>;
+          return TranscriptionResult.fromJson(json);
+        } catch (_) {
+          throw const InternalException('Не удалось разобрать ответ Groq');
+        }
+      }
+      if (response.statusCode == 401) throw const AuthException(_authErrorMessage);
+      if (response.statusCode == 429) {
+        throw const RateLimitException('Превышен лимит запросов Groq');
+      }
+      // 5xx, 524 и прочие
+      throw const NetworkException(_networkErrorMessage);
+    } on SocketException {
+      throw const NetworkException(_networkErrorMessage);
+    } on TimeoutException {
+      throw const NetworkException(_networkErrorMessage);
+    } on AppException {
+      rethrow;
+    } catch (_) {
+      throw const NetworkException(_networkErrorMessage);
+    } finally {
+      client.close();
+    }
+  }
+
   /// Single-shot транскрибация. Бросает [AuthException]/[NetworkException]/[InternalException].
   Future<TranscriptionResult> transcribe({
     required SelectedAudioFile file,
