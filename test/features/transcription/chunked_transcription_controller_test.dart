@@ -425,7 +425,7 @@ void main() {
     // -----------------------------------------------------------------------
     // 5. Сборка таймкодов.
     // -----------------------------------------------------------------------
-    test('таймкоды: chunk 0 → [00:00:00], chunk 1 offset 1200s → [00:20:00]', () async {
+    test('таймкоды: chunk 0 → [00:00:00], chunk 1 offset 4500s → [01:15:00]', () async {
       final chunks = [
         _FakeChunkFile('/tmp/chunk_000.mp3'),
         _FakeChunkFile('/tmp/chunk_001.mp3'),
@@ -477,8 +477,8 @@ void main() {
       final text = (ctrl.state as ChunkedSuccess).result.text;
 
       expect(text, contains('[00:00:00]'));
-      expect(text, contains('[00:20:00]'));
-      expect(text, contains('[00:20:05]'));
+      expect(text, contains('[01:15:00]'));
+      expect(text, contains('[01:15:05]'));
     });
 
     // -----------------------------------------------------------------------
