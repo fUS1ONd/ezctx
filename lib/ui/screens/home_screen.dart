@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_constants.dart';
@@ -133,18 +135,21 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: AppTextStyles.body.copyWith(color: AppColors.inkSecondary),
                 ),
                 const SizedBox(height: AppSpacing.xxl),
-                // Upload card / file preview
+                // Upload card / file preview — ConstrainedBox гарантирует minHeight=260
                 SizedBox(
                   width: double.infinity,
                   child: GestureDetector(
-                  onTap: _picking ? null : _onUploadTap,
-                  child: GlassTile(
-                    padding: const EdgeInsets.all(AppSpacing.lg),
-                    child: _selectedFile == null
-                        ? _buildEmptyCard()
-                        : _buildFilePreview(_selectedFile!),
+                    onTap: _picking ? null : _onUploadTap,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 260),
+                      child: GlassTile(
+                        padding: const EdgeInsets.all(AppSpacing.lg),
+                        child: _selectedFile == null
+                            ? _buildEmptyCard()
+                            : _buildFilePreview(_selectedFile!),
+                      ),
+                    ),
                   ),
-                ),
                 ),
                 // Сообщение об ошибке
                 if (_errorMessage != null) ...[
@@ -177,6 +182,17 @@ class _HomeScreenState extends State<HomeScreen> {
         Stack(
           alignment: Alignment.center,
           children: [
+            // Пунктирная рамка accent-цвета вокруг иконки загрузки
+            CustomPaint(
+              painter: _DashedBorderPainter(
+                color: AppColors.accent.withValues(alpha: 0.55),
+                strokeWidth: 1.5,
+                dashWidth: 6,
+                gapWidth: 4,
+                borderRadius: 26,
+              ),
+              child: const SizedBox(width: 88, height: 88),
+            ),
             Container(
               width: 72,
               height: 72,
@@ -201,6 +217,22 @@ class _HomeScreenState extends State<HomeScreen> {
           'mp3, wav, m4a, ogg, flac · до 19 МБ',
           style: AppTextStyles.label,
           textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        // Pill-метка «Из файлов» под подсказкой о форматах
+        Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.xs,
+          ),
+          decoration: BoxDecoration(
+            color: AppColors.accent.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.all(Radius.circular(AppRadius.pill)),
+          ),
+          child: Text(
+            'Из файлов',
+            style: AppTextStyles.label.copyWith(color: AppColors.accent),
+          ),
         ),
       ],
     );
@@ -243,5 +275,60 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ],
     );
+  }
+}
+
+/// CustomPainter для пунктирной рамки с заданным радиусом скругления.
+/// Рисует пунктир accent-цвета вокруг прямоугольника с rounded corners.
+class _DashedBorderPainter extends CustomPainter {
+  const _DashedBorderPainter({
+    required this.color,
+    required this.strokeWidth,
+    required this.dashWidth,
+    required this.gapWidth,
+    required this.borderRadius,
+  });
+
+  final Color color;
+  final double strokeWidth;
+  final double dashWidth;
+  final double gapWidth;
+  final double borderRadius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    // Путь вокруг скруглённого прямоугольника
+    final rrect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      Radius.circular(borderRadius),
+    );
+
+    final path = Path()..addRRect(rrect);
+
+    // Вычисляем общую длину контура и рисуем пунктир
+    final metrics = path.computeMetrics().toList();
+    for (final metric in metrics) {
+      double distance = 0;
+      while (distance < metric.length) {
+        final end = math.min(distance + dashWidth, metric.length);
+        canvas.drawPath(metric.extractPath(distance, end), paint);
+        distance += dashWidth + gapWidth;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedBorderPainter oldDelegate) {
+    return oldDelegate.color != color ||
+        oldDelegate.strokeWidth != strokeWidth ||
+        oldDelegate.dashWidth != dashWidth ||
+        oldDelegate.gapWidth != gapWidth ||
+        oldDelegate.borderRadius != borderRadius;
   }
 }
