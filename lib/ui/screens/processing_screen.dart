@@ -68,14 +68,33 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
     if (s is TranscriptionSuccess) {
       _ticker?.cancel();
       if (mounted) {
-        Navigator.pushReplacementNamed(
-          context,
-          AppConstants.routeResult,
-          arguments: ResultArgs(file: _file!, result: s.result),
-        );
+        // Показываем "Готово" (done) на 300 мс, затем переходим на экран результата.
+        setState(() {});
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (mounted) {
+            Navigator.pushReplacementNamed(
+              context,
+              AppConstants.routeResult,
+              arguments: ResultArgs(file: _file!, result: s.result),
+            );
+          }
+        });
       }
     }
     if (mounted) setState(() {});
+  }
+
+  /// Перезапускает таймер и транскрибацию при повторной попытке.
+  void _restart() {
+    _ticker?.cancel();
+    setState(() {
+      _elapsed = Duration.zero;
+      _startedAt = DateTime.now();
+    });
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() => _elapsed = DateTime.now().difference(_startedAt!));
+    });
+    _controller.start(_file!);
   }
 
   @override
@@ -194,7 +213,10 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
                       const Divider(height: AppSpacing.lg),
                       _buildPipelineStep(
                         label: 'Готово',
-                        status: _PipelineStatus.pending,
+                        // Отображаем done только при успешном завершении.
+                        status: state is TranscriptionSuccess
+                            ? _PipelineStatus.done
+                            : _PipelineStatus.pending,
                       ),
                     ],
                   ),
@@ -284,7 +306,7 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
           if (state.retryable && _file != null)
             PrimaryButton(
               label: 'Повторить',
-              onPressed: () => _controller.start(_file!),
+              onPressed: _restart,
             ),
           const SizedBox(height: AppSpacing.sm),
           TextButton(
