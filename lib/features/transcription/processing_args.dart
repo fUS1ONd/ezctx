@@ -11,11 +11,4 @@ class ProcessingArgs {
   final AudioMetadata? metadata;
 
   const ProcessingArgs({required this.file, this.metadata});
-
-  /// Файл требует чанкования если его размер ≥ 19 МБ.
-  ///
-  /// Groq API отклоняет одиночные файлы > 19.5 МБ независимо от длительности,
-  /// поэтому проверка идёт по байтам, а не по времени. ffmpeg перекодирует
-  /// файл в 128kbps — результирующий чанк меньше оригинала.
-  bool get isChunked => file.sizeBytes >= 19 * 1024 * 1024;
 }

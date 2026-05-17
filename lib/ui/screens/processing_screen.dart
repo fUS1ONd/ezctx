@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 
@@ -7,8 +8,10 @@ import '../../core/constants/design_tokens.dart';
 import '../../core/storage/secure_storage_service.dart';
 import '../../features/settings/api_key_repository.dart';
 import '../../features/transcription/audio_chunking_service.dart';
+import '../../features/transcription/audio_normalization_service.dart';
 import '../../features/transcription/chunked_transcription_controller.dart';
 import '../../features/transcription/groq_api_service.dart';
+import '../../features/transcription/normalized_audio_file.dart';
 import '../../features/transcription/processing_args.dart';
 import '../../features/transcription/result_args.dart';
 import '../../features/transcription/selected_audio_file.dart';
@@ -36,8 +39,17 @@ class _ProcessingScreenState extends State<ProcessingScreen>
   /// Контроллер для chunked-режима (большие файлы ≥ 19 МБ).
   ChunkedTranscriptionController? _chunkedController;
 
-  /// true — файл ≥ 19 МБ, используется chunked-режим.
+  /// true — длительность нормализованного mp3 > kChunkThresholdSeconds.
   bool _isChunked = false;
+
+  /// true — идёт нормализация аудио.
+  bool _normalizing = false;
+
+  /// Результат нормализации (нормализованный временный файл).
+  NormalizedAudioFile? _normalizedFile;
+
+  /// Ошибка нормализации.
+  String? _normalizationError;
 
   SelectedAudioFile? _file;
   DateTime? _startedAt;
@@ -86,11 +98,9 @@ class _ProcessingScreenState extends State<ProcessingScreen>
       SelectedAudioFile? file;
       if (args is ProcessingArgs) {
         file = args.file;
-        _isChunked = args.isChunked;
       } else if (args is SelectedAudioFile) {
         // Обратная совместимость — старый путь без ProcessingArgs.
         file = args;
-        _isChunked = false;
       }
 
       if (file != null) {
@@ -102,24 +112,60 @@ class _ProcessingScreenState extends State<ProcessingScreen>
           }
         });
 
-        if (_isChunked) {
-          // Chunked-режим: создаём ChunkedTranscriptionController.
-          _chunkedController = ChunkedTranscriptionController(
-            keyRepository: ApiKeyRepository(SecureStorageServiceImpl()),
-            apiService: GroqApiService(),
-            chunkingService: AudioChunkingService(),
-          );
-          _chunkedController!.addListener(_onChunkedStateChange);
-          _chunkedController!.start(_file!);
-        } else {
-          // Стандартный режим: TranscriptionController (Phase 1 путь).
-          _controller.start(_file!);
-        }
+        // Запускаем pipeline через postFrameCallback, чтобы контекст был готов.
+        WidgetsBinding.instance.addPostFrameCallback((_) => _startProcessing());
       } else {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) Navigator.popUntil(context, (r) => r.isFirst);
         });
       }
+    }
+  }
+
+  /// Основной pipeline: нормализация → (chunked | single) транскрибация.
+  Future<void> _startProcessing() async {
+    if (!mounted) return;
+    setState(() {
+      _normalizing = true;
+      _normalizationError = null;
+    });
+
+    try {
+      _normalizedFile = await AudioNormalizationService().normalize(_file!.path);
+      _isChunked =
+          _normalizedFile!.durationSeconds > AppConstants.kChunkThresholdSeconds;
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _normalizing = false;
+        _normalizationError = 'Ошибка подготовки аудио: $e';
+      });
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() => _normalizing = false);
+
+    // Создаём SelectedAudioFile на основе нормализованного файла.
+    final normalizedAudioFile = SelectedAudioFile(
+      path: _normalizedFile!.path,
+      name: _file!.name,
+      sizeBytes: File(_normalizedFile!.path).statSync().size,
+      extension: 'mp3',
+    );
+
+    if (_isChunked) {
+      // Chunked-режим: создаём ChunkedTranscriptionController.
+      _chunkedController = ChunkedTranscriptionController(
+        keyRepository: ApiKeyRepository(SecureStorageServiceImpl()),
+        apiService: GroqApiService(),
+        chunkingService: AudioChunkingService(),
+      );
+      _chunkedController!.addListener(_onChunkedStateChange);
+      _chunkedController!.start(normalizedAudioFile);
+    } else {
+      // Стандартный режим: TranscriptionController.
+      _controller.start(normalizedAudioFile);
     }
   }
 
@@ -165,17 +211,19 @@ class _ProcessingScreenState extends State<ProcessingScreen>
     if (mounted) setState(() {});
   }
 
-  /// Перезапускает таймер и транскрибацию при повторной попытке.
+  /// Перезапускает таймер и pipeline при повторной попытке.
   void _restart() {
     _ticker?.cancel();
     setState(() {
       _elapsed = Duration.zero;
       _startedAt = DateTime.now();
+      _normalizationError = null;
+      _normalizedFile = null;
     });
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() => _elapsed = DateTime.now().difference(_startedAt!));
     });
-    _controller.start(_file!);
+    _startProcessing();
   }
 
   @override
@@ -186,6 +234,12 @@ class _ProcessingScreenState extends State<ProcessingScreen>
     _controller.dispose();
     _chunkedController?.removeListener(_onChunkedStateChange);
     _chunkedController?.dispose();
+    // Удаляем временный нормализованный файл.
+    if (_normalizedFile != null) {
+      try {
+        File(_normalizedFile!.path).deleteSync();
+      } catch (_) {}
+    }
     super.dispose();
   }
 
@@ -204,9 +258,9 @@ class _ProcessingScreenState extends State<ProcessingScreen>
 
     // Стандартный режим (Phase 1 путь).
     final state = _controller.state;
-    final isLoading = state is TranscriptionLoading;
-    final isError = state is TranscriptionError;
-    final isMissingKey = state is TranscriptionMissingKey;
+    final isLoading = _normalizing || state is TranscriptionLoading;
+    final isError = !_normalizing && state is TranscriptionError;
+    final isMissingKey = !_normalizing && state is TranscriptionMissingKey;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -275,9 +329,16 @@ class _ProcessingScreenState extends State<ProcessingScreen>
 
                 const SizedBox(height: AppSpacing.lg),
 
-                // ShimmerBar — виден только при загрузке
+                // ShimmerBar — виден при нормализации или загрузке
                 if (isLoading) ...[
                   const ShimmerBar(),
+                  const SizedBox(height: AppSpacing.sm),
+                  if (_normalizing)
+                    Text(
+                      'Подготовка аудио…',
+                      style: AppTextStyles.body
+                          .copyWith(color: AppColors.inkSecondary),
+                    ),
                   const SizedBox(height: AppSpacing.lg),
                 ],
 
@@ -291,14 +352,27 @@ class _ProcessingScreenState extends State<ProcessingScreen>
                       ),
                       const Divider(height: AppSpacing.lg),
                       _buildPipelineStep(
+                        label: 'Подготовка аудио',
+                        status: _normalizing
+                            ? _PipelineStatus.active
+                            : (_normalizedFile != null
+                                ? _PipelineStatus.done
+                                : (_normalizationError != null
+                                    ? _PipelineStatus.error
+                                    : _PipelineStatus.pending)),
+                      ),
+                      const Divider(height: AppSpacing.lg),
+                      _buildPipelineStep(
                         label: 'Распознавание',
                         status: isError
                             ? _PipelineStatus.error
-                            : isLoading
+                            : (state is TranscriptionLoading
                                 ? _PipelineStatus.active
                                 : isMissingKey
                                     ? _PipelineStatus.pending
-                                    : _PipelineStatus.done,
+                                    : (state is TranscriptionSuccess
+                                        ? _PipelineStatus.done
+                                        : _PipelineStatus.pending)),
                       ),
                       const Divider(height: AppSpacing.lg),
                       _buildPipelineStep(
@@ -314,8 +388,12 @@ class _ProcessingScreenState extends State<ProcessingScreen>
 
                 const Spacer(),
 
+                // Ошибка нормализации
+                if (_normalizationError != null)
+                  _buildNormalizationError(_normalizationError!),
+
                 // Нижняя панель: loading / error / missingKey
-                _buildBottomBar(state),
+                if (_normalizationError == null) _buildBottomBar(state),
 
                 // Безопасный нижний отступ с учётом системной панели навигации
                 SizedBox(height: MediaQuery.of(context).padding.bottom + 32),
@@ -324,6 +402,29 @@ class _ProcessingScreenState extends State<ProcessingScreen>
           ),
         ),
       ),
+    );
+  }
+
+  /// Панель ошибки нормализации с кнопкой «Повторить».
+  Widget _buildNormalizationError(String message) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          message,
+          style: AppTextStyles.label.copyWith(color: AppColors.bad),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        PrimaryButton(
+          label: 'Повторить',
+          onPressed: _restart,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        TextButton(
+          onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
+          child: const Text('Назад'),
+        ),
+      ],
     );
   }
 
