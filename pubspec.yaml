@@ -23,6 +23,18 @@ dev_dependencies:
   mockito: ^5.4.4
   build_runner: ^2.4.13
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.3
 
 flutter:
   uses-material-design: true
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  # Fallback-иконка для старых Android (<8.0) без адаптивных иконок
+  image_path_android: "assets/icon/icon-day.png"
+  # Адаптивная иконка для Android 8.0+ (API 26+)
+  adaptive_icon_foreground: "assets/icon/icon-foreground-day.png"
+  adaptive_icon_background: "assets/icon/icon-background-day.png"
+  # Иконка для уведомлений (монохромная, Android 13+)
+  adaptive_icon_monochrome: "assets/icon/icon-foreground-day.png"
