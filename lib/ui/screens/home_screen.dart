@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/design_tokens.dart';
 import '../../core/error/app_exception.dart';
+import '../../core/storage/secure_storage_service.dart';
+import '../../features/settings/api_key_repository.dart';
 import '../../features/transcription/file_picker_service.dart';
 import '../../features/transcription/selected_audio_file.dart';
 import '../widgets/glass_icon_btn.dart';
@@ -46,10 +48,41 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _onTranscribeTap() {
-    // Plan 04: переход на /processing с передачей _selectedFile.
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Транскрибация — в следующем плане')),
+  Future<void> _onTranscribeTap() async {
+    if (_selectedFile == null) return;
+
+    // Pre-flight: есть ли хотя бы один API-ключ?
+    final keys = await ApiKeyRepository(SecureStorageServiceImpl()).listKeys();
+    if (!mounted) return;
+
+    if (keys.isEmpty) {
+      final goToSettings = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Добавьте API-ключ'),
+          content: const Text('Для работы нужен ключ Groq. Это бесплатно.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Отмена'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Перейти в настройки'),
+            ),
+          ],
+        ),
+      );
+      if (goToSettings == true && mounted) {
+        Navigator.pushNamed(context, AppConstants.routeApiKeys);
+      }
+      return;
+    }
+
+    Navigator.pushNamed(
+      context,
+      AppConstants.routeProcessing,
+      arguments: _selectedFile,
     );
   }
 
@@ -119,7 +152,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 // Кнопка «Транскрибировать»
                 PrimaryButton(
                   label: 'Транскрибировать',
-                  onPressed: _selectedFile == null ? null : _onTranscribeTap,
+                  onPressed: _selectedFile == null
+                      ? null
+                      : () => _onTranscribeTap(),
                 ),
               ],
             ),
