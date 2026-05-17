@@ -27,3 +27,8 @@ class ValidationException extends AppException {
 class InternalException extends AppException {
   const InternalException(super.message);
 }
+
+/// HTTP 429 от Groq — превышен rate limit; ретраится с задержкой.
+class RateLimitException extends AppException {
+  const RateLimitException(super.message);
+}
