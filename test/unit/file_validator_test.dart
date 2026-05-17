@@ -89,14 +89,13 @@ void main() {
       expect(v.validate(path: 'a.mp3', sizeBytes: 19 * 1024 * 1024).isOk, isTrue);
     });
 
-    test('20 МБ — too large', () {
-      final r = v.validate(path: 'a.mp3', sizeBytes: tooBigSize);
-      expect(r.isOk, isFalse);
-      expect(r.errorMessage, contains('слишком большой'));
+    test('20 МБ — ok (Phase 2: ограничение снято, chunking обрабатывает любой размер)', () {
+      expect(v.validate(path: 'a.mp3', sizeBytes: tooBigSize).isOk, isTrue);
     });
 
-    test('0 байт — технически ok (валидация уровня picker)', () {
-      expect(v.validate(path: 'a.mp3', sizeBytes: 0).isOk, isTrue);
+    test('0 байт — ошибка (пустой файл недопустим)', () {
+      final r = v.validate(path: 'a.mp3', sizeBytes: 0);
+      expect(r.isOk, isFalse);
     });
   });
 }
