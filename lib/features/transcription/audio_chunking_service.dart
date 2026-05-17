@@ -54,15 +54,13 @@ class AudioChunkingService {
       throw const InternalException('Не удалось получить длительность файла');
     }
 
-    // getDuration() возвращает строку в миллисекундах
-    final durationMs = double.tryParse(durationStr);
-    if (durationMs == null) {
+    // getDuration() возвращает строку в секундах (float), напр. "1140.233469"
+    final durationSeconds = double.tryParse(durationStr);
+    if (durationSeconds == null) {
       throw InternalException(
         'Не удалось разобрать длительность файла: "$durationStr"',
       );
     }
-
-    final durationSeconds = durationMs / 1000.0;
     final sizeBytes = File(filePath).statSync().size;
     final name = p.basename(filePath);
 

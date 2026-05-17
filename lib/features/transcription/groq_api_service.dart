@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/error/app_exception.dart';
@@ -38,12 +39,18 @@ class GroqApiService {
         ..headers['Authorization'] = 'Bearer $apiKey'
         ..fields['model'] = AppConstants.groqDefaultModel
         ..fields['response_format'] = AppConstants.groqResponseFormat
-        // Запрашиваем word-level и segment-level таймкоды для сборки по чанкам.
-        ..fields['timestamp_granularities[]'] =
-            AppConstants.groqTimestampGranularity
-        ..fields['timestamp_granularities[1]'] = 'segment'
+        // Для сборки чанков нужны segment-level таймкоды.
+        // word-level здесь не нужен — _assembleResult использует только r.segments.
+        // Groq ожидает повторяющееся поле timestamp_granularities[], передаём segment.
+        ..fields['timestamp_granularities[]'] = 'segment'
         ..files.add(
-          http.MultipartFile.fromBytes('file', bytes, filename: filename),
+          http.MultipartFile.fromBytes(
+            'file',
+            bytes,
+            filename: filename,
+            // Явно указываем audio/mpeg — fromBytes не выводит тип из расширения.
+            contentType: MediaType('audio', 'mpeg'),
+          ),
         );
 
       final streamed = await client.send(request).timeout(
@@ -67,8 +74,10 @@ class GroqApiService {
       if (response.statusCode == 429) {
         throw const RateLimitException('Превышен лимит запросов Groq');
       }
-      // 5xx, 524 и прочие
-      throw const NetworkException(_networkErrorMessage);
+      // Для всех остальных ошибок включаем тело ответа Groq для диагностики.
+      throw NetworkException(
+        'Groq ${response.statusCode}: ${response.body}',
+      );
     } on SocketException {
       throw const NetworkException(_networkErrorMessage);
     } on TimeoutException {
