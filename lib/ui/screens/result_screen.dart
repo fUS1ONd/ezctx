@@ -9,6 +9,40 @@ import '../widgets/glass_icon_btn.dart';
 import '../widgets/gradient_background.dart';
 import '../widgets/primary_button.dart';
 
+/// Ленивый список сегментов транскрипции.
+/// Разбивает текст по [HH:MM:SS] маркерам и рендерит только видимые элементы.
+class _TranscriptView extends StatefulWidget {
+  const _TranscriptView({required this.text});
+  final String text;
+
+  @override
+  State<_TranscriptView> createState() => _TranscriptViewState();
+}
+
+class _TranscriptViewState extends State<_TranscriptView> {
+  late final List<String> _segments;
+
+  @override
+  void initState() {
+    super.initState();
+    _segments = _ResultScreenState._splitSegments(widget.text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      itemCount: _segments.length,
+      itemBuilder: (context, i) => Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+        child: SelectableText(
+          _segments[i],
+          style: AppTextStyles.body,
+        ),
+      ),
+    );
+  }
+}
+
 /// Экран результата транскрибации.
 /// Отображает текст, кнопку «Скопировать» с визуальным feedback, сохраняет txt.
 class ResultScreen extends StatefulWidget {
@@ -125,16 +159,11 @@ class _ResultScreenState extends State<ResultScreen> {
                 ),
                 const SizedBox(height: AppSpacing.lg),
 
-                // Текст расшифровки (прокручиваемый, выделяемый)
+                // Текст расшифровки — ленивый рендеринг по сегментам
                 Expanded(
                   child: GlassCard(
                     padding: const EdgeInsets.all(AppSpacing.md),
-                    child: SingleChildScrollView(
-                      child: SelectableText(
-                        r.text,
-                        style: AppTextStyles.body,
-                      ),
-                    ),
+                    child: _TranscriptView(text: r.text),
                   ),
                 ),
 
@@ -156,6 +185,31 @@ class _ResultScreenState extends State<ResultScreen> {
         ),
       ),
     );
+  }
+
+  /// Разбивает текст по маркерам [HH:MM:SS] на сегменты для ленивого рендеринга.
+  static List<String> _splitSegments(String text) {
+    final pattern = RegExp(r'(?=\[\d{2}:\d{2}:\d{2}\])');
+    final parts = text.split(pattern);
+    // Если маркеров нет — разбиваем по абзацам, иначе по 200 символов
+    if (parts.length <= 1) {
+      final paras = text.split('\n\n').where((s) => s.trim().isNotEmpty).toList();
+      if (paras.length > 1) return paras;
+      // Нет ни маркеров, ни абзацев — нарезаем по ~200 символов на строках
+      final lines = text.split('\n');
+      final chunks = <String>[];
+      final buf = StringBuffer();
+      for (final line in lines) {
+        buf.writeln(line);
+        if (buf.length >= 200) {
+          chunks.add(buf.toString().trim());
+          buf.clear();
+        }
+      }
+      if (buf.isNotEmpty) chunks.add(buf.toString().trim());
+      return chunks.isEmpty ? [text] : chunks;
+    }
+    return parts.where((s) => s.trim().isNotEmpty).toList();
   }
 
   String _formatNow() {
