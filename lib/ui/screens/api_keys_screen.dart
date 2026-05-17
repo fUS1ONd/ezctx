@@ -20,6 +20,9 @@ class ApiKeysScreen extends StatefulWidget {
 }
 
 class _ApiKeysScreenState extends State<ApiKeysScreen> {
+  // Единственный экземпляр репозитория на весь lifecycle экрана.
+  final ApiKeyRepository _repository = ApiKeyRepository(SecureStorageServiceImpl());
+
   List<ApiKeyView> _keys = [];
   bool _loading = true;
   String? _errorMessage;
@@ -40,7 +43,7 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
 
   Future<void> _loadKeys() async {
     setState(() => _loading = true);
-    final keys = await ApiKeyRepository(SecureStorageServiceImpl()).listKeys();
+    final keys = await _repository.listKeys();
     if (mounted) {
       setState(() {
         _keys = keys;
@@ -55,8 +58,7 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
       _errorMessage = null;
     });
     try {
-      final repo = ApiKeyRepository(SecureStorageServiceImpl());
-      await repo.addKey(_inputController.text);
+      await _repository.addKey(_inputController.text);
       _inputController.clear();
       await _loadKeys();
       if (!mounted) return;
@@ -92,8 +94,7 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
       ),
     );
     if (confirmed == true) {
-      final repo = ApiKeyRepository(SecureStorageServiceImpl());
-      await repo.removeKey(key.raw);
+      await _repository.removeKey(key.raw);
       await _loadKeys();
     }
   }

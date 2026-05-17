@@ -21,6 +21,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  // Единственный экземпляр репозитория на весь lifecycle экрана.
+  final ApiKeyRepository _repository = ApiKeyRepository(SecureStorageServiceImpl());
+
   SelectedAudioFile? _selectedFile;
   String? _errorMessage;
   bool _picking = false;
@@ -52,7 +55,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_selectedFile == null) return;
 
     // Pre-flight: есть ли хотя бы один API-ключ?
-    final keys = await ApiKeyRepository(SecureStorageServiceImpl()).listKeys();
+    final keys = await _repository.listKeys();
     if (!mounted) return;
 
     if (keys.isEmpty) {
