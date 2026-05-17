@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 /// Метаданные аудиофайла, полученные через ffprobe.
 class AudioMetadata {
   final String name;

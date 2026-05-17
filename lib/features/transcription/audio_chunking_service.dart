@@ -41,7 +41,7 @@ class AudioChunkingService {
 
     if (_probeOverride != null) {
       // В тестах используем подменённую функцию
-      info = await _probeOverride!(filePath);
+      info = await _probeOverride(filePath);
     } else {
       // В продакшне вызываем реальный ffprobe
       final session = await FFprobeKit.getMediaInformation(filePath);
@@ -92,7 +92,7 @@ class AudioChunkingService {
 
     if (_ffmpegOverride != null) {
       // В тестах override выполняет команду напрямую и бросает ошибку при неудаче
-      await _ffmpegOverride!(command);
+      await _ffmpegOverride(command);
     } else {
       // Оборачиваем асинхронный executeAsync в Completer
       final completer = Completer<void>();
