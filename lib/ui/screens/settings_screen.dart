@@ -36,6 +36,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  /// Корректное русское склонение для количества активных ключей.
+  String _keyCountLabel(int count) {
+    if (count == 0) return 'Нет ключей';
+    if (count == 1) return '1 активен';
+    if (count <= 4) return '$count активных';
+    return '$count активных';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -77,11 +85,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           style: AppTextStyles.body,
                         ),
                         subtitle: Text(
-                          _loading
-                              ? '...'
-                              : (_keyCount == 0
-                                    ? 'Нет ключей'
-                                    : '$_keyCount активен'),
+                          _loading ? '...' : _keyCountLabel(_keyCount),
                           style: AppTextStyles.label,
                         ),
                         trailing: Icon(
