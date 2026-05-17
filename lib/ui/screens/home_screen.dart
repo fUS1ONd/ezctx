@@ -241,7 +241,7 @@ class _HomeScreenState extends State<HomeScreen> {
         const Text('Выберите файл', style: AppTextStyles.heading),
         const SizedBox(height: AppSpacing.xs),
         Text(
-          'mp3, wav, m4a, ogg, flac · до 19 МБ',
+          'mp3, wav, m4a, ogg, flac',
           style: AppTextStyles.label,
           textAlign: TextAlign.center,
         ),
