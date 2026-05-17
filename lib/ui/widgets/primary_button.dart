@@ -96,7 +96,8 @@ class _PrimaryButtonState extends State<PrimaryButton> {
               children: [
                 if (widget.icon != null) ...[
                   Icon(widget.icon, color: Colors.white, size: 20),
-                  const SizedBox(width: 8),
+                  // Отступ через токен вместо magic number
+                  const SizedBox(width: AppSpacing.sm),
                 ],
                 Text(
                   widget.label,

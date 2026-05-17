@@ -12,6 +12,15 @@ import 'screens/settings_screen.dart';
 class EzCtxApp extends StatelessWidget {
   const EzCtxApp({super.key});
 
+  /// Таблица билдеров маршрутов для onGenerateRoute.
+  static final Map<String, WidgetBuilder> _routeBuilders = {
+    AppConstants.routeHome: (_) => const HomeScreen(),
+    AppConstants.routeSettings: (_) => const SettingsScreen(),
+    AppConstants.routeApiKeys: (_) => const ApiKeysScreen(),
+    AppConstants.routeProcessing: (_) => const ProcessingScreen(),
+    AppConstants.routeResult: (_) => const ResultScreen(),
+  };
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -28,12 +37,24 @@ class EzCtxApp extends StatelessWidget {
         ),
       ),
       initialRoute: AppConstants.routeHome,
-      routes: {
-        AppConstants.routeHome: (_) => const HomeScreen(),
-        AppConstants.routeSettings: (_) => const SettingsScreen(),
-        AppConstants.routeApiKeys: (_) => const ApiKeysScreen(),
-        AppConstants.routeProcessing: (_) => const ProcessingScreen(),
-        AppConstants.routeResult: (_) => const ResultScreen(),
+      // Fade-переходы 300 мс easeInOut между всеми именованными маршрутами
+      onGenerateRoute: (settings) {
+        final builder = _routeBuilders[settings.name];
+        if (builder == null) return null;
+        return PageRouteBuilder(
+          settings: settings,
+          transitionDuration: const Duration(milliseconds: 300),
+          pageBuilder: (ctx, animation, secondaryAnimation) => builder(ctx),
+          transitionsBuilder: (ctx, animation, secondaryAnimation, child) {
+            return FadeTransition(
+              opacity: CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeInOut,
+              ),
+              child: child,
+            );
+          },
+        );
       },
     );
   }

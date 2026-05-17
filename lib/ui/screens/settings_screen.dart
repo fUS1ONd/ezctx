@@ -6,6 +6,7 @@ import '../../core/storage/secure_storage_service.dart';
 import '../../features/settings/api_key_repository.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_icon_btn.dart';
+import '../widgets/glass_tile.dart';
 import '../widgets/gradient_background.dart';
 
 /// Экран настроек.
@@ -69,6 +70,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: AppSpacing.xl),
                 const Text('Настройки', style: AppTextStyles.display),
                 const SizedBox(height: AppSpacing.lg),
+                // Статус-карточка подключения к Groq API
+                if (!_loading && _keyCount > 0) ...[
+                  _buildGroqStatusCard(),
+                  const SizedBox(height: AppSpacing.md),
+                ],
                 GlassCard(
                   padding: EdgeInsets.zero,
                   child: Column(
@@ -105,6 +111,59 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// Статус-карточка «Подключено к Groq» — отображается когда ключ сохранён.
+  Widget _buildGroqStatusCard() {
+    return GlassTile(
+      child: Row(
+        children: [
+          // Аватар-иконка ключа на accent-градиенте
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              gradient: AppGradients.accent,
+              borderRadius: BorderRadius.circular(AppRadius.icon),
+            ),
+            child: const Icon(
+              Icons.vpn_key_rounded,
+              color: Colors.white,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          // Заголовок и статус с зелёной точкой
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Подключено к Groq', style: AppTextStyles.heading),
+                const SizedBox(height: AppSpacing.xs),
+                Row(
+                  children: [
+                    // Зелёная точка — индикатор активного ключа
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: AppColors.good,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Text(
+                      'API ключ активен',
+                      style: AppTextStyles.label,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
