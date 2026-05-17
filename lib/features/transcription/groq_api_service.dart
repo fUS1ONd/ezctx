@@ -41,7 +41,13 @@ class GroqApiService {
             AppConstants.groqTimestampGranularity
         ..files.add(await http.MultipartFile.fromPath('file', file.path));
 
-      final streamed = await client.send(request);
+      final streamed = await client.send(request).timeout(
+        const Duration(minutes: 5),
+        onTimeout: () {
+          client.close();
+          throw const NetworkException('Превышено время ожидания ответа от Groq');
+        },
+      );
       final response = await http.Response.fromStream(streamed);
 
       if (response.statusCode == 200) {
