@@ -163,18 +163,9 @@ class ChunkedTranscriptionController extends ChangeNotifier {
       return;
     }
 
-    // Получаем метаданные для вычисления chunkDuration.
-    double chunkDuration = kChunkDurationSeconds;
-    try {
-      final metadata = await _chunkingService.getMetadata(file.path);
-      if (metadata.durationSeconds > 0) {
-        // chunkDuration — постоянная величина; метаданные нужны только для
-        // проверки длительности при необходимости. Используем константу.
-        chunkDuration = kChunkDurationSeconds;
-      }
-    } catch (_) {
-      // Ошибка метаданных не блокирует: используем константу.
-    }
+    // Длительность чанка — константа. Адаптивный размер чанка будет в будущей фазе.
+    // TODO(future): адаптировать chunkDuration по длительности файла
+    const double chunkDuration = kChunkDurationSeconds;
 
     // Разбиваем файл на чанки.
     List<File> chunkFiles;
