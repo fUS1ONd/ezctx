@@ -5,16 +5,22 @@ import '../../core/constants/design_tokens.dart';
 import '../../core/error/app_exception.dart';
 import '../../core/storage/secure_storage_service.dart';
 import '../../features/settings/api_key_repository.dart';
+import '../../features/transcription/groq_key_pool.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_icon_btn.dart';
 import '../widgets/glass_tile.dart';
 import '../widgets/gradient_background.dart';
+import '../widgets/key_status_tile.dart';
 import '../widgets/primary_button.dart';
 
 /// Экран управления API-ключами Groq.
 /// Поддерживает добавление, маскированное отображение и удаление ключей.
+/// Подписан на [GroqKeyPool] через ListenableBuilder для реактивного UI.
 class ApiKeysScreen extends StatefulWidget {
-  const ApiKeysScreen({super.key});
+  const ApiKeysScreen({super.key, required this.pool});
+
+  /// Пул ключей — источник статусов для каждого ключа.
+  final GroqKeyPool pool;
 
   @override
   State<ApiKeysScreen> createState() => _ApiKeysScreenState();
@@ -58,8 +64,11 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
       _saving = true;
       _errorMessage = null;
     });
+    final rawKey = _inputController.text;
     try {
-      await _repository.addKey(_inputController.text);
+      await _repository.addKey(rawKey);
+      // Синхронизируем пул — репозиторий хранит ключи, пул управляет статусами.
+      widget.pool.addKey(rawKey);
       _inputController.clear();
       await _loadKeys();
     } on ValidationException catch (e) {
@@ -92,6 +101,8 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
     );
     if (confirmed == true) {
       await _repository.removeKey(key.raw);
+      // Синхронизируем пул после удаления из репозитория.
+      widget.pool.removeKey(key.raw);
       await _loadKeys();
     }
   }
@@ -106,36 +117,46 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
         style: AppTextStyles.label.copyWith(color: AppColors.inkTertiary),
       );
     }
-    return Column(
-      children: _keys.map((key) {
-        return Padding(
-          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-          child: GlassCard(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.sm,
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.vpn_key_outlined, size: 24, color: AppColors.inkSecondary),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Text(key.masked, style: AppTextStyles.mono),
-                ),
-                Semantics(
-                  label: 'Удалить ключ',
-                  button: true,
-                  child: IconButton(
-                    icon: const Icon(Icons.delete_outline),
-                    color: AppColors.bad,
-                    onPressed: () => _confirmDelete(key),
+    // ListenableBuilder переподписывает виджет при каждом notifyListeners() из пула.
+    // Пул нотифицирует при добавлении/удалении ключа и при смене статуса (rate-limit).
+    return ListenableBuilder(
+      listenable: widget.pool,
+      builder: (context, _) => Column(
+        children: _keys.map((key) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+            child: GlassCard(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.vpn_key_outlined, size: 24, color: AppColors.inkSecondary),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(key.masked, style: AppTextStyles.mono),
                   ),
-                ),
-              ],
+                  // Статус ключа: «Активен» или «До HH:MM:SS»
+                  KeyStatusTile(
+                    status: widget.pool.getStatusForKey(key.raw),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Semantics(
+                    label: 'Удалить ключ',
+                    button: true,
+                    child: IconButton(
+                      icon: const Icon(Icons.delete_outline),
+                      color: AppColors.bad,
+                      onPressed: () => _confirmDelete(key),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        );
-      }).toList(),
+          );
+        }).toList(),
+      ),
     );
   }
 

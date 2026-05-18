@@ -42,8 +42,8 @@ class EzCtxApp extends StatelessWidget {
           case AppConstants.routeSettings:
             page = const SettingsScreen();
           case AppConstants.routeApiKeys:
-            // Pool передаётся заранее; ApiKeysScreen использует его в плане 04-03.
-            page = const ApiKeysScreen();
+            // Pool передаётся в ApiKeysScreen для реактивного обновления статусов.
+            page = ApiKeysScreen(pool: groqKeyPool);
           case AppConstants.routeProcessing:
             // Pool передаётся в ProcessingScreen для инициализации контроллеров.
             page = ProcessingScreen(groqKeyPool: groqKeyPool);
