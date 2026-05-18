@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-last_updated: "2026-05-18T06:00:00.000Z"
+last_updated: "2026-05-18T17:30:00.000Z"
 progress:
-  total_phases: 7
-  completed_phases: 4
-  total_plans: 15
-  completed_plans: 15
-  percent: 57
+  total_phases: 9
+  completed_phases: 5
+  total_plans: 18
+  completed_plans: 17
+  percent: 56
 ---
 
 # STATE: ezctx
@@ -32,14 +32,16 @@ Phase: 01 (walking-skeleton-short-audio-clipboard) — COMPLETE (5/5 plans done)
 Phase: 02 (real-lectures-chunking-progress) — COMPLETE (4/4 plans done, verified)
 Phase: 03 (audio-normalization) — COMPLETE (3/3 plans done)
 Phase: 04 (multi-key-pool) — COMPLETE (3/3 plans done, verified)
+Phase: 05 (model-language-controls) — COMPLETE (2/2 plans done, reviewed)
 
 - **Milestone:** v1 Android MVP
 - **Phase 01:** Complete — все 5 планов выполнены
 - **Phase 02:** Complete — все 4 плана выполнены; 5/5 критериев verified; 16 тестов pass
 - **Phase 03:** Complete — все 3 плана выполнены
 - **Phase 04:** Complete — GroqKeyPool, миграция контроллеров, KeyStatusTile UI; 12/13 критериев auto + 503-fix
-- **Status:** Ready to execute Phase 05
-- **Progress:** 4/7 phases complete `[████░░░] 57%`
+- **Phase 05:** Complete — TranscriptionOptions data layer, переключатель модели/языка в HomeScreen, review fixes
+- **Status:** Ready to execute Phase 06
+- **Progress:** 5/7 phases complete `[█████░░] 71%`
 
 ## Phase Map
 
@@ -49,16 +51,18 @@ Phase: 04 (multi-key-pool) — COMPLETE (3/3 plans done, verified)
 | 2 | Real Lectures (Chunking & Progress) | Complete | 4 plans |
 | 3 | Audio Normalization (Pre-Transcription) | Complete (minor issues) | 3 plans |
 | 4 | Multi-Key Pool & Rate-Limit UI | Complete | 3 plans |
-| 5 | Model & Language Controls | Not started | TBD |
+| 5 | Model & Language Controls | Complete | 2 plans |
+| 5.5 | Clipboard Engine (super_clipboard) | Not started | TBD |
 | 6 | Output Formats & Sharing | Not started | TBD |
 | 7 | History | Not started | TBD |
 | 8 | Error Handling & Onboarding Polish | Not started | TBD |
+| 9 | Equal Chunk Distribution | Planned | 1 plan |
 
 ## Performance Metrics
 
-- **Phases completed:** 4/7
-- **Plans completed:** 15
-- **Requirements covered:** 26/36 (72%)
+- **Phases completed:** 5/7
+- **Plans completed:** 17
+- **Requirements covered:** 30/36 (83%)
 
 ## Accumulated Context
 
@@ -96,10 +100,10 @@ None (APK build pending in CI after push to main).
 
 ## Session Continuity
 
-- **Next action:** Execute Phase 05 — Model & Language Controls
-- **Stopped at:** Phase 04 полностью завершена — все 3 плана выполнены
+- **Next action:** Execute Phase 06 — Output Formats & Sharing
+- **Stopped at:** Phase 05 полностью завершена — 2 плана выполнены, review fixes применены
 - **Last session:** 2026-05-18
-- **Last activity:** 2026-05-18 - 04-03 завершён: KeyStatusTile + ApiKeysScreen ListenableBuilder + pool sync
+- **Last activity:** 2026-05-18 - 05-02 завершён: HomeScreen model/language controls, ProcessingScreen wiring, review fixes
 
 ---
 *State initialized: 2026-05-16*

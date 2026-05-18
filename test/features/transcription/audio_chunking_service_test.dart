@@ -97,7 +97,8 @@ void main() {
       await File('${outDir.path}/chunk_001.mp3').create();
 
       final service = AudioChunkingService(ffmpegOverride: (_) async {});
-      final chunks = await service.split('/fake/input.mp3', outputDir: outDir.path);
+      // 84 мин = 5040s > порога 4920s → N=2
+      final chunks = await service.split('/fake/input.mp3', 5040.0, outputDir: outDir.path);
 
       expect(chunks.length, equals(2));
       expect(chunks[0].path, endsWith('chunk_000.mp3'));
@@ -113,24 +114,25 @@ void main() {
       }
 
       final service = AudioChunkingService(ffmpegOverride: (_) async {});
-      final chunks = await service.split('/fake/long.mp3', outputDir: outDir.path);
+      // 330 мин = 19800s → N=ceil(19800/4920)=5, но тест проверяет возвращаемые файлы
+      final chunks = await service.split('/fake/long.mp3', 19800.0, outputDir: outDir.path);
 
       expect(chunks.length, equals(4));
     });
 
-    test('1 чанк (файл < kChunkDurationSeconds по длительности)', () async {
+    test('1 чанк (70 мин = 4200s, меньше порога 4920s)', () async {
       final outDir = await _tmpDir();
       addTearDown(() => outDir.deleteSync(recursive: true));
 
       await File('${outDir.path}/chunk_000.mp3').create();
 
       final service = AudioChunkingService(ffmpegOverride: (_) async {});
-      final chunks = await service.split('/fake/short.mp3', outputDir: outDir.path);
+      final chunks = await service.split('/fake/short.mp3', 4200.0, outputDir: outDir.path);
 
       expect(chunks.length, equals(1));
     });
 
-    test('ffmpeg-команда содержит -c:a copy и segment_time 4500 (нормализованный вход)', () async {
+    test('84 мин (5040s): N=2, optimalDuration=2520 → содержит -segment_time 2520.0', () async {
       final outDir = await _tmpDir();
       addTearDown(() => outDir.deleteSync(recursive: true));
 
@@ -139,13 +141,43 @@ void main() {
         ffmpegOverride: (cmd) async { capturedCommand = cmd; },
       );
 
-      await service.split('/input/audio.mp3', outputDir: outDir.path);
+      await service.split('/input/audio.mp3', 5040.0, outputDir: outDir.path);
 
       expect(capturedCommand, isNotNull);
       expect(capturedCommand, contains('-f segment'));
-      expect(capturedCommand, contains('-segment_time 4500'));
+      expect(capturedCommand, contains('-segment_time 2520.0'));
       expect(capturedCommand, contains('-c:a copy'));
       expect(capturedCommand, contains('chunk_%03d.mp3'));
+    });
+
+    test('150 мин (9000s): N=2, optimalDuration=4500 → содержит -segment_time 4500.0', () async {
+      final outDir = await _tmpDir();
+      addTearDown(() => outDir.deleteSync(recursive: true));
+
+      String? capturedCommand;
+      final service = AudioChunkingService(
+        ffmpegOverride: (cmd) async { capturedCommand = cmd; },
+      );
+
+      await service.split('/input/audio.mp3', 9000.0, outputDir: outDir.path);
+
+      expect(capturedCommand, isNotNull);
+      expect(capturedCommand, contains('-segment_time 4500.0'));
+    });
+
+    test('165 мин (9900s): N=3, optimalDuration=3300 → содержит -segment_time 3300.0', () async {
+      final outDir = await _tmpDir();
+      addTearDown(() => outDir.deleteSync(recursive: true));
+
+      String? capturedCommand;
+      final service = AudioChunkingService(
+        ffmpegOverride: (cmd) async { capturedCommand = cmd; },
+      );
+
+      await service.split('/input/audio.mp3', 9900.0, outputDir: outDir.path);
+
+      expect(capturedCommand, isNotNull);
+      expect(capturedCommand, contains('-segment_time 3300.0'));
     });
 
     test('ошибка ffmpeg → InternalException', () async {
@@ -159,7 +191,19 @@ void main() {
       );
 
       await expectLater(
-        () => service.split('/fake/input.mp3', outputDir: outDir.path),
+        () => service.split('/fake/input.mp3', 3600.0, outputDir: outDir.path),
+        throwsA(isA<InternalException>()),
+      );
+    });
+
+    test('totalDurationSeconds <= 0 → InternalException', () async {
+      final outDir = await _tmpDir();
+      addTearDown(() => outDir.deleteSync(recursive: true));
+
+      final service = AudioChunkingService(ffmpegOverride: (_) async {});
+
+      await expectLater(
+        () => service.split('/fake/input.mp3', 0.0, outputDir: outDir.path),
         throwsA(isA<InternalException>()),
       );
     });

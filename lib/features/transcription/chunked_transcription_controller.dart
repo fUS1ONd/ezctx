@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math' show min;
 
 import 'package:flutter/foundation.dart';
 
@@ -167,14 +166,10 @@ class ChunkedTranscriptionController extends ChangeNotifier {
       return;
     }
 
-    // Длительность чанка — константа. Адаптивный размер чанка будет в будущей фазе.
-    // TODO(future): адаптировать chunkDuration по длительности файла
-    const double chunkDuration = kChunkDurationSeconds;
-
-    // Разбиваем файл на чанки.
+    // Разбиваем файл на равные чанки.
     List<File> chunkFiles;
     try {
-      chunkFiles = await _chunkingService.split(file.path);
+      chunkFiles = await _chunkingService.split(file.path, file.durationSeconds);
     } catch (e) {
       _set(ChunkedError(
         message: e is AppException ? e.message : e.toString(),
@@ -182,6 +177,10 @@ class ChunkedTranscriptionController extends ChangeNotifier {
       ));
       return;
     }
+
+    // Используем реальное количество чанков от ffmpeg для точных таймкодов.
+    // chunkFiles.length >= 1 гарантировано: split() либо возвращает файлы, либо бросает.
+    final chunkDuration = file.durationSeconds / chunkFiles.length;
 
     final n = chunkFiles.length;
     _chunkStates = List<ChunkState>.generate(n, (i) => ChunkWaiting(i));
@@ -194,11 +193,10 @@ class ChunkedTranscriptionController extends ChangeNotifier {
       totalCount: n,
     ));
 
-    // Семафор с количеством слотов = min(живых ключей, лимита параллельности).
-    final concurrency = min(
-      _pool.aliveKeyCount.clamp(1, AppConstants.kMaxConcurrentChunks),
-      AppConstants.kMaxConcurrentChunks,
-    );
+    // Семафор: clamp(1, kMaxConcurrentChunks) уже гарантирует верхний предел.
+    // Нижний порог 1 предотвращает деление на ноль и гарантирует обработку хотя бы одного чанка.
+    final concurrency =
+        _pool.aliveKeyCount.clamp(1, AppConstants.kMaxConcurrentChunks);
     final semaphore = _Semaphore(concurrency);
 
     try {

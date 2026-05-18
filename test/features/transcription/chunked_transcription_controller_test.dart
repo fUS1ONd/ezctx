@@ -242,7 +242,11 @@ class _MockAudioChunkingService extends AudioChunkingService {
   Future<AudioMetadata> getMetadata(String filePath) async => metadata;
 
   @override
-  Future<List<File>> split(String filePath, {String? outputDir}) async {
+  Future<List<File>> split(
+    String filePath,
+    double totalDurationSeconds, {
+    String? outputDir,
+  }) async {
     return chunkFiles;
   }
 }
@@ -258,7 +262,8 @@ const _testKey = ApiKeyView(
 
 final _dummyFile = NormalizedAudioFile(
   path: '/tmp/test_lecture.mp3',
-  durationSeconds: 600.0,
+  // 9000s = 2.5 ч → chunkDuration = 9000/2 = 4500s → offset чанка 1 = [01:15:00]
+  durationSeconds: 9000.0,
 );
 
 TranscriptionResult _makeResult({

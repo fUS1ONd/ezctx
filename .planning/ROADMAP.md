@@ -13,9 +13,11 @@
 - [ ] **Phase 3: Audio Normalization (Pre-Transcription)** — Любой аудиоформат конвертируется в 32 kbps / 16 kHz / Mono mp3 перед чанкованием; isChunked определяется по длительности нормализованного файла.
 - [x] **Phase 4: Multi-Key Pool & Rate-Limit UI** — Пул из нескольких Groq-ключей с round-robin, авто-блокировкой и видимым в UI статусом/квотой.
 - [ ] **Phase 5: Model & Language Controls** — Переключатель large-v3 / turbo и селектор языка распознавания.
+- [ ] **Phase 5.5: Clipboard Engine (super_clipboard)** — Замена стандартного `Clipboard.setData` на пакет `super_clipboard` для корректного копирования длинных транскрипций (1.5+ часа) без обрезания на Android.
 - [ ] **Phase 6: Output Formats & Sharing** — SRT с таймкодами + share intent в Telegram/GPT/заметки.
 - [ ] **Phase 7: History** — Локальный список ранее расшифрованных лекций с возможностью повторного открытия и удаления.
 - [ ] **Phase 8: Error Handling & Onboarding Polish** — Onboarding без ключей, понятные сетевые ошибки с retry, ожидание разблокировки ключей с обратным отсчётом.
+- [ ] **Phase 9: Equal Chunk Distribution** — Равномерное распределение чанков: вместо фиксированного шага 75 мин делим общую длительность на N равных кусков; порог поднят с 17.6 до 18.7 MB (82 мин).
 
 ## Phase Details
 
@@ -146,8 +148,34 @@ Plans:
   3. При «Авто» в multipart-запросе к Groq поле `language` отсутствует; при явном выборе — передаётся корректный ISO-код (проверяется по логам/инспектору запроса).
   4. Русскоязычная запись, расшифрованная с `language=ru` и `large-v3`, имеет заметно меньше ошибок распознавания, чем та же запись с `large-v3-turbo` и «Авто» (ручная проверка одной и той же лекции).
 
-**Plans:** TBD
+**Plans:** 2 plans
+Plans:
+
+**Wave 1**
+
+- [ ] 05-01-PLAN.md — TranscriptionOptions model + TranscriptionOptionsRepository + AppConstants + GroqApiService model/language params + ProcessingArgs + controllers
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 05-02-PLAN.md — HomeScreen: model toggle (SegmentedButton) + language selector (DropdownButton) + persistence; ProcessingScreen wiring
+
 **UI hint:** yes
+
+### Phase 5.5: Clipboard Engine (super_clipboard)
+
+**Goal:** Кнопка «Скопировать» корректно помещает в буфер обмена полную транскрипцию любой длины (1.5+ часа) без обрезания на Android, за счёт замены `Clipboard.setData` на пакет `super_clipboard`.
+**Mode:** mvp
+**Depends on:** Phase 5
+**Requirements:** OUT-02, OUT-03
+**Success Criteria** (what must be TRUE):
+
+  1. Транскрипция аудио длительностью 1.5 часа (≈30 000–50 000 символов) полностью копируется в буфер обмена и вставляется в стороннее приложение (Telegram, Заметки) без обрезания.
+  2. `super_clipboard` инициализирован и используется во всех местах, где ранее вызывался `Clipboard.setData` / `Clipboard.getData`.
+  3. Снек-бар «Скопировано» появляется только после успешной записи в буфер; при ошибке показывается сообщение об ошибке.
+  4. Поведение на коротких транскрипциях (< 1000 символов) не изменилось — кнопка работает как раньше.
+
+**Plans:** TBD
+**UI hint:** no
 
 ### Phase 6: Output Formats & Sharing
 
@@ -197,6 +225,29 @@ Plans:
 **Plans:** TBD
 **UI hint:** yes
 
+### Phase 9: Equal Chunk Distribution
+
+**Goal:** Вместо фиксированного шага чанкования (75 мин) делим нормализованное аудио на N равных кусков, минимизируя время ожидания при параллельной обработке в Groq.
+**Mode:** standard
+**Depends on:** Phase 3
+**Requirements:** PERF-01
+**Success Criteria** (what must be TRUE):
+
+  1. `AudioChunkingService.split()` принимает `totalDurationSeconds` и вычисляет `optimalDuration = totalDurationSeconds / ceil(totalDurationSeconds / kChunkThresholdSeconds)`; ffmpeg вызывается с `-segment_time optimalDuration`.
+  2. `kChunkThresholdSeconds` обновлён с 4500 до 4920 (82 мин ≈ 18.7 MB при 32 kbps); `kChunkDurationSeconds` удалена как константа.
+  3. Файл длительностью 76 мин (4560s < 4920s) не чанкуется вовсе — single-shot (0 лишних запросов к Groq).
+  4. Файл длительностью 84 мин (5040s) бьётся на 2 равных чанка по 42 мин вместо 82 + 2 мин.
+  5. Таймкоды корректны: offset чанка i = `i * optimalDuration` — существующая логика в `ChunkedTranscriptionController` работает без изменений.
+  6. Все существующие unit-тесты `AudioChunkingService` обновлены и проходят с новой сигнатурой.
+
+**Plans:** 1 plan
+
+**Wave 1**
+
+- [ ] 09-01-PLAN.md — Equal chunk distribution: обновить `AudioChunkingService.split()` + константы + тесты
+
+**UI hint:** no
+
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -205,10 +256,12 @@ Plans:
 | 2. Real Lectures (Chunking & Progress) | 4/4 | Complete | 2026-05-17 |
 | 3. Audio Normalization (Pre-Transcription) | 0/? | Not started | - |
 | 4. Multi-Key Pool & Rate-Limit UI | 0/3 | Planned | - |
-| 5. Model & Language Controls | 0/? | Not started | - |
+| 5. Model & Language Controls | 0/2 | Planned | - |
+| 5.5. Clipboard Engine (super_clipboard) | 0/? | Not started | - |
 | 6. Output Formats & Sharing | 0/? | Not started | - |
 | 7. History | 0/? | Not started | - |
 | 8. Error Handling & Onboarding Polish | 0/? | Not started | - |
+| 9. Equal Chunk Distribution | 0/1 | Not started | - |
 
 ## Rebalancing Notes
 
