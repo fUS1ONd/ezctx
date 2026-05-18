@@ -292,53 +292,29 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Элементы выпадающего списка языков.
-  static const _languageItems = [
-    DropdownMenuItem(
-      value: TranscriptionLanguage.auto,
-      child: Text('Авто'),
-    ),
-    DropdownMenuItem(
-      value: TranscriptionLanguage.ru,
-      child: Text('Русский'),
-    ),
-    DropdownMenuItem(
-      value: TranscriptionLanguage.en,
-      child: Text('English'),
-    ),
-    DropdownMenuItem(
-      value: TranscriptionLanguage.de,
-      child: Text('Deutsch'),
-    ),
-    DropdownMenuItem(
-      value: TranscriptionLanguage.fr,
-      child: Text('Français'),
-    ),
-    DropdownMenuItem(
-      value: TranscriptionLanguage.es,
-      child: Text('Español'),
-    ),
-    DropdownMenuItem(
-      value: TranscriptionLanguage.uk,
-      child: Text('Українська'),
-    ),
-    DropdownMenuItem(
-      value: TranscriptionLanguage.zh,
-      child: Text('中文'),
-    ),
-    DropdownMenuItem(
-      value: TranscriptionLanguage.ja,
-      child: Text('日本語'),
-    ),
-    DropdownMenuItem(
-      value: TranscriptionLanguage.ko,
-      child: Text('한국어'),
-    ),
-    DropdownMenuItem(
-      value: TranscriptionLanguage.ar,
-      child: Text('العربية'),
-    ),
-  ];
+  /// Человекочитаемое название языка. Exhaustive switch — компилятор потребует
+  /// обновить метод при добавлении нового значения в [TranscriptionLanguage].
+  static String _languageLabel(TranscriptionLanguage lang) => switch (lang) {
+    TranscriptionLanguage.auto => 'Авто',
+    TranscriptionLanguage.ru   => 'Русский',
+    TranscriptionLanguage.en   => 'English',
+    TranscriptionLanguage.de   => 'Deutsch',
+    TranscriptionLanguage.fr   => 'Français',
+    TranscriptionLanguage.es   => 'Español',
+    TranscriptionLanguage.uk   => 'Українська',
+    TranscriptionLanguage.zh   => '中文',
+    TranscriptionLanguage.ja   => '日本語',
+    TranscriptionLanguage.ko   => '한국어',
+    TranscriptionLanguage.ar   => 'العربية',
+  };
+
+  /// Элементы дропдауна языков, вычисленные из enum (exhaustive).
+  static final _languageItems = TranscriptionLanguage.values
+      .map((lang) => DropdownMenuItem(
+            value: lang,
+            child: Text(_languageLabel(lang)),
+          ))
+      .toList();
 
   Widget _buildEmptyCard() {
     return Column(

@@ -218,6 +218,8 @@ class _ProcessingScreenState extends State<ProcessingScreen>
           }
         });
       }
+      // Предотвращаем повторный setState ниже при успехе.
+      return;
     }
     if (mounted) setState(() {});
   }
@@ -225,11 +227,16 @@ class _ProcessingScreenState extends State<ProcessingScreen>
   /// Перезапускает таймер и pipeline при повторной попытке.
   void _restart() {
     _ticker?.cancel();
+    // Утилизируем старый chunked-контроллер перед сбросом состояния.
+    _chunkedController?.removeListener(_onChunkedStateChange);
+    _chunkedController?.dispose();
     setState(() {
       _elapsed = Duration.zero;
       _startedAt = DateTime.now();
       _normalizationError = null;
       _normalizedFile = null;
+      _isChunked = false;
+      _chunkedController = null;
     });
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() => _elapsed = DateTime.now().difference(_startedAt!));
