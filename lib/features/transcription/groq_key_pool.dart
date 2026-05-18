@@ -106,19 +106,23 @@ class GroqKeyPool extends ChangeNotifier {
     Timer(delay, _onWakeup);
   }
 
-  /// Вызывается при пробуждении — раздаёт ключи ожидающим по одному.
+  /// Вызывается при пробуждении — выдаёт ровно один ключ одному ожидающему.
+  ///
+  /// После complete() цикл прерывается. Обработчик acquireKey() вернётся
+  /// к вызывающему коду; если потребуется ещё ключ — acquireKey() снова добавит
+  /// waiter и вызовет _scheduleWakeup(). Это предотвращает «шторм 429»: один и
+  /// тот же единственный разблокированный ключ не раздаётся сразу всем ожидающим.
   void _onWakeup() {
     if (_waiters.isEmpty) return;
-    // Раздаём ключи waiters по одному через _nextAlive (не один ключ всем)
-    while (_waiters.isNotEmpty) {
-      final alive = _nextAlive();
-      if (alive == null) {
-        // Живых ключей ещё нет — перепланировать пробуждение
-        _scheduleWakeup();
-        break;
-      }
-      _waiters.removeAt(0).complete(alive);
+    final alive = _nextAlive();
+    if (alive == null) {
+      // Живых ключей ещё нет — перепланировать пробуждение.
+      _scheduleWakeup();
+      notifyListeners();
+      return;
     }
+    // Выдаём ключ ровно одному waiter'у и выходим.
+    _waiters.removeAt(0).complete(alive);
     notifyListeners();
   }
 
