@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../../core/services/clipboard_service.dart';
 
 import '../../core/constants/design_tokens.dart';
 import '../../features/transcription/result_args.dart';
@@ -127,14 +127,20 @@ class _ResultScreenState extends State<ResultScreen> {
 
   Future<void> _onCopyTap() async {
     if (_args == null) return;
-    // Bug-3: копируем текущий режим отображения, а не всегда timestamped.
-    // plain text значительно короче и не попадает под лимит буфера обмена Android 13+.
-    await Clipboard.setData(ClipboardData(text: _currentText));
-    if (!mounted) return;
-    setState(() => _copied = true);
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      if (mounted) setState(() => _copied = false);
-    });
+    // Используем ClipboardService (super_clipboard) — обходит Android Binder-лимит для длинных транскрипций.
+    try {
+      await ClipboardService.copyText(_currentText);
+      if (!mounted) return;
+      setState(() => _copied = true);
+      Future.delayed(const Duration(milliseconds: 1500), () {
+        if (mounted) setState(() => _copied = false);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка копирования: $e')),
+      );
+    }
   }
 
   @override
