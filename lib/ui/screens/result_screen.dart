@@ -20,12 +20,21 @@ class _TranscriptView extends StatefulWidget {
 }
 
 class _TranscriptViewState extends State<_TranscriptView> {
-  late final List<String> _segments;
+  late List<String> _segments;
 
   @override
   void initState() {
     super.initState();
     _segments = _ResultScreenState._splitSegments(widget.text);
+  }
+
+  @override
+  void didUpdateWidget(_TranscriptView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Пересчитываем сегменты при смене текста (переключатель plain/timestamp).
+    if (oldWidget.text != widget.text) {
+      _segments = _ResultScreenState._splitSegments(widget.text);
+    }
   }
 
   @override
@@ -45,6 +54,8 @@ class _TranscriptViewState extends State<_TranscriptView> {
 
 /// Экран результата транскрибации.
 /// Отображает текст, кнопку «Скопировать» с визуальным feedback, сохраняет txt.
+/// Переключатель «С метками / Без меток» (Bug-2): виден только когда
+/// result.text != result.plainText (т.е. файл был chunked и содержит таймкоды).
 class ResultScreen extends StatefulWidget {
   const ResultScreen({super.key});
 
@@ -57,6 +68,10 @@ class _ResultScreenState extends State<ResultScreen> {
   bool _copied = false;
   String? _savedPath;
 
+  /// true = показываем текст с таймкодами; false = plain text.
+  /// Изначально true только если в результате есть таймкоды.
+  bool _showTimestamps = true;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -64,6 +79,8 @@ class _ResultScreenState extends State<ResultScreen> {
       final raw = ModalRoute.of(context)?.settings.arguments;
       if (raw is ResultArgs) {
         _args = raw;
+        // Если таймкодов нет (single-shot plain), стартуем в plain-режиме.
+        _showTimestamps = _hasTimestamps(raw.result.text);
         // OUT-02: автоматически сохраняем txt после открытия экрана
         _saveTranscriptTxt();
       } else {
@@ -74,11 +91,17 @@ class _ResultScreenState extends State<ResultScreen> {
     }
   }
 
+  /// Проверяет, есть ли в тексте таймкоды вида [HH:MM:SS].
+  static bool _hasTimestamps(String text) {
+    return RegExp(r'\[\d{2}:\d{2}:\d{2}\]').hasMatch(text);
+  }
+
   Future<void> _saveTranscriptTxt() async {
     try {
       final path = await const TranscriptWriter().writeTxt(
         baseName: _args!.file.name,
-        text: _args!.result.text,
+        // Сохраняем plain text — это основной формат для LLM-работы.
+        text: _args!.result.plainText,
       );
       if (mounted) setState(() => _savedPath = path);
     } catch (_) {
@@ -86,9 +109,19 @@ class _ResultScreenState extends State<ResultScreen> {
     }
   }
 
+  /// Возвращает текст в текущем режиме отображения (для копирования и показа).
+  String get _currentText {
+    final r = _args!.result;
+    // Если тексты совпадают (single-shot или нет таймкодов) — всегда возвращаем text.
+    if (r.text == r.plainText) return r.text;
+    return _showTimestamps ? r.text : r.plainText;
+  }
+
   Future<void> _onCopyTap() async {
     if (_args == null) return;
-    await Clipboard.setData(ClipboardData(text: _args!.result.text));
+    // Bug-3: копируем текущий режим отображения, а не всегда timestamped.
+    // plain text значительно короче и не попадает под лимит буфера обмена Android 13+.
+    await Clipboard.setData(ClipboardData(text: _currentText));
     if (!mounted) return;
     setState(() => _copied = true);
     Future.delayed(const Duration(milliseconds: 1500), () {
@@ -105,6 +138,8 @@ class _ResultScreenState extends State<ResultScreen> {
     final file = _args!.file;
     final r = _args!.result;
     final formattedDate = _formatNow();
+    // Переключатель нужен только если есть обе версии (chunked с таймкодами).
+    final hasToggle = r.text != r.plainText;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -157,13 +192,23 @@ class _ResultScreenState extends State<ResultScreen> {
                     onPressed: _onCopyTap,
                   ),
                 ),
-                const SizedBox(height: AppSpacing.lg),
+                const SizedBox(height: AppSpacing.sm),
+
+                // Переключатель формата (Bug-2): виден только при наличии таймкодов.
+                if (hasToggle) ...[
+                  _buildFormatToggle(),
+                  const SizedBox(height: AppSpacing.sm),
+                ],
 
                 // Текст расшифровки — ленивый рендеринг по сегментам
                 Expanded(
                   child: GlassCard(
                     padding: const EdgeInsets.all(AppSpacing.md),
-                    child: _TranscriptView(text: r.text),
+                    child: _TranscriptView(
+                      // Ключ заставляет ListView перестроиться при смене режима.
+                      key: ValueKey(_showTimestamps),
+                      text: _currentText,
+                    ),
                   ),
                 ),
 
@@ -184,6 +229,32 @@ class _ResultScreenState extends State<ResultScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  /// Строит переключатель «С метками / Без меток».
+  Widget _buildFormatToggle() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Вид:',
+          style: AppTextStyles.label.copyWith(color: AppColors.inkSecondary),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        // Используем ChoiceChip-пару для наглядного переключения.
+        _FormatChip(
+          label: 'С метками',
+          selected: _showTimestamps,
+          onTap: () => setState(() => _showTimestamps = true),
+        ),
+        const SizedBox(width: AppSpacing.xs),
+        _FormatChip(
+          label: 'Без меток',
+          selected: !_showTimestamps,
+          onTap: () => setState(() => _showTimestamps = false),
+        ),
+      ],
     );
   }
 
@@ -230,5 +301,51 @@ class _ResultScreenState extends State<ResultScreen> {
     if (h > 0) return '${h}ч ${m}мин';
     if (m > 0) return '${m}мин ${s}с';
     return '${s}с';
+  }
+}
+
+/// Минималистичный чип-переключатель для выбора формата отображения.
+class _FormatChip extends StatelessWidget {
+  const _FormatChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.xs,
+        ),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.accent.withValues(alpha: 0.15)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          border: Border.all(
+            color: selected
+                ? AppColors.accent.withValues(alpha: 0.5)
+                : AppColors.inkDivider,
+            width: 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: AppTextStyles.label.copyWith(
+            color: selected ? AppColors.accent : AppColors.inkSecondary,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+          ),
+        ),
+      ),
+    );
   }
 }

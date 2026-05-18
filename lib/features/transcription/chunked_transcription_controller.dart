@@ -318,12 +318,16 @@ class ChunkedTranscriptionController extends ChangeNotifier {
   ///
   /// Для каждого сегмента вычисляет абсолютное время:
   /// `absoluteStart = chunkIndex * chunkDuration + segment.start`.
-  /// Форматирует в `[HH:MM:SS] segment.text`.
+  /// [text] форматирует в `[HH:MM:SS] segment.text` (timestamped).
+  /// [plainText] содержит тот же текст без временных меток (Bug-2).
   TranscriptionResult _assembleResult(
     List<TranscriptionResult> results,
     double chunkDuration,
   ) {
+    // timestamped-буфер: `[HH:MM:SS] текст`
     final buffer = StringBuffer();
+    // plain-буфер: чистый текст без таймкодов для переключателя вида
+    final plainBuffer = StringBuffer();
     final allSegments = <TranscriptionSegment>[];
     double totalDuration = 0.0;
     String language = '';
@@ -339,6 +343,7 @@ class ChunkedTranscriptionController extends ChangeNotifier {
           final absoluteStart = i * chunkDuration + seg.start;
           final ts = _formatTimecode(absoluteStart);
           buffer.write('[$ts] ${seg.text.trim()}\n');
+          plainBuffer.write('${seg.text.trim()}\n');
           allSegments.add(TranscriptionSegment(
             start: absoluteStart,
             end: i * chunkDuration + seg.end,
@@ -350,11 +355,13 @@ class ChunkedTranscriptionController extends ChangeNotifier {
         final offsetStart = i * chunkDuration;
         final ts = _formatTimecode(offsetStart);
         buffer.write('[$ts] ${r.text.trim()}\n');
+        plainBuffer.write('${r.text.trim()}\n');
       }
     }
 
     return TranscriptionResult(
       text: buffer.toString().trimRight(),
+      plainText: plainBuffer.toString().trimRight(),
       language: language,
       duration: totalDuration,
       words: const [],

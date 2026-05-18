@@ -46,10 +46,18 @@ class WordTimestamp {
 }
 
 /// Результат транскрибации Groq Whisper.
-/// Phase 1 использует только `text`. Поле `words` понадобится в Phase 5 (SRT).
-/// Поле `segments` используется в Phase 2 для сборки таймкодов по чанкам.
+///
+/// [text] — текст с таймкодами `[HH:MM:SS]` (для chunked-результата) или
+/// plain text (для single-shot файла, который API вернул без сегментов).
+///
+/// [plainText] — текст без таймкодов. Для single-shot равен [text].
+/// Используется переключателем вида на ResultScreen (Bug-2).
 class TranscriptionResult {
   final String text;
+
+  /// Чистый текст без временных меток. Для single-shot совпадает с [text].
+  final String plainText;
+
   final String language;
   final double duration;
   final List<WordTimestamp> words;
@@ -59,15 +67,17 @@ class TranscriptionResult {
 
   const TranscriptionResult({
     required this.text,
+    String? plainText,
     required this.language,
     required this.duration,
     required this.words,
     this.segments = const [],
-  });
+  }) : plainText = plainText ?? text;
 
   /// Создаёт пустой результат-заглушку (используется при сборке чанков вместо null-слотов).
   const TranscriptionResult.empty()
       : text = '',
+        plainText = '',
         language = '',
         duration = 0.0,
         words = const [],
@@ -76,8 +86,11 @@ class TranscriptionResult {
   factory TranscriptionResult.fromJson(Map<String, dynamic> json) {
     final wordsList = json['words'] as List<dynamic>?;
     final segmentsList = json['segments'] as List<dynamic>?;
+    final rawText = json['text'] as String? ?? '';
     return TranscriptionResult(
-      text: json['text'] as String? ?? '',
+      text: rawText,
+      // Для single-shot API возвращает plain text — plainText совпадает с text.
+      plainText: rawText,
       language: json['language'] as String? ?? '',
       duration: (json['duration'] as num?)?.toDouble() ?? 0.0,
       words: wordsList == null
