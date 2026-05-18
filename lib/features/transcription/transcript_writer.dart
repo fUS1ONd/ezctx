@@ -23,6 +23,26 @@ class TranscriptWriter {
     return file.path;
   }
 
+  /// Сохраняет оба формата (plain и с таймкодами) и возвращает оба пути.
+  /// Пути: `<app docs>/transcripts/<baseName>.txt` и `<baseName>_timestamped.txt`.
+  Future<({String plainPath, String timestampedPath})> writeBoth({
+    required String baseName,
+    required String plainText,
+    required String timestampedText,
+  }) async {
+    final docs = await getApplicationDocumentsDirectory();
+    final dir = Directory('${docs.path}/transcripts');
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    final safe = _sanitize(baseName);
+    final plainFile = File('${dir.path}/$safe.txt');
+    final tsFile = File('${dir.path}/${safe}_timestamped.txt');
+    await plainFile.writeAsString(plainText, flush: true);
+    await tsFile.writeAsString(timestampedText, flush: true);
+    return (plainPath: plainFile.path, timestampedPath: tsFile.path);
+  }
+
   static String _sanitize(String name) {
     var n = name;
     final dotIdx = n.lastIndexOf('.');

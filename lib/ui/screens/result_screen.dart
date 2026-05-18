@@ -54,8 +54,8 @@ class _TranscriptViewState extends State<_TranscriptView> {
 
 /// Экран результата транскрибации.
 /// Отображает текст, кнопку «Скопировать» с визуальным feedback, сохраняет txt.
-/// Переключатель «С метками / Без меток» (Bug-2): виден только когда
-/// result.text != result.plainText (т.е. файл был chunked и содержит таймкоды).
+/// Переключатель «С метками / Без меток» (Bug-2): всегда виден; при отсутствии
+/// таймкодов оба режима показывают одинаковый текст — это ожидаемое поведение.
 class ResultScreen extends StatefulWidget {
   const ResultScreen({super.key});
 
@@ -98,12 +98,20 @@ class _ResultScreenState extends State<ResultScreen> {
 
   Future<void> _saveTranscriptTxt() async {
     try {
-      final path = await const TranscriptWriter().writeTxt(
+      // Сохраняем оба формата: plain (для LLM) и с таймкодами (для истории).
+      final paths = await const TranscriptWriter().writeBoth(
         baseName: _args!.file.name,
-        // Сохраняем plain text — это основной формат для LLM-работы.
-        text: _args!.result.plainText,
+        plainText: _args!.result.plainText,
+        timestampedText: _args!.result.text,
       );
-      if (mounted) setState(() => _savedPath = path);
+      if (mounted) {
+        // Показываем папку (не полный путь), так как файлов теперь два.
+        final folderPath = paths.plainPath.substring(
+          0,
+          paths.plainPath.lastIndexOf('/'),
+        );
+        setState(() => _savedPath = folderPath);
+      }
     } catch (_) {
       // тихо — UI не блокируется ошибкой записи
     }
@@ -138,8 +146,6 @@ class _ResultScreenState extends State<ResultScreen> {
     final file = _args!.file;
     final r = _args!.result;
     final formattedDate = _formatNow();
-    // Переключатель нужен только если есть обе версии (chunked с таймкодами).
-    final hasToggle = r.text != r.plainText;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -194,11 +200,9 @@ class _ResultScreenState extends State<ResultScreen> {
                 ),
                 const SizedBox(height: AppSpacing.sm),
 
-                // Переключатель формата (Bug-2): виден только при наличии таймкодов.
-                if (hasToggle) ...[
-                  _buildFormatToggle(),
-                  const SizedBox(height: AppSpacing.sm),
-                ],
+                // Переключатель формата (Bug-2): всегда виден.
+                _buildFormatToggle(),
+                const SizedBox(height: AppSpacing.sm),
 
                 // Текст расшифровки — ленивый рендеринг по сегментам
                 Expanded(
@@ -216,6 +220,7 @@ class _ResultScreenState extends State<ResultScreen> {
                 if (_savedPath != null) ...[
                   const SizedBox(height: AppSpacing.sm),
                   Text(
+                    // _savedPath содержит путь к папке (два файла: plain + timestamped).
                     'Сохранено: $_savedPath',
                     style: AppTextStyles.label
                         .copyWith(color: AppColors.inkTertiary),

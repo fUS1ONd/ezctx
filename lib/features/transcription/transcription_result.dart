@@ -47,11 +47,12 @@ class WordTimestamp {
 
 /// Результат транскрибации Groq Whisper.
 ///
-/// [text] — текст с таймкодами `[HH:MM:SS]` (для chunked-результата) или
-/// plain text (для single-shot файла, который API вернул без сегментов).
+/// [text] — текст с таймкодами `[HH:MM:SS]`. Строится из сегментов, если
+/// они присутствуют в ответе (chunked и single-shot verbose_json оба возвращают
+/// segments). Если сегментов нет — содержит plain text.
 ///
-/// [plainText] — текст без таймкодов. Для single-shot равен [text].
-/// Используется переключателем вида на ResultScreen (Bug-2).
+/// [plainText] — текст без таймкодов. Используется переключателем вида
+/// на ResultScreen.
 class TranscriptionResult {
   final String text;
 
@@ -84,13 +85,39 @@ class TranscriptionResult {
         segments = const [];
 
   factory TranscriptionResult.fromJson(Map<String, dynamic> json) {
-    final wordsList = json['words'] as List<dynamic>?;
-    final segmentsList = json['segments'] as List<dynamic>?;
     final rawText = json['text'] as String? ?? '';
+    final segmentsList = json['segments'] as List<dynamic>?;
+    final wordsList = json['words'] as List<dynamic>?;
+
+    final segments = segmentsList == null
+        ? const <TranscriptionSegment>[]
+        : segmentsList
+            .map((s) => TranscriptionSegment.fromJson(s as Map<String, dynamic>))
+            .toList();
+
+    String timestampedText;
+    String plainText;
+
+    if (segments.isNotEmpty) {
+      // Строим оба варианта из сегментов (single-shot verbose_json тоже возвращает segments).
+      final buf = StringBuffer();
+      final plain = StringBuffer();
+      for (final seg in segments) {
+        final ts = _formatTimecode(seg.start);
+        buf.write('[$ts] ${seg.text.trim()}\n');
+        plain.write('${seg.text.trim()}\n');
+      }
+      timestampedText = buf.toString().trimRight();
+      plainText = plain.toString().trimRight();
+    } else {
+      // Запасной вариант: сегментов нет — используем сырой текст в обоих режимах.
+      timestampedText = rawText;
+      plainText = rawText;
+    }
+
     return TranscriptionResult(
-      text: rawText,
-      // Для single-shot API возвращает plain text — plainText совпадает с text.
-      plainText: rawText,
+      text: timestampedText,
+      plainText: plainText,
       language: json['language'] as String? ?? '',
       duration: (json['duration'] as num?)?.toDouble() ?? 0.0,
       words: wordsList == null
@@ -98,12 +125,16 @@ class TranscriptionResult {
           : wordsList
               .map((w) => WordTimestamp.fromJson(w as Map<String, dynamic>))
               .toList(),
-      segments: segmentsList == null
-          ? const <TranscriptionSegment>[]
-          : segmentsList
-              .map((s) =>
-                  TranscriptionSegment.fromJson(s as Map<String, dynamic>))
-              .toList(),
+      segments: segments,
     );
+  }
+
+  /// Форматирует секунды в строку `HH:MM:SS`.
+  static String _formatTimecode(double totalSeconds) {
+    final secs = totalSeconds.round();
+    final h = secs ~/ 3600;
+    final m = (secs % 3600) ~/ 60;
+    final s = secs % 60;
+    return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 }
