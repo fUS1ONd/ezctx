@@ -36,6 +36,13 @@
         <meta-data
             android:name="io.flutter.embedding.android.EnableImpeller"
             android:value="true" />
+        <!-- super_clipboard ContentProvider: обходит Android Binder-лимит для больших текстов -->
+        <provider
+            android:name="com.superlist.super_native_extensions.DataProvider"
+            android:authorities="com.ezctx.app.SuperClipboardDataProvider"
+            android:exported="true"
+            android:grantUriPermissions="true" >
+        </provider>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
