@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
@@ -9,6 +10,73 @@ import '../../core/constants/app_constants.dart';
 import '../../core/error/app_exception.dart';
 import 'selected_audio_file.dart';
 import 'transcription_result.dart';
+
+// ────────────────────────────────────────────────────────────────────────────
+// Парсинг retry-after заголовков (top-level для тестируемости)
+// ────────────────────────────────────────────────────────────────────────────
+
+/// Парсит заголовки HTTP 429-ответа и возвращает рекомендуемую задержку в секундах.
+///
+/// Порядок приоритетов (per D-06):
+///   1. `retry-after` → целое число секунд
+///   2. `x-ratelimit-reset-requests` и `x-ratelimit-reset-tokens` → мин из двух
+///   3. Fallback 60 секунд
+///
+/// Безопасность T-04-02: значение ограничено сверху 3600 с (1 час),
+/// чтобы Groq не мог заблокировать ключ на сутки через манипуляцию заголовком.
+int parseRetryAfterFromHeaders(Map<String, String> headers) {
+  // 1. retry-after (целые секунды)
+  final retryAfter = headers['retry-after'];
+  if (retryAfter != null) {
+    final seconds = int.tryParse(retryAfter.trim());
+    if (seconds != null && seconds > 0) {
+      return min(seconds, 3600);
+    }
+  }
+
+  // 2. x-ratelimit-reset-requests / x-ratelimit-reset-tokens (строки вида "2m59.56s")
+  final resetReq = headers['x-ratelimit-reset-requests'];
+  final resetTok = headers['x-ratelimit-reset-tokens'];
+  int? secsReq = resetReq != null ? _parseDurationString(resetReq) : null;
+  int? secsTok = resetTok != null ? _parseDurationString(resetTok) : null;
+
+  if (secsReq != null || secsTok != null) {
+    final result = [
+      if (secsReq != null) secsReq,
+      if (secsTok != null) secsTok,
+    ].reduce(min);
+    return min(result, 3600);
+  }
+
+  // 3. Fallback
+  return 60;
+}
+
+/// Парсит строку вида "2h", "2m30s", "2m59.56s", "45s", "500ms" в целые секунды.
+/// Возвращает 60 (fallback) если строка не распознана или сумма равна 0.
+int _parseDurationString(String s) {
+  var total = 0;
+
+  // Часы: "2h"
+  final hoursMatch = RegExp(r'(\d+)h').firstMatch(s);
+  if (hoursMatch != null) {
+    total += int.parse(hoursMatch.group(1)!) * 3600;
+  }
+
+  // Минуты: "2m" но не "ms"
+  final minutesMatch = RegExp(r'(\d+)m(?!s)').firstMatch(s);
+  if (minutesMatch != null) {
+    total += int.parse(minutesMatch.group(1)!) * 60;
+  }
+
+  // Секунды (включая дробные): "59.56s"
+  final secondsMatch = RegExp(r'([\d.]+)s').firstMatch(s);
+  if (secondsMatch != null) {
+    total += double.parse(secondsMatch.group(1)!).ceil();
+  }
+
+  return total > 0 ? total : 60;
+}
 
 /// HTTP-клиент для Groq Whisper. Phase 1: single-shot (один файл, один запрос).
 /// Чанкование и параллельность — Phase 2.
@@ -72,7 +140,13 @@ class GroqApiService {
       }
       if (response.statusCode == 401) throw const AuthException(_authErrorMessage);
       if (response.statusCode == 429) {
-        throw const RateLimitException('Превышен лимит запросов Groq');
+        // Парсим заголовки для определения времени ожидания (T-04-02: cap 3600 с)
+        final retryAfterSeconds =
+            parseRetryAfterFromHeaders(response.headers);
+        throw RateLimitException(
+          'Превышен лимит запросов Groq',
+          retryAfterSeconds: retryAfterSeconds,
+        );
       }
       // Для всех остальных ошибок включаем тело ответа Groq для диагностики.
       throw NetworkException(
