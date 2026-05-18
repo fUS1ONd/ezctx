@@ -265,7 +265,8 @@ const _testKey = ApiKeyView(
 
 final _dummyFile = NormalizedAudioFile(
   path: '/tmp/test_lecture.mp3',
-  durationSeconds: 3000.0, // 50 мин — больше порога чанкования
+  // 9000s = 2.5 ч → N=ceil(9000/4920)=2, chunkDuration=4500s → offset чанка 1 = [01:15:00]
+  durationSeconds: 9000.0,
 );
 
 // ---------------------------------------------------------------------------

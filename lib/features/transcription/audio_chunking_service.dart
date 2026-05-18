@@ -91,6 +91,11 @@ class AudioChunkingService {
         (totalDurationSeconds / AppConstants.kChunkThresholdSeconds).ceil();
     final optimalDuration = totalDurationSeconds / n;
 
+    // Защита от command injection: отклоняем пути со спецсимволами ffmpeg/shell.
+    if (filePath.contains(RegExp(r'''["'`$\\!]'''))) {
+      throw InternalException('Путь к файлу содержит недопустимые символы: $filePath');
+    }
+
     // Создаём уникальную временную директорию для чанков
     final tmpBase = outputDir ??
         '${(await getTemporaryDirectory()).path}'

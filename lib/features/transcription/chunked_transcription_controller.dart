@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math' show min;
 
 import 'package:flutter/foundation.dart';
 
@@ -179,10 +178,9 @@ class ChunkedTranscriptionController extends ChangeNotifier {
       return;
     }
 
-    // Вычисляем фактическую длительность чанка для корректных таймкодов.
-    final chunkN =
-        (file.durationSeconds / AppConstants.kChunkThresholdSeconds).ceil();
-    final chunkDuration = file.durationSeconds / chunkN;
+    // Используем реальное количество чанков от ffmpeg для точных таймкодов.
+    // chunkFiles.length >= 1 гарантировано: split() либо возвращает файлы, либо бросает.
+    final chunkDuration = file.durationSeconds / chunkFiles.length;
 
     final n = chunkFiles.length;
     _chunkStates = List<ChunkState>.generate(n, (i) => ChunkWaiting(i));
@@ -195,11 +193,10 @@ class ChunkedTranscriptionController extends ChangeNotifier {
       totalCount: n,
     ));
 
-    // Семафор с количеством слотов = min(живых ключей, лимита параллельности).
-    final concurrency = min(
-      _pool.aliveKeyCount.clamp(1, AppConstants.kMaxConcurrentChunks),
-      AppConstants.kMaxConcurrentChunks,
-    );
+    // Семафор: clamp(1, kMaxConcurrentChunks) уже гарантирует верхний предел.
+    // Нижний порог 1 предотвращает деление на ноль и гарантирует обработку хотя бы одного чанка.
+    final concurrency =
+        _pool.aliveKeyCount.clamp(1, AppConstants.kMaxConcurrentChunks);
     final semaphore = _Semaphore(concurrency);
 
     try {
