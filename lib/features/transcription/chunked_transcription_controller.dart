@@ -275,10 +275,18 @@ class ChunkedTranscriptionController extends ChangeNotifier {
           totalCount: _chunkStates.length,
         ));
         return;
+      } on AllKeysBlockedException {
+        // Все ключи заблокированы и таймаут (10 мин) истёк — пробрасываем напрямую,
+        // чтобы Future.wait→catch вывел понятное сообщение, а не «Неизвестная ошибка».
+        rethrow;
       } on RateLimitException catch (e) {
         attempt++;
         // Сообщаем пулу о блокировке ключа на указанное время.
         _pool.reportRateLimited(key, e.retryAfterSeconds);
+        if (attempt >= maxAttempts) {
+          // Исчерпаны все попытки из-за rate-limit — сообщаем корректную причину.
+          throw const NetworkException('Превышено число попыток (rate limit)');
+        }
         _updateChunkState(index, ChunkRetrying(index, attempt: attempt));
         // Не ждём явно: следующая итерация вызовет acquireKey() и дождётся живого ключа.
       } on AuthException {
