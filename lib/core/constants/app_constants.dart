@@ -35,6 +35,10 @@ class AppConstants {
   /// 75 мин × 240 КБ/мин ≈ 17.6 МБ < 19 МБ лимита Groq.
   static const double kChunkDurationSeconds = 4500.0;
 
+  /// Максимальное число параллельных чанков.
+  /// Реальное значение = min(pool.aliveKeyCount, этой константы).
+  static const int kMaxConcurrentChunks = 5;
+
   // Secure storage keys
   static const String storageKeyApiKeys = 'groq_api_keys_v1';
 

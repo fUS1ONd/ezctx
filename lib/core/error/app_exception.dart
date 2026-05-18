@@ -29,6 +29,17 @@ class InternalException extends AppException {
 }
 
 /// HTTP 429 от Groq — превышен rate limit; ретраится с задержкой.
+/// [retryAfterSeconds] — количество секунд до следующего разрешённого запроса.
+/// Парсится из заголовков retry-after / x-ratelimit-reset-*; дефолт 60 с.
 class RateLimitException extends AppException {
-  const RateLimitException(super.message);
+  final int retryAfterSeconds;
+  const RateLimitException(super.message, {this.retryAfterSeconds = 60});
+}
+
+/// Все API-ключи заблокированы rate-limit'ом и таймаут ожидания истёк.
+/// Бросается из GroqKeyPool.acquireKey() после 10 минут ожидания живого ключа.
+class AllKeysBlockedException extends AppException {
+  const AllKeysBlockedException([
+    super.message = 'Все ключи заблокированы. Ожидание…',
+  ]);
 }
