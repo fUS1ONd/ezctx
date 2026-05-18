@@ -9,6 +9,7 @@ import 'package:http_parser/http_parser.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/error/app_exception.dart';
 import 'selected_audio_file.dart';
+import 'transcription_options.dart';
 import 'transcription_result.dart';
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -99,13 +100,14 @@ class GroqApiService {
     required List<int> bytes,
     required String filename,
     required String apiKey,
+    TranscriptionOptions options = const TranscriptionOptions.defaults(),
   }) async {
     final client = _clientFactory();
     try {
       final uri = Uri.parse(AppConstants.groqApiUrl);
       final request = http.MultipartRequest('POST', uri)
         ..headers['Authorization'] = 'Bearer $apiKey'
-        ..fields['model'] = AppConstants.groqDefaultModel
+        ..fields['model'] = options.model.apiValue
         ..fields['response_format'] = AppConstants.groqResponseFormat
         // Для сборки чанков нужны segment-level таймкоды.
         // word-level здесь не нужен — _assembleResult использует только r.segments.
@@ -120,6 +122,10 @@ class GroqApiService {
             contentType: MediaType('audio', 'mpeg'),
           ),
         );
+      // Передаём язык только если явно задан (auto — не передаём).
+      if (options.language != TranscriptionLanguage.auto) {
+        request.fields['language'] = options.language.isoCode;
+      }
 
       final streamed = await client.send(request).timeout(
         const Duration(minutes: 5),
@@ -171,18 +177,23 @@ class GroqApiService {
   Future<TranscriptionResult> transcribe({
     required SelectedAudioFile file,
     required String apiKey,
+    TranscriptionOptions options = const TranscriptionOptions.defaults(),
   }) async {
     final client = _clientFactory();
     try {
       final uri = Uri.parse(AppConstants.groqApiUrl);
       final request = http.MultipartRequest('POST', uri)
         ..headers['Authorization'] = 'Bearer $apiKey'
-        ..fields['model'] = AppConstants.groqDefaultModel
+        ..fields['model'] = options.model.apiValue
         ..fields['response_format'] = AppConstants.groqResponseFormat
         // Pitfall 3: имя поля с '[]' обязательно (Groq API соглашение для массивов).
         ..fields['timestamp_granularities[]'] =
             AppConstants.groqTimestampGranularity
         ..files.add(await http.MultipartFile.fromPath('file', file.path));
+      // Передаём язык только если явно задан (auto — не передаём).
+      if (options.language != TranscriptionLanguage.auto) {
+        request.fields['language'] = options.language.isoCode;
+      }
 
       final streamed = await client.send(request).timeout(
         const Duration(minutes: 5),

@@ -9,7 +9,8 @@ import 'package:ezctx/features/transcription/audio_metadata.dart';
 import 'package:ezctx/features/transcription/chunked_transcription_controller.dart';
 import 'package:ezctx/features/transcription/groq_api_service.dart';
 import 'package:ezctx/features/transcription/groq_key_pool.dart';
-import 'package:ezctx/features/transcription/selected_audio_file.dart';
+import 'package:ezctx/features/transcription/normalized_audio_file.dart';
+import 'package:ezctx/features/transcription/transcription_options.dart';
 import 'package:ezctx/features/transcription/transcription_result.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -34,6 +35,7 @@ class _MockGroqApiService extends GroqApiService {
     required List<int> bytes,
     required String filename,
     required String apiKey,
+    TranscriptionOptions options = const TranscriptionOptions.defaults(),
   }) async {
     callCount++;
     return _handler(bytes, filename, apiKey);
@@ -254,11 +256,9 @@ const _testKey = ApiKeyView(
   masked: '••••••••••••••••1234',
 );
 
-final _dummyFile = SelectedAudioFile(
+final _dummyFile = NormalizedAudioFile(
   path: '/tmp/test_lecture.mp3',
-  name: 'test_lecture.mp3',
-  sizeBytes: 10 * 1024 * 1024,
-  extension: 'mp3',
+  durationSeconds: 600.0,
 );
 
 TranscriptionResult _makeResult({

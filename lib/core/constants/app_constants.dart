@@ -7,6 +7,7 @@ class AppConstants {
   static const String groqApiUrl =
       'https://api.groq.com/openai/v1/audio/transcriptions';
   static const String groqDefaultModel = 'whisper-large-v3';
+  static const String groqTurboModel = 'whisper-large-v3-turbo';
   static const String groqResponseFormat = 'verbose_json';
   static const String groqTimestampGranularity = 'word';
 
@@ -41,6 +42,7 @@ class AppConstants {
 
   // Secure storage keys
   static const String storageKeyApiKeys = 'groq_api_keys_v1';
+  static const String storageKeyTranscriptionOptions = 'transcription_options_v1';
 
   // Маршруты приложения
   static const String routeHome = '/';

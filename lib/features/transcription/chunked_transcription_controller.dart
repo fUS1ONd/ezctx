@@ -9,9 +9,10 @@ import '../../core/error/app_exception.dart';
 import 'audio_chunking_service.dart';
 import 'chunk_state.dart';
 import 'groq_key_pool.dart';
-import 'selected_audio_file.dart';
+import 'normalized_audio_file.dart';
 import 'transcription_result.dart';
 import 'groq_api_service.dart';
+import 'transcription_options.dart';
 
 // ---------------------------------------------------------------------------
 // Вспомогательный семафор: ограничивает количество одновременных операций.
@@ -154,7 +155,10 @@ class ChunkedTranscriptionController extends ChangeNotifier {
   ///
   /// Переводит контроллер через ChunkedSplitting → ChunkedProcessing →
   /// ChunkedSuccess / ChunkedError / ChunkedMissingKey.
-  Future<void> start(SelectedAudioFile file) async {
+  Future<void> start(
+    NormalizedAudioFile file, {
+    TranscriptionOptions options = const TranscriptionOptions.defaults(),
+  }) async {
     _set(const ChunkedSplitting());
 
     // Проверяем наличие ключей в пуле.
@@ -201,7 +205,7 @@ class ChunkedTranscriptionController extends ChangeNotifier {
       await Future.wait(
         chunkFiles.asMap().entries.map(
           (entry) => semaphore.run(
-            () => _processChunk(entry.key, entry.value),
+            () => _processChunk(entry.key, entry.value, options),
           ),
         ),
       );
@@ -241,7 +245,11 @@ class ChunkedTranscriptionController extends ChangeNotifier {
   /// При [RateLimitException] сообщает пулу о блокировке и пробует следующий ключ.
   /// При [AuthException] — пробрасывает немедленно.
   /// При [NetworkException] — экспоненциальная задержка, до [_maxAttempts] попыток.
-  Future<void> _processChunk(int index, File file) async {
+  Future<TranscriptionResult> _processChunk(
+    int index,
+    File file,
+    TranscriptionOptions options,
+  ) async {
     final bytes = await file.readAsBytes();
     final filename = 'chunk_${index.toString().padLeft(3, '0')}.mp3';
 
@@ -264,6 +272,7 @@ class ChunkedTranscriptionController extends ChangeNotifier {
           bytes: bytes,
           filename: filename,
           apiKey: key,
+          options: options,
         );
 
         _results[index] = result;
@@ -274,7 +283,7 @@ class ChunkedTranscriptionController extends ChangeNotifier {
           completedCount: _completedCount,
           totalCount: _chunkStates.length,
         ));
-        return;
+        return result;
       } on AllKeysBlockedException {
         // Все ключи заблокированы и таймаут (10 мин) истёк — пробрасываем напрямую,
         // чтобы Future.wait→catch вывел понятное сообщение, а не «Неизвестная ошибка».

@@ -4,6 +4,7 @@ import '../../core/error/app_exception.dart';
 import 'groq_api_service.dart';
 import 'groq_key_pool.dart';
 import 'selected_audio_file.dart';
+import 'transcription_options.dart';
 import 'transcription_result.dart';
 
 sealed class TranscriptionState {
@@ -66,7 +67,10 @@ class TranscriptionController extends ChangeNotifier {
 
   /// Запустить транскрибацию. Файл передаётся снаружи (HomeScreen → ProcessingScreen).
   /// При HTTP 429 автоматически ротирует ключи через [GroqKeyPool].
-  Future<void> start(SelectedAudioFile file) async {
+  Future<void> start(
+    SelectedAudioFile file, {
+    TranscriptionOptions options = const TranscriptionOptions.defaults(),
+  }) async {
     _set(const TranscriptionLoading());
 
     // Проверяем наличие ключей в пуле.
@@ -92,7 +96,11 @@ class TranscriptionController extends ChangeNotifier {
       }
 
       try {
-        final result = await _api.transcribe(file: file, apiKey: key);
+        final result = await _api.transcribe(
+          file: file,
+          apiKey: key,
+          options: options,
+        );
         _set(TranscriptionSuccess(result));
         return;
       } on RateLimitException catch (e) {

@@ -150,14 +150,6 @@ class _ProcessingScreenState extends State<ProcessingScreen>
     if (!mounted) return;
     setState(() => _normalizing = false);
 
-    // Создаём SelectedAudioFile на основе нормализованного файла.
-    final normalizedAudioFile = SelectedAudioFile(
-      path: _normalizedFile!.path,
-      name: _file!.name,
-      sizeBytes: File(_normalizedFile!.path).statSync().size,
-      extension: 'mp3',
-    );
-
     if (_isChunked) {
       // Chunked-режим: создаём ChunkedTranscriptionController с pool из widget.
       _chunkedController = ChunkedTranscriptionController(
@@ -168,9 +160,15 @@ class _ProcessingScreenState extends State<ProcessingScreen>
       _chunkedController!.addListener(_onChunkedStateChange);
       // await: некропотанные исключения внутри start() долетят до try/catch
       // этого метода, а не будут молча проглочены как unhandled Future rejection.
-      await _chunkedController!.start(normalizedAudioFile);
+      await _chunkedController!.start(_normalizedFile!);
     } else {
-      // Стандартный режим: TranscriptionController.
+      // Стандартный режим: TranscriptionController с нормализованным файлом.
+      final normalizedAudioFile = SelectedAudioFile(
+        path: _normalizedFile!.path,
+        name: _file!.name,
+        sizeBytes: File(_normalizedFile!.path).statSync().size,
+        extension: 'mp3',
+      );
       await _controller.start(normalizedAudioFile);
     }
   }
@@ -582,7 +580,11 @@ class _ProcessingScreenState extends State<ProcessingScreen>
             if (retryable && _file != null)
               PrimaryButton(
                 label: 'Повторить',
-                onPressed: () => _chunkedController?.start(_file!),
+                onPressed: () {
+                  if (_normalizedFile != null) {
+                    _chunkedController?.start(_normalizedFile!);
+                  }
+                },
               ),
             const SizedBox(height: AppSpacing.sm),
             TextButton(

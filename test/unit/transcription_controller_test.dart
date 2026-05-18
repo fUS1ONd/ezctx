@@ -3,6 +3,7 @@ import 'package:ezctx/features/transcription/groq_api_service.dart';
 import 'package:ezctx/features/transcription/groq_key_pool.dart';
 import 'package:ezctx/features/transcription/selected_audio_file.dart';
 import 'package:ezctx/features/transcription/transcription_controller.dart';
+import 'package:ezctx/features/transcription/transcription_options.dart';
 import 'package:ezctx/features/transcription/transcription_result.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -15,6 +16,7 @@ class _StubGroqService extends GroqApiService {
   Future<TranscriptionResult> transcribe({
     required SelectedAudioFile file,
     required String apiKey,
+    TranscriptionOptions options = const TranscriptionOptions.defaults(),
   }) => _handler(file, apiKey);
 }
 
