@@ -11,7 +11,7 @@
 - [ ] **Phase 1: Walking Skeleton (Short Audio → Clipboard)** — Минимальный end-to-end слайс: пользователь импортирует короткий (<19 MB) аудиофайл, получает текст на экране и копирует в буфер.
 - [ ] **Phase 2: Real Lectures (Chunking & Progress)** — Большие файлы (>19 MB) режутся ffmpeg-ом, отправляются параллельно, пользователь видит прогресс.
 - [ ] **Phase 3: Audio Normalization (Pre-Transcription)** — Любой аудиоформат конвертируется в 32 kbps / 16 kHz / Mono mp3 перед чанкованием; isChunked определяется по длительности нормализованного файла.
-- [ ] **Phase 4: Multi-Key Pool & Rate-Limit UI** — Пул из нескольких Groq-ключей с round-robin, авто-блокировкой и видимым в UI статусом/квотой.
+- [x] **Phase 4: Multi-Key Pool & Rate-Limit UI** — Пул из нескольких Groq-ключей с round-robin, авто-блокировкой и видимым в UI статусом/квотой.
 - [ ] **Phase 5: Model & Language Controls** — Переключатель large-v3 / turbo и селектор языка распознавания.
 - [ ] **Phase 6: Output Formats & Sharing** — SRT с таймкодами + share intent в Telegram/GPT/заметки.
 - [ ] **Phase 7: History** — Локальный список ранее расшифрованных лекций с возможностью повторного открытия и удаления.
@@ -98,7 +98,8 @@ Plans:
   4. UI показывает индикатор «Подготовка аудио…» пока идёт ffmpeg-конвертация; после завершения переходит к прогрессу чанков (или single-shot).
   5. 35 MB OGG-лекция длительностью < 80 мин успешно разбивается на корректные чанки и полностью расшифровывается через Groq.
 
-**Plans:** TBD
+**Plans:** 3 plans
+
 **UI hint:** yes
 
 ### Phase 4: Multi-Key Pool & Rate-Limit UI

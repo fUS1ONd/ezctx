@@ -3,18 +3,18 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-last_updated: "2026-05-17T00:00:00.000Z"
+last_updated: "2026-05-18T00:00:00.000Z"
 progress:
   total_phases: 7
-  completed_phases: 2
-  total_plans: 9
-  completed_plans: 9
-  percent: 29
+  completed_phases: 3
+  total_plans: 12
+  completed_plans: 12
+  percent: 43
 ---
 
 # STATE: ezctx
 
-**Last updated:** 2026-05-17
+**Last updated:** 2026-05-18
 
 ## Project Reference
 
@@ -34,8 +34,8 @@ Phase: 02 (real-lectures-chunking-progress) — COMPLETE (4/4 plans done, verifi
 - **Milestone:** v1 Android MVP
 - **Phase 01:** Complete — все 5 планов выполнены
 - **Phase 02:** Complete — все 4 плана выполнены; 5/5 критериев verified; 16 тестов pass
-- **Status:** Ready to execute Phase 03
-- **Progress:** 2/7 phases complete `[██░░░░░] 29%`
+- **Status:** Ready to execute Phase 05
+- **Progress:** 3/7 phases complete `[███░░░░] 43%`
 
 ## Phase Map
 
@@ -44,7 +44,7 @@ Phase: 02 (real-lectures-chunking-progress) — COMPLETE (4/4 plans done, verifi
 | 1 | Walking Skeleton (Short Audio → Clipboard) | Complete | 5 plans |
 | 2 | Real Lectures (Chunking & Progress) | Complete | 4 plans |
 | 3 | Audio Normalization (Pre-Transcription) | Complete (minor issues) | 3 plans |
-| 4 | Multi-Key Pool & Rate-Limit UI | Context ready | TBD |
+| 4 | Multi-Key Pool & Rate-Limit UI | Complete | 3 plans |
 | 5 | Model & Language Controls | Not started | TBD |
 | 6 | Output Formats & Sharing | Not started | TBD |
 | 7 | History | Not started | TBD |
@@ -92,10 +92,10 @@ None (APK build pending in CI after push to main).
 
 ## Session Continuity
 
-- **Next action:** Plan Phase 04 — `/gsd:plan-phase 4` (Multi-Key Pool & Rate-Limit UI)
-- **Stopped at:** Phase 04 context gathered (04-CONTEXT.md ready); planning not yet started
-- **Last session:** 2026-05-17
-- **Last activity:** 2026-05-17 - discuss-phase 4 завершён: GroqKeyPool ChangeNotifier, blackbox ротация на 429, статус-only UI
+- **Next action:** Execute Phase 05 — Model & Language Controls
+- **Stopped at:** Phase 04 полностью завершена — все 3 плана выполнены
+- **Last session:** 2026-05-18
+- **Last activity:** 2026-05-18 - 04-03 завершён: KeyStatusTile + ApiKeysScreen ListenableBuilder + pool sync
 
 ---
 *State initialized: 2026-05-16*
