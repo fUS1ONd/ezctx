@@ -65,6 +65,14 @@ class TranscriptionResult {
     this.segments = const [],
   });
 
+  /// Создаёт пустой результат-заглушку (используется при сборке чанков вместо null-слотов).
+  const TranscriptionResult.empty()
+      : text = '',
+        language = '',
+        duration = 0.0,
+        words = const [],
+        segments = const [];
+
   factory TranscriptionResult.fromJson(Map<String, dynamic> json) {
     final wordsList = json['words'] as List<dynamic>?;
     final segmentsList = json['segments'] as List<dynamic>?;

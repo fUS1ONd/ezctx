@@ -233,8 +233,13 @@ class ChunkedTranscriptionController extends ChangeNotifier {
     }
 
     // Все чанки успешны — собираем результат.
+    // Защита: если какой-то слот остался null (теоретически не должно быть
+    // после Future.wait без исключений), заменяем на пустой результат вместо
+    // краша при force-unwrap r!.
     final assembled = _assembleResult(
-      _results.map((r) => r!).toList(),
+      _results
+          .map((r) => r ?? TranscriptionResult.empty())
+          .toList(),
       chunkDuration,
     );
     _set(ChunkedSuccess(result: assembled));
