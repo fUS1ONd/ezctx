@@ -192,6 +192,8 @@ class _ProcessingScreenState extends State<ProcessingScreen>
           }
         });
       }
+      // return: предотвращаем повторный setState ниже для пути ChunkedSuccess.
+      return;
     }
     if (mounted) setState(() {});
   }
