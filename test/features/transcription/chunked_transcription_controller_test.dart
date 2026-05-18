@@ -3,7 +3,6 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:ezctx/core/error/app_exception.dart';
-import 'package:ezctx/core/storage/secure_storage_service.dart';
 import 'package:ezctx/features/settings/api_key_repository.dart';
 import 'package:ezctx/features/transcription/audio_chunking_service.dart';
 import 'package:ezctx/features/transcription/audio_metadata.dart';
@@ -39,32 +38,6 @@ class _MockGroqApiService extends GroqApiService {
     callCount++;
     return _handler(bytes, filename, apiKey);
   }
-}
-
-/// Заглушка SecureStorageService.
-class _FakeSecureStorage implements SecureStorageService {
-  @override
-  Future<void> writeRawKey(String value) async {}
-  @override
-  Future<String?> readRawKey() async => null;
-  @override
-  Future<void> deleteRawKey() async {}
-  @override
-  Future<List<String>> listApiKeys() async => [];
-  @override
-  Future<void> addApiKey(String key) async {}
-  @override
-  Future<void> removeApiKey(String key) async {}
-}
-
-/// Мок ApiKeyRepository — возвращает заданный список ключей.
-class _MockApiKeyRepository extends ApiKeyRepository {
-  _MockApiKeyRepository(this._mockKeys) : super(_FakeSecureStorage());
-
-  final List<ApiKeyView> _mockKeys;
-
-  @override
-  Future<List<ApiKeyView>> listKeys() async => _mockKeys;
 }
 
 /// Файл-заглушка: реализует [File] без обращения к файловой системе.
