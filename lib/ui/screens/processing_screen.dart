@@ -5,12 +5,11 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/design_tokens.dart';
-import '../../core/storage/secure_storage_service.dart';
-import '../../features/settings/api_key_repository.dart';
 import '../../features/transcription/audio_chunking_service.dart';
 import '../../features/transcription/audio_normalization_service.dart';
 import '../../features/transcription/chunked_transcription_controller.dart';
 import '../../features/transcription/groq_api_service.dart';
+import '../../features/transcription/groq_key_pool.dart';
 import '../../features/transcription/normalized_audio_file.dart';
 import '../../features/transcription/processing_args.dart';
 import '../../features/transcription/result_args.dart';
@@ -25,8 +24,12 @@ import '../widgets/primary_button.dart';
 import '../widgets/shimmer_bar.dart';
 
 /// Экран обработки: запускает транскрибацию, показывает pipeline, обрабатывает ошибки.
+/// Принимает [groqKeyPool] — singleton пул ключей из main.dart.
 class ProcessingScreen extends StatefulWidget {
-  const ProcessingScreen({super.key});
+  const ProcessingScreen({super.key, required this.groqKeyPool});
+
+  /// Singleton пул Groq API-ключей, передаётся в контроллеры транскрибации.
+  final GroqKeyPool groqKeyPool;
 
   @override
   State<ProcessingScreen> createState() => _ProcessingScreenState();
@@ -68,8 +71,9 @@ class _ProcessingScreenState extends State<ProcessingScreen>
   @override
   void initState() {
     super.initState();
+    // Используем pool из widget — singleton создан в main.dart.
     _controller = TranscriptionController(
-      keyRepository: ApiKeyRepository(SecureStorageServiceImpl()),
+      pool: widget.groqKeyPool,
       apiService: GroqApiService(),
     );
     _controller.addListener(_onStateChange);
@@ -155,9 +159,9 @@ class _ProcessingScreenState extends State<ProcessingScreen>
     );
 
     if (_isChunked) {
-      // Chunked-режим: создаём ChunkedTranscriptionController.
+      // Chunked-режим: создаём ChunkedTranscriptionController с pool из widget.
       _chunkedController = ChunkedTranscriptionController(
-        keyRepository: ApiKeyRepository(SecureStorageServiceImpl()),
+        pool: widget.groqKeyPool,
         apiService: GroqApiService(),
         chunkingService: AudioChunkingService(),
       );
