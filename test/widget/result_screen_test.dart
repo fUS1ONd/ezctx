@@ -1,13 +1,30 @@
+import 'package:ezctx/core/services/clipboard_service.dart';
 import 'package:ezctx/features/transcription/result_args.dart';
 import 'package:ezctx/features/transcription/selected_audio_file.dart';
 import 'package:ezctx/features/transcription/transcription_result.dart';
 import 'package:ezctx/ui/screens/result_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mockito/mockito.dart';
+
+import '../core/services/clipboard_service_test.mocks.dart';
 
 void main() {
   const transcriptText = 'Это тестовая расшифровка лекции для проверки буфера.';
+
+  late MockClipboardWriter mockClipboard;
+
+  setUp(() {
+    mockClipboard = MockClipboardWriter();
+    when(mockClipboard.write(any)).thenAnswer((_) async {});
+    ClipboardService.clipboardOverride = mockClipboard;
+    ClipboardService.simulateUnavailable = false;
+  });
+
+  tearDown(() {
+    ClipboardService.clipboardOverride = null;
+    ClipboardService.simulateUnavailable = false;
+  });
 
   ResultArgs makeArgs() => const ResultArgs(
         file: SelectedAudioFile(
@@ -40,25 +57,15 @@ void main() {
     expect(find.byType(SelectableText), findsWidgets);
   });
 
-  testWidgets('Tap «Скопировать» вызывает Clipboard.setData с текстом',
+  testWidgets('Tap «Скопировать» вызывает ClipboardService.copyText с текстом',
       (tester) async {
-    String? capturedText;
-
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
-      if (call.method == 'Clipboard.setData') {
-        capturedText = (call.arguments as Map)['text'] as String?;
-      }
-      return null;
-    });
-
     await tester.pumpWidget(buildScreen());
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Скопировать'));
     await tester.pump();
 
-    expect(capturedText, transcriptText);
+    verify(mockClipboard.write(any)).called(1);
 
     // Даём таймеру сброса состояния завершиться
     await tester.pump(const Duration(milliseconds: 1600));
@@ -66,9 +73,6 @@ void main() {
 
   testWidgets('После tap «Скопировать» кнопка показывает «Скопировано»',
       (tester) async {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(SystemChannels.platform, (_) async => null);
-
     await tester.pumpWidget(buildScreen());
     await tester.pumpAndSettle();
 
