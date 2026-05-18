@@ -158,77 +158,90 @@ class _HomeScreenState extends State<HomeScreen> {
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+            // Внешняя колонка: прокручиваемый контент + кнопка, прибитая снизу.
+            // Это исправляет BOTTOM OVERFLOWED после добавления model/language карточки.
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: AppSpacing.md),
-                // Шапка: логотип + название + кнопка настроек
-                Row(
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        gradient: AppGradients.accent,
-                        borderRadius: BorderRadius.circular(11),
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Text('Слух', style: AppTextStyles.heading),
-                    const Spacer(),
-                    GlassIconBtn(
-                      icon: Icons.settings_outlined,
-                      semanticLabel: 'Настройки',
-                      onPressed: () =>
-                          Navigator.pushNamed(context, AppConstants.routeSettings),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.xl),
-                // Display заголовок
-                const Text('Расшифруй\nлюбой звук', style: AppTextStyles.display),
-                const SizedBox(height: AppSpacing.md),
-                // Subtitle
-                Text(
-                  'Загрузите аудиозапись лекции и получите готовый текст',
-                  style: AppTextStyles.body.copyWith(color: AppColors.inkSecondary),
-                ),
-                const SizedBox(height: AppSpacing.xxl),
-                // Upload card / file preview — ConstrainedBox гарантирует minHeight=260
-                SizedBox(
-                  width: double.infinity,
-                  child: GestureDetector(
-                    onTap: _picking ? null : _onUploadTap,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(minHeight: 260),
-                      child: GlassTile(
-                        padding: const EdgeInsets.all(AppSpacing.lg),
-                        child: _selectedFile == null
-                            ? _buildEmptyCard()
-                            : _buildFilePreview(_selectedFile!),
-                      ),
+                // Прокручиваемый контент занимает всё свободное пространство.
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: AppSpacing.md),
+                        // Шапка: логотип + название + кнопка настроек
+                        Row(
+                          children: [
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                gradient: AppGradients.accent,
+                                borderRadius: BorderRadius.circular(11),
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            Text('Слух', style: AppTextStyles.heading),
+                            const Spacer(),
+                            GlassIconBtn(
+                              icon: Icons.settings_outlined,
+                              semanticLabel: 'Настройки',
+                              onPressed: () =>
+                                  Navigator.pushNamed(context, AppConstants.routeSettings),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.xl),
+                        // Display заголовок
+                        const Text('Расшифруй\nлюбой звук', style: AppTextStyles.display),
+                        const SizedBox(height: AppSpacing.md),
+                        // Subtitle
+                        Text(
+                          'Загрузите аудиозапись лекции и получите готовый текст',
+                          style: AppTextStyles.body.copyWith(color: AppColors.inkSecondary),
+                        ),
+                        const SizedBox(height: AppSpacing.xxl),
+                        // Upload card / file preview — ConstrainedBox гарантирует minHeight=260
+                        SizedBox(
+                          width: double.infinity,
+                          child: GestureDetector(
+                            onTap: _picking ? null : _onUploadTap,
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(minHeight: 260),
+                              child: GlassTile(
+                                padding: const EdgeInsets.all(AppSpacing.lg),
+                                child: _selectedFile == null
+                                    ? _buildEmptyCard()
+                                    : _buildFilePreview(_selectedFile!),
+                              ),
+                            ),
+                          ),
+                        ),
+                        // Сообщение об ошибке
+                        if (_errorMessage != null) ...[
+                          const SizedBox(height: AppSpacing.sm),
+                          Text(
+                            _errorMessage!,
+                            style: AppTextStyles.label.copyWith(color: AppColors.bad),
+                          ),
+                        ],
+                        const SizedBox(height: AppSpacing.xl),
+                        // Настройки: выбор модели и языка распознавания
+                        _buildModelAndLanguageCard(),
+                        const SizedBox(height: AppSpacing.xl),
+                      ],
                     ),
                   ),
                 ),
-                // Сообщение об ошибке
-                if (_errorMessage != null) ...[
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    _errorMessage!,
-                    style: AppTextStyles.label.copyWith(color: AppColors.bad),
-                  ),
-                ],
-                const SizedBox(height: AppSpacing.xl),
-                // Настройки: выбор модели и языка распознавания
-                _buildModelAndLanguageCard(),
-                const SizedBox(height: AppSpacing.xl),
-                // Кнопка «Транскрибировать»
+                // Кнопка «Транскрибировать» прибита к нижнему краю экрана.
                 PrimaryButton(
                   label: 'Транскрибировать',
                   onPressed: _selectedFile == null
                       ? null
                       : () => _onTranscribeTap(),
                 ),
+                const SizedBox(height: AppSpacing.md),
               ],
             ),
           ),
