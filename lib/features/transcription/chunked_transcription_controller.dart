@@ -167,14 +167,10 @@ class ChunkedTranscriptionController extends ChangeNotifier {
       return;
     }
 
-    // Длительность чанка — константа. Адаптивный размер чанка будет в будущей фазе.
-    // TODO(future): адаптировать chunkDuration по длительности файла
-    const double chunkDuration = kChunkDurationSeconds;
-
-    // Разбиваем файл на чанки.
+    // Разбиваем файл на равные чанки.
     List<File> chunkFiles;
     try {
-      chunkFiles = await _chunkingService.split(file.path);
+      chunkFiles = await _chunkingService.split(file.path, file.durationSeconds);
     } catch (e) {
       _set(ChunkedError(
         message: e is AppException ? e.message : e.toString(),
@@ -182,6 +178,11 @@ class ChunkedTranscriptionController extends ChangeNotifier {
       ));
       return;
     }
+
+    // Вычисляем фактическую длительность чанка для корректных таймкодов.
+    final chunkN =
+        (file.durationSeconds / AppConstants.kChunkThresholdSeconds).ceil();
+    final chunkDuration = file.durationSeconds / chunkN;
 
     final n = chunkFiles.length;
     _chunkStates = List<ChunkState>.generate(n, (i) => ChunkWaiting(i));

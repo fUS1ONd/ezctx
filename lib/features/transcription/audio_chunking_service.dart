@@ -8,11 +8,9 @@ import 'package:ffmpeg_kit_flutter_new/return_code.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import 'package:ezctx/core/constants/app_constants.dart';
 import 'package:ezctx/core/error/app_exception.dart';
 import 'audio_metadata.dart';
-
-/// Длительность одного чанка в секундах (4500s = 75 мин, ~17.6 МБ при 32k нормализованного mp3).
-const double kChunkDurationSeconds = 4500.0;
 
 /// Сервис для получения метаданных аудиофайла и его разбивки на чанки.
 ///
@@ -71,11 +69,28 @@ class AudioChunkingService {
     );
   }
 
-  /// Разбивает аудиофайл [filePath] на чанки ≤ 19 МБ.
+  /// Разбивает аудиофайл [filePath] на равные чанки ≤ kChunkThresholdSeconds.
   ///
+  /// Алгоритм: N = ceil(totalDurationSeconds / kChunkThresholdSeconds),
+  /// optimalDuration = totalDurationSeconds / N.
   /// Возвращает отсортированный список файлов `chunk_NNN.mp3` во временной директории.
-  /// Бросает [InternalException] при ошибке ffmpeg.
-  Future<List<File>> split(String filePath, {String? outputDir}) async {
+  /// Бросает [InternalException] при ошибке ffmpeg или если [totalDurationSeconds] ≤ 0.
+  Future<List<File>> split(
+    String filePath,
+    double totalDurationSeconds, {
+    String? outputDir,
+  }) async {
+    if (totalDurationSeconds <= 0) {
+      throw const InternalException(
+        'Длительность файла должна быть больше нуля',
+      );
+    }
+
+    // Вычисляем оптимальное число чанков и длительность каждого
+    final n =
+        (totalDurationSeconds / AppConstants.kChunkThresholdSeconds).ceil();
+    final optimalDuration = totalDurationSeconds / n;
+
     // Создаём уникальную временную директорию для чанков
     final tmpBase = outputDir ??
         '${(await getTemporaryDirectory()).path}'
@@ -84,7 +99,7 @@ class AudioChunkingService {
 
     // Команда ffmpeg: сегментация по времени, -c:a copy (файл уже нормализован)
     final command =
-        '-i "$filePath" -f segment -segment_time ${kChunkDurationSeconds.toInt()}'
+        '-i "$filePath" -f segment -segment_time $optimalDuration'
         ' -c:a copy'
         ' "$tmpBase/chunk_%03d.mp3"';
 

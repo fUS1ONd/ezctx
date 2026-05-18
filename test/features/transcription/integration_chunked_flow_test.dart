@@ -245,7 +245,11 @@ class _MockAudioChunkingService extends AudioChunkingService {
       );
 
   @override
-  Future<List<File>> split(String filePath, {String? outputDir}) async {
+  Future<List<File>> split(
+    String filePath,
+    double totalDurationSeconds, {
+    String? outputDir,
+  }) async {
     return chunkFiles;
   }
 }
