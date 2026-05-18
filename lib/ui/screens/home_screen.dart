@@ -7,11 +7,14 @@ import '../../core/constants/design_tokens.dart';
 import '../../core/error/app_exception.dart';
 import '../../core/storage/secure_storage_service.dart';
 import '../../features/settings/api_key_repository.dart';
+import '../../features/settings/transcription_options_repository.dart';
 import '../../features/transcription/audio_chunking_service.dart';
 import '../../features/transcription/audio_metadata.dart';
 import '../../features/transcription/file_picker_service.dart';
 import '../../features/transcription/processing_args.dart';
 import '../../features/transcription/selected_audio_file.dart';
+import '../../features/transcription/transcription_options.dart';
+import '../widgets/glass_card.dart';
 import '../widgets/glass_icon_btn.dart';
 import '../widgets/glass_tile.dart';
 import '../widgets/gradient_background.dart';
@@ -29,11 +32,36 @@ class _HomeScreenState extends State<HomeScreen> {
   // Единственный экземпляр репозитория на весь lifecycle экрана.
   final ApiKeyRepository _repository = ApiKeyRepository(SecureStorageServiceImpl());
 
+  /// Текущие настройки транскрибации (модель и язык).
+  TranscriptionOptions _options = const TranscriptionOptions.defaults();
+
+  /// Репозиторий для сохранения и загрузки настроек транскрибации.
+  final _optionsRepo = TranscriptionOptionsRepository();
+
   SelectedAudioFile? _selectedFile;
   AudioMetadata? _metadata;
   bool _loadingMetadata = false;
   String? _errorMessage;
   bool _picking = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Загружаем сохранённые настройки транскрибации при старте экрана.
+    _loadOptions();
+  }
+
+  Future<void> _loadOptions() async {
+    final saved = await _optionsRepo.load();
+    if (mounted) setState(() => _options = saved);
+  }
+
+  /// Сохраняет новые настройки и обновляет state, если значения изменились.
+  Future<void> _onOptionsChanged(TranscriptionOptions updated) async {
+    if (updated == _options) return;
+    setState(() => _options = updated);
+    await _optionsRepo.save(updated);
+  }
 
   Future<void> _onUploadTap() async {
     if (_picking) return;
@@ -114,7 +142,11 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.pushNamed(
       context,
       AppConstants.routeProcessing,
-      arguments: ProcessingArgs(file: _selectedFile!, metadata: _metadata),
+      arguments: ProcessingArgs(
+        file: _selectedFile!,
+        metadata: _metadata,
+        options: _options,
+      ),
     );
   }
 
@@ -187,6 +219,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
                 const SizedBox(height: AppSpacing.xl),
+                // Настройки: выбор модели и языка распознавания
+                _buildModelAndLanguageCard(),
+                const SizedBox(height: AppSpacing.xl),
                 // Кнопка «Транскрибировать»
                 PrimaryButton(
                   label: 'Транскрибировать',
@@ -201,6 +236,109 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
+  /// Карточка выбора модели Whisper и языка распознавания.
+  Widget _buildModelAndLanguageCard() {
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Переключатель модели Whisper
+          Row(
+            children: [
+              Text('Модель', style: AppTextStyles.body),
+              const Spacer(),
+              SegmentedButton<WhisperModel>(
+                segments: const [
+                  ButtonSegment(
+                    value: WhisperModel.largeV3,
+                    label: Text('large-v3'),
+                  ),
+                  ButtonSegment(
+                    value: WhisperModel.turbo,
+                    label: Text('turbo'),
+                  ),
+                ],
+                selected: {_options.model},
+                onSelectionChanged: (sel) =>
+                    _onOptionsChanged(_options.copyWith(model: sel.first)),
+                style: const ButtonStyle(
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          // Выпадающий список языков распознавания
+          Row(
+            children: [
+              Text('Язык', style: AppTextStyles.body),
+              const Spacer(),
+              DropdownButton<TranscriptionLanguage>(
+                value: _options.language,
+                underline: const SizedBox.shrink(),
+                isDense: true,
+                items: _languageItems,
+                onChanged: (lang) {
+                  if (lang != null) {
+                    _onOptionsChanged(_options.copyWith(language: lang));
+                  }
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Элементы выпадающего списка языков.
+  static const _languageItems = [
+    DropdownMenuItem(
+      value: TranscriptionLanguage.auto,
+      child: Text('Авто'),
+    ),
+    DropdownMenuItem(
+      value: TranscriptionLanguage.ru,
+      child: Text('Русский'),
+    ),
+    DropdownMenuItem(
+      value: TranscriptionLanguage.en,
+      child: Text('English'),
+    ),
+    DropdownMenuItem(
+      value: TranscriptionLanguage.de,
+      child: Text('Deutsch'),
+    ),
+    DropdownMenuItem(
+      value: TranscriptionLanguage.fr,
+      child: Text('Français'),
+    ),
+    DropdownMenuItem(
+      value: TranscriptionLanguage.es,
+      child: Text('Español'),
+    ),
+    DropdownMenuItem(
+      value: TranscriptionLanguage.uk,
+      child: Text('Українська'),
+    ),
+    DropdownMenuItem(
+      value: TranscriptionLanguage.zh,
+      child: Text('中文'),
+    ),
+    DropdownMenuItem(
+      value: TranscriptionLanguage.ja,
+      child: Text('日本語'),
+    ),
+    DropdownMenuItem(
+      value: TranscriptionLanguage.ko,
+      child: Text('한국어'),
+    ),
+    DropdownMenuItem(
+      value: TranscriptionLanguage.ar,
+      child: Text('العربية'),
+    ),
+  ];
 
   Widget _buildEmptyCard() {
     return Column(

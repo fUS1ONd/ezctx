@@ -15,6 +15,7 @@ import '../../features/transcription/processing_args.dart';
 import '../../features/transcription/result_args.dart';
 import '../../features/transcription/selected_audio_file.dart';
 import '../../features/transcription/transcription_controller.dart';
+import '../../features/transcription/transcription_options.dart';
 import '../widgets/chunk_tile.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_icon_btn.dart';
@@ -53,6 +54,9 @@ class _ProcessingScreenState extends State<ProcessingScreen>
 
   /// Ошибка нормализации.
   String? _normalizationError;
+
+  /// Настройки транскрибации, переданные с HomeScreen через ProcessingArgs.
+  TranscriptionOptions _transcriptionOptions = const TranscriptionOptions.defaults();
 
   SelectedAudioFile? _file;
   DateTime? _startedAt;
@@ -102,6 +106,7 @@ class _ProcessingScreenState extends State<ProcessingScreen>
       SelectedAudioFile? file;
       if (args is ProcessingArgs) {
         file = args.file;
+        _transcriptionOptions = args.options;
       } else if (args is SelectedAudioFile) {
         // Обратная совместимость — старый путь без ProcessingArgs.
         file = args;
@@ -160,7 +165,7 @@ class _ProcessingScreenState extends State<ProcessingScreen>
       _chunkedController!.addListener(_onChunkedStateChange);
       // await: некропотанные исключения внутри start() долетят до try/catch
       // этого метода, а не будут молча проглочены как unhandled Future rejection.
-      await _chunkedController!.start(_normalizedFile!);
+      await _chunkedController!.start(_normalizedFile!, options: _transcriptionOptions);
     } else {
       // Стандартный режим: TranscriptionController с нормализованным файлом.
       final normalizedAudioFile = SelectedAudioFile(
@@ -169,7 +174,7 @@ class _ProcessingScreenState extends State<ProcessingScreen>
         sizeBytes: File(_normalizedFile!.path).statSync().size,
         extension: 'mp3',
       );
-      await _controller.start(normalizedAudioFile);
+      await _controller.start(normalizedAudioFile, options: _transcriptionOptions);
     }
   }
 
@@ -582,7 +587,10 @@ class _ProcessingScreenState extends State<ProcessingScreen>
                 label: 'Повторить',
                 onPressed: () {
                   if (_normalizedFile != null) {
-                    _chunkedController?.start(_normalizedFile!);
+                    _chunkedController?.start(
+                      _normalizedFile!,
+                      options: _transcriptionOptions,
+                    );
                   }
                 },
               ),
