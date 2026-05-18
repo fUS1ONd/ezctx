@@ -204,7 +204,20 @@ class GroqApiService {
       if (response.statusCode == 401) {
         throw const AuthException(_authErrorMessage);
       }
-      // 4xx (кроме 401), 5xx, 524
+      // 429 / 503: пробрасываем RateLimitException — TranscriptionController
+      // должен сообщить пулу о блокировке через pool.reportRateLimited().
+      // Идентично обработке в transcribeChunk().
+      if (response.statusCode == 429 || response.statusCode == 503) {
+        final retryAfterSeconds =
+            parseRetryAfterFromHeaders(response.headers);
+        throw RateLimitException(
+          response.statusCode == 429
+              ? 'Превышен лимит запросов Groq'
+              : 'Сервис временно недоступен (503)',
+          retryAfterSeconds: retryAfterSeconds,
+        );
+      }
+      // 4xx (кроме 401/429), 5xx, 524
       throw const NetworkException(_networkErrorMessage);
     } on SocketException {
       throw const NetworkException(_networkErrorMessage);
