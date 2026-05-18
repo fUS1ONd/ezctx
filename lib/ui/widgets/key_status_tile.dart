@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/constants/design_tokens.dart';
@@ -90,7 +91,9 @@ class _KeyStatusTileState extends State<KeyStatusTile> {
   Widget build(BuildContext context) {
     final s = widget.status;
     if (s is BlockedKeyStatus) {
-      final remaining = s.blockedUntil.difference(DateTime.now());
+      // Используем clock.now() вместо DateTime.now() — согласованность с пулом
+      // и тестируемость через FakeClock (иначе тесты с FakeClock будут флакить).
+      final remaining = s.blockedUntil.difference(clock.now());
       // Если блокировка истекла — показываем как активный
       if (remaining.isNegative) return _activeBadge();
       return _blockedBadge(_formatRemaining(remaining));
