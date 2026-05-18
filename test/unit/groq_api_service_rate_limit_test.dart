@@ -1,7 +1,38 @@
+import 'package:ezctx/core/error/app_exception.dart';
 import 'package:ezctx/features/transcription/groq_api_service.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
 void main() {
+  group('GroqApiService 503', () {
+    test('503 бросает RateLimitException с retryAfterSeconds из заголовков', () async {
+      final service = GroqApiService(
+        clientFactory: () => MockClient((request) async {
+          return http.Response(
+            '{"error": "Service Unavailable"}',
+            503,
+            headers: {'retry-after': '30'},
+          );
+        }),
+      );
+      expect(
+        () => service.transcribeChunk(
+          bytes: [0, 1, 2],
+          filename: 'test.mp3',
+          apiKey: 'test-key',
+        ),
+        throwsA(
+          isA<RateLimitException>().having(
+            (e) => e.retryAfterSeconds,
+            'retryAfterSeconds',
+            30,
+          ),
+        ),
+      );
+    });
+  });
+
   group('parseRetryAfterFromHeaders', () {
     test('_parseRetryAfter возвращает секунды из retry-after', () {
       final result = parseRetryAfterFromHeaders({'retry-after': '45'});

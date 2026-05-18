@@ -139,12 +139,14 @@ class GroqApiService {
         }
       }
       if (response.statusCode == 401) throw const AuthException(_authErrorMessage);
-      if (response.statusCode == 429) {
+      if (response.statusCode == 429 || response.statusCode == 503) {
         // Парсим заголовки для определения времени ожидания (T-04-02: cap 3600 с)
         final retryAfterSeconds =
             parseRetryAfterFromHeaders(response.headers);
         throw RateLimitException(
-          'Превышен лимит запросов Groq',
+          response.statusCode == 429
+              ? 'Превышен лимит запросов Groq'
+              : 'Сервис временно недоступен (503)',
           retryAfterSeconds: retryAfterSeconds,
         );
       }
