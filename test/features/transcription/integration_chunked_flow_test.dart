@@ -9,12 +9,12 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:ezctx/core/error/app_exception.dart';
-import 'package:ezctx/core/storage/secure_storage_service.dart';
 import 'package:ezctx/features/settings/api_key_repository.dart';
 import 'package:ezctx/features/transcription/audio_chunking_service.dart';
 import 'package:ezctx/features/transcription/audio_metadata.dart';
 import 'package:ezctx/features/transcription/chunked_transcription_controller.dart';
 import 'package:ezctx/features/transcription/groq_api_service.dart';
+import 'package:ezctx/features/transcription/groq_key_pool.dart';
 import 'package:ezctx/features/transcription/selected_audio_file.dart';
 import 'package:ezctx/features/transcription/transcription_result.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -22,36 +22,6 @@ import 'package:flutter_test/flutter_test.dart';
 // ---------------------------------------------------------------------------
 // Ручные моки (без mockito codegen, без Flutter binding).
 // ---------------------------------------------------------------------------
-
-/// Заглушка SecureStorageService — API-ключи хранятся только в памяти.
-class _FakeSecureStorage implements SecureStorageService {
-  final List<String> _keys;
-  _FakeSecureStorage(this._keys);
-
-  @override
-  Future<void> writeRawKey(String value) async {}
-  @override
-  Future<String?> readRawKey() async => _keys.isNotEmpty ? _keys.first : null;
-  @override
-  Future<void> deleteRawKey() async {}
-  @override
-  Future<List<String>> listApiKeys() async => List.unmodifiable(_keys);
-  @override
-  Future<void> addApiKey(String key) async => _keys.add(key);
-  @override
-  Future<void> removeApiKey(String key) async => _keys.remove(key);
-}
-
-/// Мок ApiKeyRepository — возвращает заданный список ключей.
-class _MockApiKeyRepository extends ApiKeyRepository {
-  _MockApiKeyRepository(this._mockKeys)
-      : super(_FakeSecureStorage(_mockKeys.map((k) => k.raw).toList()));
-
-  final List<ApiKeyView> _mockKeys;
-
-  @override
-  Future<List<ApiKeyView>> listKeys() async => _mockKeys;
-}
 
 /// Мок GroqApiService — обработчик вызовов задаётся через конструктор.
 class _MockGroqApiService extends GroqApiService {
@@ -343,11 +313,11 @@ void main() {
         );
       });
 
+      // 1 ключ → aliveKeyCount=1 → semaphore=1 → последовательное выполнение
       final ctrl = ChunkedTranscriptionController(
-        keyRepository: _MockApiKeyRepository([_testKey]),
+        pool: GroqKeyPool(initialKeys: [_testKey.raw]),
         apiService: apiService,
         chunkingService: _MockAudioChunkingService(chunkFiles: chunks),
-        maxConcurrent: 1, // последовательно — для предсказуемого порядка
       );
 
       await ctrl.start(_dummyFile);
@@ -386,7 +356,7 @@ void main() {
       });
 
       final ctrl = ChunkedTranscriptionController(
-        keyRepository: _MockApiKeyRepository([_testKey]),
+        pool: GroqKeyPool(initialKeys: [_testKey.raw]),
         apiService: apiService,
         chunkingService: _MockAudioChunkingService(chunkFiles: [chunk]),
       );
@@ -412,7 +382,7 @@ void main() {
       });
 
       final ctrl = ChunkedTranscriptionController(
-        keyRepository: _MockApiKeyRepository([_testKey]),
+        pool: GroqKeyPool(initialKeys: [_testKey.raw]),
         apiService: apiService,
         chunkingService: _MockAudioChunkingService(chunkFiles: [chunk]),
       );
@@ -420,10 +390,10 @@ void main() {
       await ctrl.start(_dummyFile);
 
       expect(ctrl.state, isA<ChunkedError>(),
-          reason: 'После 3 безуспешных попыток должна быть ChunkedError');
-      // maxRetries=3 → попытка 0, 1, 2 → всего 3 вызова (0→attempt++, 1→attempt++, 2→rethrow)
-      expect(calls, equals(3),
-          reason: 'transcribeChunk вызывается 3 раза до исчерпания retry');
+          reason: 'После 10 безуспешных попыток должна быть ChunkedError');
+      // maxAttempts=10 → 10 попыток NetworkException → rethrow
+      expect(calls, equals(10),
+          reason: 'transcribeChunk вызывается 10 раз до исчерпания retry');
       final err = ctrl.state as ChunkedError;
       expect(err.retryable, isTrue,
           reason: 'NetworkException → retryable=true');
@@ -455,11 +425,11 @@ void main() {
         throw const AuthException('Неверный API-ключ');
       });
 
+      // 1 ключ → semaphore=1 → последовательно: chunk0 → chunk1
       final ctrl = ChunkedTranscriptionController(
-        keyRepository: _MockApiKeyRepository([_testKey]),
+        pool: GroqKeyPool(initialKeys: [_testKey.raw]),
         apiService: apiService,
         chunkingService: _MockAudioChunkingService(chunkFiles: [chunk0, chunk1]),
-        maxConcurrent: 1, // последовательно для предсказуемого порядка
       );
 
       await ctrl.start(_dummyFile);

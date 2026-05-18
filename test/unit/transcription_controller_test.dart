@@ -1,30 +1,10 @@
 import 'package:ezctx/core/error/app_exception.dart';
-import 'package:ezctx/core/storage/secure_storage_service.dart';
-import 'package:ezctx/features/settings/api_key_repository.dart';
 import 'package:ezctx/features/transcription/groq_api_service.dart';
+import 'package:ezctx/features/transcription/groq_key_pool.dart';
 import 'package:ezctx/features/transcription/selected_audio_file.dart';
 import 'package:ezctx/features/transcription/transcription_controller.dart';
 import 'package:ezctx/features/transcription/transcription_result.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-// Минимальное fake-хранилище: избегает flutter_secure_storage на тест-хосте.
-class _FakeStorage implements SecureStorageService {
-  final List<String> _keys;
-  _FakeStorage(this._keys);
-
-  @override
-  Future<List<String>> listApiKeys() async => List.unmodifiable(_keys);
-  @override
-  Future<void> addApiKey(String k) async { if (!_keys.contains(k)) _keys.add(k); }
-  @override
-  Future<void> removeApiKey(String k) async => _keys.remove(k);
-  // ignore: deprecated_member_use_from_same_package
-  @override Future<void> writeRawKey(String v) async {}
-  // ignore: deprecated_member_use_from_same_package
-  @override Future<String?> readRawKey() async => null;
-  // ignore: deprecated_member_use_from_same_package
-  @override Future<void> deleteRawKey() async {}
-}
 
 // Stub GroqApiService: результат или исключение задаётся через handler.
 class _StubGroqService extends GroqApiService {
@@ -56,9 +36,9 @@ TranscriptionController _make({
   List<String> keys = const [],
   Future<TranscriptionResult> Function(SelectedAudioFile, String)? groq,
 }) {
-  final repo = ApiKeyRepository(_FakeStorage(List.of(keys)));
+  final pool = GroqKeyPool(initialKeys: List.of(keys));
   final api = _StubGroqService(groq ?? (_, __) async => _ok);
-  return TranscriptionController(keyRepository: repo, apiService: api);
+  return TranscriptionController(pool: pool, apiService: api);
 }
 
 void main() {
