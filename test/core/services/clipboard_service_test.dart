@@ -62,7 +62,7 @@ void main() {
       );
       ClipboardService.clipboardOverride = mockClipboard;
 
-      expect(
+      await expectLater(
         () => ClipboardService.copyText('текст'),
         throwsA(isA<PlatformException>()),
       );

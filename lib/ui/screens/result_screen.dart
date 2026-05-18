@@ -106,14 +106,13 @@ class _ResultScreenState extends State<ResultScreen> {
       );
       if (mounted) {
         // Показываем папку (не полный путь), так как файлов теперь два.
-        final folderPath = paths.plainPath.substring(
-          0,
-          paths.plainPath.lastIndexOf('/'),
-        );
+        final sep = paths.plainPath.lastIndexOf('/');
+        final folderPath =
+            sep > 0 ? paths.plainPath.substring(0, sep) : paths.plainPath;
         setState(() => _savedPath = folderPath);
       }
-    } catch (_) {
-      // тихо — UI не блокируется ошибкой записи
+    } catch (e, st) {
+      debugPrint('_saveTranscriptTxt: $e\n$st');
     }
   }
 
