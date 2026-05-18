@@ -64,7 +64,15 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
       _saving = true;
       _errorMessage = null;
     });
-    final rawKey = _inputController.text;
+    // trim() убирает случайные пробелы/переносы; пустую строку проверяем явно.
+    final rawKey = _inputController.text.trim();
+    if (rawKey.isEmpty) {
+      setState(() {
+        _errorMessage = 'Ключ не может быть пустым';
+        _saving = false;
+      });
+      return;
+    }
     try {
       await _repository.addKey(rawKey);
       // Синхронизируем пул — репозиторий хранит ключи, пул управляет статусами.
