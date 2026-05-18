@@ -12,7 +12,7 @@ import '../widgets/primary_button.dart';
 /// Ленивый список сегментов транскрипции.
 /// Разбивает текст по [HH:MM:SS] маркерам и рендерит только видимые элементы.
 class _TranscriptView extends StatefulWidget {
-  const _TranscriptView({required this.text});
+  const _TranscriptView({super.key, required this.text});
   final String text;
 
   @override

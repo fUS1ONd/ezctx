@@ -274,7 +274,6 @@ class _ProcessingScreenState extends State<ProcessingScreen>
     final chunkedState = _chunkedController?.state;
 
     // Флаги для single-режима.
-    final isSingleLoading = !_isChunked && (_normalizing || singleState is TranscriptionLoading);
     final isSingleError = !_isChunked && !_normalizing && singleState is TranscriptionError;
     final isSingleMissingKey = !_isChunked && !_normalizing && singleState is TranscriptionMissingKey;
 
