@@ -13,7 +13,7 @@
 - [ ] **Phase 3: Audio Normalization (Pre-Transcription)** — Любой аудиоформат конвертируется в 32 kbps / 16 kHz / Mono mp3 перед чанкованием; isChunked определяется по длительности нормализованного файла.
 - [x] **Phase 4: Multi-Key Pool & Rate-Limit UI** — Пул из нескольких Groq-ключей с round-robin, авто-блокировкой и видимым в UI статусом/квотой.
 - [ ] **Phase 5: Model & Language Controls** — Переключатель large-v3 / turbo и селектор языка распознавания.
-- [ ] **Phase 5.5: Clipboard Engine (super_clipboard)** — Замена стандартного `Clipboard.setData` на пакет `super_clipboard` для корректного копирования длинных транскрипций (1.5+ часа) без обрезания на Android.
+- [x] **Phase 5.5: Clipboard Engine (super_clipboard)** — Замена стандартного `Clipboard.setData` на пакет `super_clipboard` для корректного копирования длинных транскрипций (1.5+ часа) без обрезания на Android. (completed 2026-05-18)
 - [ ] **Phase 6: Output Formats & Sharing** — SRT с таймкодами + share intent в Telegram/GPT/заметки.
 - [ ] **Phase 7: History** — Локальный список ранее расшифрованных лекций с возможностью повторного открытия и удаления.
 - [ ] **Phase 8: Error Handling & Onboarding Polish** — Onboarding без ключей, понятные сетевые ошибки с retry, ожидание разблокировки ключей с обратным отсчётом.
@@ -174,7 +174,7 @@ Plans:
   3. Снек-бар «Скопировано» появляется только после успешной записи в буфер; при ошибке показывается сообщение об ошибке.
   4. Поведение на коротких транскрипциях (< 1000 символов) не изменилось — кнопка работает как раньше.
 
-**Plans:** TBD
+**Plans:** 1/1 plans complete
 **UI hint:** no
 
 ### Phase 6: Output Formats & Sharing
@@ -257,7 +257,7 @@ Plans:
 | 3. Audio Normalization (Pre-Transcription) | 0/? | Not started | - |
 | 4. Multi-Key Pool & Rate-Limit UI | 0/3 | Planned | - |
 | 5. Model & Language Controls | 0/2 | Planned | - |
-| 5.5. Clipboard Engine (super_clipboard) | 0/? | Not started | - |
+| 5.5. Clipboard Engine (super_clipboard) | 1/1 | Complete   | 2026-05-18 |
 | 6. Output Formats & Sharing | 0/? | Not started | - |
 | 7. History | 0/? | Not started | - |
 | 8. Error Handling & Onboarding Polish | 0/? | Not started | - |

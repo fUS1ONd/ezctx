@@ -3,13 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-last_updated: "2026-05-18T17:30:00.000Z"
+stopped_at: Phase 05 полностью завершена — 2 плана выполнены, review fixes применены
+last_updated: "2026-05-18T19:30:46.707Z"
+last_activity: "2026-05-18 - 05-02 завершён: HomeScreen model/language controls, ProcessingScreen wiring, review fixes"
 progress:
-  total_phases: 9
-  completed_phases: 5
-  total_plans: 18
+  total_phases: 10
+  completed_phases: 6
+  total_plans: 19
   completed_plans: 17
-  percent: 56
+  percent: 60
 ---
 
 # STATE: ezctx
@@ -41,7 +43,7 @@ Phase: 05 (model-language-controls) — COMPLETE (2/2 plans done, reviewed)
 - **Phase 04:** Complete — GroqKeyPool, миграция контроллеров, KeyStatusTile UI; 12/13 критериев auto + 503-fix
 - **Phase 05:** Complete — TranscriptionOptions data layer, переключатель модели/языка в HomeScreen, review fixes
 - **Status:** Ready to execute Phase 06
-- **Progress:** 5/7 phases complete `[█████░░] 71%`
+- **Progress:** [█████████░] 89%
 
 ## Phase Map
 
@@ -97,12 +99,13 @@ None (APK build pending in CI after push to main).
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260517-if3 | Исправить все актуальные UI-баги фазы 1 | 2026-05-17 | 29b65c9 | [260517-if3-ui-1](.planning/quick/260517-if3-ui-1/) |
+| Phase 05.5-clipboard-engine P01 | 20m | 3 tasks | 6 files |
 
 ## Session Continuity
 
 - **Next action:** Execute Phase 06 — Output Formats & Sharing
 - **Stopped at:** Phase 05 полностью завершена — 2 плана выполнены, review fixes применены
-- **Last session:** 2026-05-18
+- **Last session:** 2026-05-18T19:30:40.611Z
 - **Last activity:** 2026-05-18 - 05-02 завершён: HomeScreen model/language controls, ProcessingScreen wiring, review fixes
 
 ---
