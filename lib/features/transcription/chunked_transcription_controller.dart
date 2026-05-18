@@ -109,13 +109,19 @@ class ChunkedTranscriptionController extends ChangeNotifier {
     required GroqKeyPool pool,
     required GroqApiService apiService,
     required AudioChunkingService chunkingService,
+    @visibleForTesting Duration Function(int attempt)? retryDelay,
   })  : _pool = pool,
         _api = apiService,
-        _chunkingService = chunkingService;
+        _chunkingService = chunkingService,
+        _retryDelay = retryDelay ?? _defaultRetryDelay;
+
+  static Duration _defaultRetryDelay(int attempt) =>
+      Duration(seconds: 5 * (1 << (attempt - 1).clamp(0, 5)));
 
   final GroqKeyPool _pool;
   final GroqApiService _api;
   final AudioChunkingService _chunkingService;
+  final Duration Function(int attempt) _retryDelay;
 
   ChunkedState _state = const ChunkedIdle();
   ChunkedState get state => _state;
@@ -288,9 +294,7 @@ class ChunkedTranscriptionController extends ChangeNotifier {
           throw const NetworkException('Превышено максимальное число попыток');
         }
         _updateChunkState(index, ChunkRetrying(index, attempt: attempt));
-        // Экспоненциальная задержка: 5, 10, 20, 40... секунд (max 160 с).
-        final delaySeconds = 5 * (1 << (attempt - 1).clamp(0, 5));
-        await Future.delayed(Duration(seconds: delaySeconds));
+        await Future.delayed(_retryDelay(attempt));
       }
     }
 

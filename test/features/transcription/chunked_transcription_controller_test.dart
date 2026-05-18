@@ -320,6 +320,7 @@ void main() {
         pool: GroqKeyPool(initialKeys: [_testKey.raw]),
         apiService: apiService,
         chunkingService: chunkingService,
+        retryDelay: (_) => Duration.zero,
       );
 
       await ctrl.start(_dummyFile);

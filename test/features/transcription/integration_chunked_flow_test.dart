@@ -381,10 +381,12 @@ void main() {
         throw const NetworkException('Сеть недоступна');
       });
 
+      // retryDelay: нулевой → тест не ждёт реальных задержек
       final ctrl = ChunkedTranscriptionController(
         pool: GroqKeyPool(initialKeys: [_testKey.raw]),
         apiService: apiService,
         chunkingService: _MockAudioChunkingService(chunkFiles: [chunk]),
+        retryDelay: (_) => Duration.zero,
       );
 
       await ctrl.start(_dummyFile);
