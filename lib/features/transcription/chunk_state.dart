@@ -38,3 +38,9 @@ class ChunkFailed extends ChunkState {
   const ChunkFailed(int index, {required this.error})
       : super(index: index, label: 'Часть ${index + 1}: ошибка');
 }
+
+/// Чанк ожидает свободного ключа из пула (все ключи временно заблокированы).
+class ChunkWaitingForKey extends ChunkState {
+  const ChunkWaitingForKey(int index)
+      : super(index: index, label: 'Часть ${index + 1}: ожидание ключа...');
+}

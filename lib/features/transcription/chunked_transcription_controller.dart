@@ -1,12 +1,14 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' show min;
 
 import 'package:flutter/foundation.dart';
 
+import '../../core/constants/app_constants.dart';
 import '../../core/error/app_exception.dart';
-import '../settings/api_key_repository.dart';
 import 'audio_chunking_service.dart';
 import 'chunk_state.dart';
+import 'groq_key_pool.dart';
 import 'selected_audio_file.dart';
 import 'transcription_result.dart';
 import 'groq_api_service.dart';
@@ -100,22 +102,20 @@ class ChunkedMissingKey extends ChunkedState {
 
 /// ChangeNotifier, управляющий пайплайном транскрибации большого файла:
 /// разбивка через [AudioChunkingService] → параллельная отправка (≤ maxConcurrent) →
-/// retry на транзиентных ошибках → сборка текста с таймкодами → удаление tmp-чанков.
+/// retry на транзиентных ошибках через [GroqKeyPool] → сборка текста с таймкодами →
+/// удаление tmp-чанков.
 class ChunkedTranscriptionController extends ChangeNotifier {
   ChunkedTranscriptionController({
-    required ApiKeyRepository keyRepository,
+    required GroqKeyPool pool,
     required GroqApiService apiService,
     required AudioChunkingService chunkingService,
-    int maxConcurrent = 3,
-  })  : _keys = keyRepository,
+  })  : _pool = pool,
         _api = apiService,
-        _chunkingService = chunkingService,
-        _semaphore = _Semaphore(maxConcurrent);
+        _chunkingService = chunkingService;
 
-  final ApiKeyRepository _keys;
+  final GroqKeyPool _pool;
   final GroqApiService _api;
   final AudioChunkingService _chunkingService;
-  final _Semaphore _semaphore;
 
   ChunkedState _state = const ChunkedIdle();
   ChunkedState get state => _state;
@@ -151,13 +151,11 @@ class ChunkedTranscriptionController extends ChangeNotifier {
   Future<void> start(SelectedAudioFile file) async {
     _set(const ChunkedSplitting());
 
-    // Получаем ключ.
-    final keys = await _keys.listKeys();
-    if (keys.isEmpty) {
+    // Проверяем наличие ключей в пуле.
+    if (_pool.allKeys.isEmpty) {
       _set(const ChunkedMissingKey());
       return;
     }
-    final apiKey = keys.first.raw;
 
     // Получаем метаданные для вычисления chunkDuration.
     double chunkDuration = kChunkDurationSeconds;
@@ -195,11 +193,18 @@ class ChunkedTranscriptionController extends ChangeNotifier {
       totalCount: n,
     ));
 
+    // Семафор с количеством слотов = min(живых ключей, лимита параллельности).
+    final concurrency = min(
+      _pool.aliveKeyCount.clamp(1, AppConstants.kMaxConcurrentChunks),
+      AppConstants.kMaxConcurrentChunks,
+    );
+    final semaphore = _Semaphore(concurrency);
+
     try {
       await Future.wait(
         chunkFiles.asMap().entries.map(
-          (entry) => _semaphore.run(
-            () => _processChunk(entry.key, entry.value, apiKey),
+          (entry) => semaphore.run(
+            () => _processChunk(entry.key, entry.value),
           ),
         ),
       );
@@ -229,60 +234,67 @@ class ChunkedTranscriptionController extends ChangeNotifier {
     _set(ChunkedSuccess(result: assembled));
   }
 
-  /// Транскрибирует один чанк с retry-логикой.
-  Future<void> _processChunk(int index, File file, String apiKey) async {
-    _updateChunkState(index, ChunkUploading(index));
-
+  /// Транскрибирует один чанк с retry-логикой через пул ключей.
+  ///
+  /// При [RateLimitException] сообщает пулу о блокировке и пробует следующий ключ.
+  /// При [AuthException] — пробрасывает немедленно.
+  /// При [NetworkException] — экспоненциальная задержка, до [_maxAttempts] попыток.
+  Future<void> _processChunk(int index, File file) async {
     final bytes = await file.readAsBytes();
     final filename = 'chunk_${index.toString().padLeft(3, '0')}.mp3';
 
-    final result = await _withRetry(
-      () => _api.transcribeChunk(
-        bytes: bytes,
-        filename: filename,
-        apiKey: apiKey,
-      ),
-      index,
-    );
-
-    _results[index] = result;
-    _chunkStates[index] = ChunkDone(index, text: result.text);
-    _completedCount++;
-    _set(ChunkedProcessing(
-      chunks: List.unmodifiable(_chunkStates),
-      completedCount: _completedCount,
-      totalCount: _chunkStates.length,
-    ));
-  }
-
-  /// Выполняет [fn] с экспоненциальным backoff.
-  ///
-  /// Ретраит [NetworkException] и [RateLimitException] до [maxRetries] раз.
-  /// [AuthException] выбрасывается немедленно без ретрая.
-  Future<T> _withRetry<T>(
-    Future<T> Function() fn,
-    int chunkIndex, {
-    int maxRetries = 3,
-  }) async {
     int attempt = 0;
-    Duration delay = const Duration(seconds: 5);
-    while (true) {
+    const maxAttempts = 10;
+
+    while (attempt < maxAttempts) {
+      // Показываем статус ожидания ключа если все заблокированы.
+      if (_pool.aliveKeyCount == 0) {
+        _updateChunkState(index, ChunkWaitingForKey(index));
+      } else {
+        _updateChunkState(index, ChunkUploading(index));
+      }
+
+      final key = await _pool.acquireKey();
+      _updateChunkState(index, ChunkUploading(index));
+
       try {
-        return await fn();
-      } catch (e) {
-        // AuthException — не ретраить, пробрасываем сразу.
-        if (e is AuthException) rethrow;
-        // Только NetworkException и RateLimitException ретраятся.
-        if (e is! NetworkException && e is! RateLimitException) rethrow;
-        if (++attempt >= maxRetries) rethrow;
-        _updateChunkState(
-          chunkIndex,
-          ChunkRetrying(chunkIndex, attempt: attempt),
+        final result = await _api.transcribeChunk(
+          bytes: bytes,
+          filename: filename,
+          apiKey: key,
         );
-        await Future.delayed(delay);
-        delay *= 2;
+
+        _results[index] = result;
+        _chunkStates[index] = ChunkDone(index, text: result.text);
+        _completedCount++;
+        _set(ChunkedProcessing(
+          chunks: List.unmodifiable(_chunkStates),
+          completedCount: _completedCount,
+          totalCount: _chunkStates.length,
+        ));
+        return;
+      } on RateLimitException catch (e) {
+        attempt++;
+        // Сообщаем пулу о блокировке ключа на указанное время.
+        _pool.reportRateLimited(key, e.retryAfterSeconds);
+        _updateChunkState(index, ChunkRetrying(index, attempt: attempt));
+        // Не ждём явно: следующая итерация вызовет acquireKey() и дождётся живого ключа.
+      } on AuthException {
+        // Неверный ключ — пробрасываем немедленно без ретрая.
+        rethrow;
+      } on NetworkException {
+        attempt++;
+        if (attempt >= maxAttempts) {
+          throw const NetworkException('Превышено максимальное число попыток');
+        }
+        _updateChunkState(index, ChunkRetrying(index, attempt: attempt));
+        // Экспоненциальная задержка: 5, 10, 20, 40... секунд (max 160 с).
+        final delaySeconds = 5 * (1 << (attempt - 1).clamp(0, 5));
+        await Future.delayed(Duration(seconds: delaySeconds));
       }
     }
+
+    throw const NetworkException('Превышено максимальное число попыток');
   }
 
   /// Собирает финальный [TranscriptionResult] из результатов чанков.

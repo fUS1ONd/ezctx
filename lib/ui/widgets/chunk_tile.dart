@@ -92,6 +92,12 @@ class ChunkTile extends StatelessWidget {
           Icons.error_outline,
           'Ошибка: $error',
         ),
+      // Все ключи временно заблокированы — ожидаем разблокировки пула.
+      ChunkWaitingForKey() => (
+          AppColors.inkTertiary,
+          Icons.key_off,
+          'Ожидание ключа...',
+        ),
     };
   }
 }

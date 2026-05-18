@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/constants/app_constants.dart';
 import '../core/constants/design_tokens.dart';
+import '../features/transcription/groq_key_pool.dart';
 import 'screens/api_keys_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/processing_screen.dart';
@@ -9,17 +10,12 @@ import 'screens/result_screen.dart';
 import 'screens/settings_screen.dart';
 
 /// Корневой виджет приложения. Регистрирует именованные маршруты и тему.
+/// Принимает [groqKeyPool] — singleton пул ключей, созданный в main.dart.
 class EzCtxApp extends StatelessWidget {
-  const EzCtxApp({super.key});
+  const EzCtxApp({super.key, required this.groqKeyPool});
 
-  /// Таблица билдеров маршрутов для onGenerateRoute.
-  static final Map<String, WidgetBuilder> _routeBuilders = {
-    AppConstants.routeHome: (_) => const HomeScreen(),
-    AppConstants.routeSettings: (_) => const SettingsScreen(),
-    AppConstants.routeApiKeys: (_) => const ApiKeysScreen(),
-    AppConstants.routeProcessing: (_) => const ProcessingScreen(),
-    AppConstants.routeResult: (_) => const ResultScreen(),
-  };
+  /// Singleton пул Groq API-ключей, передаётся в контроллеры транскрибации.
+  final GroqKeyPool groqKeyPool;
 
   @override
   Widget build(BuildContext context) {
@@ -39,12 +35,27 @@ class EzCtxApp extends StatelessWidget {
       initialRoute: AppConstants.routeHome,
       // Fade-переходы 300 мс easeInOut между всеми именованными маршрутами
       onGenerateRoute: (settings) {
-        final builder = _routeBuilders[settings.name];
-        if (builder == null) return null;
+        Widget page;
+        switch (settings.name) {
+          case AppConstants.routeHome:
+            page = const HomeScreen();
+          case AppConstants.routeSettings:
+            page = const SettingsScreen();
+          case AppConstants.routeApiKeys:
+            // Pool передаётся заранее; ApiKeysScreen использует его в плане 04-03.
+            page = const ApiKeysScreen();
+          case AppConstants.routeProcessing:
+            // Pool передаётся в ProcessingScreen для инициализации контроллеров.
+            page = ProcessingScreen(groqKeyPool: groqKeyPool);
+          case AppConstants.routeResult:
+            page = const ResultScreen();
+          default:
+            return null;
+        }
         return PageRouteBuilder(
           settings: settings,
           transitionDuration: const Duration(milliseconds: 300),
-          pageBuilder: (ctx, animation, secondaryAnimation) => builder(ctx),
+          pageBuilder: (ctx, animation, secondaryAnimation) => page,
           transitionsBuilder: (ctx, animation, secondaryAnimation, child) {
             return FadeTransition(
               opacity: CurvedAnimation(
