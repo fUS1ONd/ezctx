@@ -166,10 +166,12 @@ class _ProcessingScreenState extends State<ProcessingScreen>
         chunkingService: AudioChunkingService(),
       );
       _chunkedController!.addListener(_onChunkedStateChange);
-      _chunkedController!.start(normalizedAudioFile);
+      // await: некропотанные исключения внутри start() долетят до try/catch
+      // этого метода, а не будут молча проглочены как unhandled Future rejection.
+      await _chunkedController!.start(normalizedAudioFile);
     } else {
       // Стандартный режим: TranscriptionController.
-      _controller.start(normalizedAudioFile);
+      await _controller.start(normalizedAudioFile);
     }
   }
 
