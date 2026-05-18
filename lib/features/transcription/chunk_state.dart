@@ -26,10 +26,16 @@ class ChunkDone extends ChunkState {
 }
 
 /// Чанк повторяет запрос после ошибки (экспоненциальный backoff).
+///
+/// [maxAttempts] по умолчанию 10 — совпадает с maxAttempts в ChunkedTranscriptionController.
 class ChunkRetrying extends ChunkState {
   final int attempt;
-  const ChunkRetrying(int index, {required this.attempt})
-      : super(index: index, label: 'Часть ${index + 1}: повтор $attempt/3...');
+  final int maxAttempts;
+  const ChunkRetrying(int index, {required this.attempt, this.maxAttempts = 10})
+      : super(
+          index: index,
+          label: 'Часть ${index + 1}: повтор $attempt/$maxAttempts...',
+        );
 }
 
 /// Чанк завершился ошибкой после всех попыток.

@@ -82,10 +82,10 @@ class ChunkTile extends StatelessWidget {
           Icons.check_circle_outline,
           'Готов',
         ),
-      ChunkRetrying(:final attempt) => (
+      ChunkRetrying(:final attempt, :final maxAttempts) => (
           AppColors.bad, // warn — используем bad как наиболее близкий к warn
           Icons.refresh,
-          'Повтор $attempt/3',
+          'Повтор $attempt/$maxAttempts',
         ),
       ChunkFailed(:final error) => (
           AppColors.bad,
