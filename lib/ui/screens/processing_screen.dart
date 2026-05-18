@@ -387,48 +387,52 @@ class _ProcessingScreenState extends State<ProcessingScreen>
                   const SizedBox(height: AppSpacing.lg),
                 ],
 
-                // Pipeline (единый для single и chunked)
-                GlassCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildPipelineStep(
-                        label: 'Загрузка',
-                        status: _PipelineStatus.done,
-                      ),
-                      const Divider(height: AppSpacing.lg),
-                      _buildPipelineStep(
-                        label: 'Подготовка аудио',
-                        status: _normalizing
-                            ? _PipelineStatus.active
-                            : (_normalizedFile != null
+                // Pipeline (единый для single и chunked).
+                // Expanded + SingleChildScrollView: карточка может расти при
+                // раскрытии списка чанков без overflow.
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: GlassCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildPipelineStep(
+                            label: 'Загрузка',
+                            status: _PipelineStatus.done,
+                          ),
+                          const Divider(height: AppSpacing.lg),
+                          _buildPipelineStep(
+                            label: 'Подготовка аудио',
+                            status: _normalizing
+                                ? _PipelineStatus.active
+                                : (_normalizedFile != null
+                                    ? _PipelineStatus.done
+                                    : (_normalizationError != null
+                                        ? _PipelineStatus.error
+                                        : _PipelineStatus.pending)),
+                          ),
+                          const Divider(height: AppSpacing.lg),
+                          _buildPipelineStep(
+                            label: 'Распознавание',
+                            status: recognitionStatus,
+                            inlineContent: _isChunked && chunkedState != null
+                                ? _buildChunkedInline(chunkedState)
+                                : null,
+                          ),
+                          const Divider(height: AppSpacing.lg),
+                          _buildPipelineStep(
+                            label: 'Готово',
+                            status: isDone
                                 ? _PipelineStatus.done
-                                : (_normalizationError != null
-                                    ? _PipelineStatus.error
-                                    : _PipelineStatus.pending)),
+                                : _PipelineStatus.pending,
+                          ),
+                        ],
                       ),
-                      const Divider(height: AppSpacing.lg),
-                      _buildPipelineStep(
-                        label: 'Распознавание',
-                        status: recognitionStatus,
-                        // Inline-контент для chunked-режима.
-                        inlineContent: _isChunked && chunkedState != null
-                            ? _buildChunkedInline(chunkedState)
-                            : null,
-                      ),
-                      const Divider(height: AppSpacing.lg),
-                      _buildPipelineStep(
-                        label: 'Готово',
-                        // done при успехе в обоих режимах.
-                        status: isDone
-                            ? _PipelineStatus.done
-                            : _PipelineStatus.pending,
-                      ),
-                    ],
+                    ),
                   ),
                 ),
 
-                const Spacer(),
+                const SizedBox(height: AppSpacing.md),
 
                 // Ошибка нормализации
                 if (_normalizationError != null)
