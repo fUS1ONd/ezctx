@@ -48,7 +48,6 @@ app.*.map.json
 *.zip
 .metadata
 
-# Claude Code runtime
-.claude/scheduled_tasks.lock
-.claude/worktrees/
-.planning/debug/
+# Claude Code runtime / GSD framework (dev tools, not app source)
+.claude/
+.planning/
