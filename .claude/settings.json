@@ -1,4 +1,22 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(/opt/flutter/bin/flutter test*)",
+      "Bash(/opt/flutter/bin/flutter analyze*)",
+      "Bash(/opt/flutter/bin/flutter pub*)",
+      "Bash(/opt/flutter/bin/flutter build*)",
+      "Bash(/opt/flutter/bin/dart run*)",
+      "Bash(/opt/flutter/bin/dart test*)",
+      "Bash(/opt/flutter/bin/dart analyze*)",
+      "Bash(flutter test*)",
+      "Bash(flutter analyze*)",
+      "Bash(flutter pub*)",
+      "Bash(flutter build*)",
+      "Bash(dart run*)",
+      "Bash(dart test*)",
+      "Bash(dart analyze*)"
+    ]
+  },
   "hooks": {
     "SessionStart": [
       {

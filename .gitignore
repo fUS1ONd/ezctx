@@ -47,3 +47,8 @@ app.*.map.json
 # Большие бинарники / временные файлы
 *.zip
 .metadata
+
+# Claude Code runtime
+.claude/scheduled_tasks.lock
+.claude/worktrees/
+.planning/debug/
