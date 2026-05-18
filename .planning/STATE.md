@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-last_updated: "2026-05-18T00:00:00.000Z"
+last_updated: "2026-05-18T06:00:00.000Z"
 progress:
   total_phases: 7
-  completed_phases: 3
-  total_plans: 12
-  completed_plans: 12
-  percent: 43
+  completed_phases: 4
+  total_plans: 15
+  completed_plans: 15
+  percent: 57
 ---
 
 # STATE: ezctx
@@ -30,12 +30,16 @@ progress:
 
 Phase: 01 (walking-skeleton-short-audio-clipboard) — COMPLETE (5/5 plans done)
 Phase: 02 (real-lectures-chunking-progress) — COMPLETE (4/4 plans done, verified)
+Phase: 03 (audio-normalization) — COMPLETE (3/3 plans done)
+Phase: 04 (multi-key-pool) — COMPLETE (3/3 plans done, verified)
 
 - **Milestone:** v1 Android MVP
 - **Phase 01:** Complete — все 5 планов выполнены
 - **Phase 02:** Complete — все 4 плана выполнены; 5/5 критериев verified; 16 тестов pass
+- **Phase 03:** Complete — все 3 плана выполнены
+- **Phase 04:** Complete — GroqKeyPool, миграция контроллеров, KeyStatusTile UI; 12/13 критериев auto + 503-fix
 - **Status:** Ready to execute Phase 05
-- **Progress:** 3/7 phases complete `[███░░░░] 43%`
+- **Progress:** 4/7 phases complete `[████░░░] 57%`
 
 ## Phase Map
 
@@ -52,9 +56,9 @@ Phase: 02 (real-lectures-chunking-progress) — COMPLETE (4/4 plans done, verifi
 
 ## Performance Metrics
 
-- **Phases completed:** 2/7
-- **Plans completed:** 9
-- **Requirements covered:** 20/36 (56%)
+- **Phases completed:** 4/7
+- **Plans completed:** 15
+- **Requirements covered:** 26/36 (72%)
 
 ## Accumulated Context
 
