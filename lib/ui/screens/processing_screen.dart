@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/design_tokens.dart';
+import '../../core/error/app_exception.dart';
 import '../../core/providers/service_providers.dart';
 import '../../features/transcription/audio_chunking_service.dart';
 import '../../features/transcription/audio_normalization_service.dart';
@@ -16,11 +17,12 @@ import '../../features/transcription/processing_args.dart';
 import '../../features/transcription/result_args.dart';
 import '../../features/transcription/selected_audio_file.dart';
 import '../../features/transcription/transcription_options.dart';
-import '../widgets/chunk_tile.dart';
+import '../widgets/chunked_progress_section.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_icon_btn.dart';
 import '../widgets/glass_tile.dart';
 import '../widgets/gradient_background.dart';
+import '../widgets/pipeline_step_tile.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/shimmer_bar.dart';
 
@@ -40,7 +42,6 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen>
   NormalizedAudioFile? _normalizedFile;
   String? _normalizationError;
 
-  /// Настройки транскрибации, переданные с HomeScreen через ProcessingArgs.
   TranscriptionOptions _transcriptionOptions = const TranscriptionOptions.defaults();
 
   SelectedAudioFile? _file;
@@ -112,9 +113,10 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen>
       _normalizedFile = await AudioNormalizationService().normalize(_file!.path);
     } catch (e) {
       if (!mounted) return;
+      final msg = e is AppException ? e.userMessage : 'Ошибка подготовки аудио: $e';
       setState(() {
         _normalizing = false;
-        _normalizationError = 'Ошибка подготовки аудио: $e';
+        _normalizationError = msg;
       });
       return;
     }
@@ -189,19 +191,24 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen>
     return '$m:$s';
   }
 
+  PipelineStatus _normalizationStatus() {
+    if (_normalizing) return PipelineStatus.active;
+    if (_normalizedFile != null) return PipelineStatus.done;
+    if (_normalizationError != null) return PipelineStatus.error;
+    return PipelineStatus.pending;
+  }
+
+  PipelineStatus _recognitionStatus(ChunkedState? state) => switch (state) {
+    ChunkedProcessing() || ChunkedSplitting() => PipelineStatus.active,
+    ChunkedSuccess() => PipelineStatus.done,
+    ChunkedError() => PipelineStatus.error,
+    _ => _normalizedFile != null ? PipelineStatus.active : PipelineStatus.pending,
+  };
+
   @override
   Widget build(BuildContext context) {
     final chunkedState = _chunkedController?.state;
-
-    final _PipelineStatus recognitionStatus = switch (chunkedState) {
-      ChunkedProcessing() || ChunkedSplitting() => _PipelineStatus.active,
-      ChunkedSuccess() => _PipelineStatus.done,
-      ChunkedError() => _PipelineStatus.error,
-      _ => _normalizedFile != null ? _PipelineStatus.active : _PipelineStatus.pending,
-    };
-
     final bool isDone = chunkedState is ChunkedSuccess;
-    final bool showShimmer = _normalizing;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -268,15 +275,13 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen>
 
                 const SizedBox(height: AppSpacing.lg),
 
-                if (showShimmer) ...[
+                if (_normalizing) ...[
                   const ShimmerBar(),
                   const SizedBox(height: AppSpacing.sm),
-                  if (_normalizing)
-                    Text(
-                      'Подготовка аудио…',
-                      style: AppTextStyles.body
-                          .copyWith(color: AppColors.inkSecondary),
-                    ),
+                  Text(
+                    'Подготовка аудио…',
+                    style: AppTextStyles.body.copyWith(color: AppColors.inkSecondary),
+                  ),
                   const SizedBox(height: AppSpacing.lg),
                 ],
 
@@ -286,35 +291,39 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildPipelineStep(
+                          PipelineStepTile(
                             label: 'Загрузка',
-                            status: _PipelineStatus.done,
+                            status: PipelineStatus.done,
+                            pulseController: _pulseController,
+                            scaleAnimation: _scaleAnimation,
+                            opacityAnimation: _opacityAnimation,
                           ),
                           const Divider(height: AppSpacing.lg),
-                          _buildPipelineStep(
+                          PipelineStepTile(
                             label: 'Подготовка аудио',
-                            status: _normalizing
-                                ? _PipelineStatus.active
-                                : (_normalizedFile != null
-                                    ? _PipelineStatus.done
-                                    : (_normalizationError != null
-                                        ? _PipelineStatus.error
-                                        : _PipelineStatus.pending)),
+                            status: _normalizationStatus(),
+                            pulseController: _pulseController,
+                            scaleAnimation: _scaleAnimation,
+                            opacityAnimation: _opacityAnimation,
                           ),
                           const Divider(height: AppSpacing.lg),
-                          _buildPipelineStep(
+                          PipelineStepTile(
                             label: 'Распознавание',
-                            status: recognitionStatus,
+                            status: _recognitionStatus(chunkedState),
+                            pulseController: _pulseController,
+                            scaleAnimation: _scaleAnimation,
+                            opacityAnimation: _opacityAnimation,
                             inlineContent: chunkedState != null
-                                ? _buildChunkedInline(chunkedState)
+                                ? ChunkedProgressSection(state: chunkedState)
                                 : null,
                           ),
                           const Divider(height: AppSpacing.lg),
-                          _buildPipelineStep(
+                          PipelineStepTile(
                             label: 'Готово',
-                            status: isDone
-                                ? _PipelineStatus.done
-                                : _PipelineStatus.pending,
+                            status: isDone ? PipelineStatus.done : PipelineStatus.pending,
+                            pulseController: _pulseController,
+                            scaleAnimation: _scaleAnimation,
+                            opacityAnimation: _opacityAnimation,
                           ),
                         ],
                       ),
@@ -337,69 +346,6 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen>
         ),
       ),
     );
-  }
-
-  Widget _buildChunkedInline(ChunkedState state) {
-    return switch (state) {
-      ChunkedSplitting() => Padding(
-          padding: const EdgeInsets.only(top: AppSpacing.sm),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const ShimmerBar(),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                'Разбиваем на чанки…',
-                style: AppTextStyles.body.copyWith(color: AppColors.inkSecondary),
-              ),
-            ],
-          ),
-        ),
-
-      ChunkedProcessing(:final chunks, :final completedCount, :final totalCount) =>
-        Padding(
-          padding: const EdgeInsets.only(top: AppSpacing.sm),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(AppRadius.pill),
-                child: LinearProgressIndicator(
-                  value: totalCount == 0 ? 0.0 : completedCount / totalCount,
-                  minHeight: 6,
-                  backgroundColor: AppColors.inkDivider,
-                  color: AppColors.accent,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                '$completedCount из $totalCount чанков',
-                style: AppTextStyles.label,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              ExpansionTile(
-                title: Text(
-                  'Детали чанков',
-                  style: AppTextStyles.label,
-                ),
-                initiallyExpanded: true,
-                tilePadding: EdgeInsets.zero,
-                childrenPadding: EdgeInsets.zero,
-                children: [
-                  ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: chunks.length,
-                    itemBuilder: (context, i) => ChunkTile(state: chunks[i]),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-
-      _ => const SizedBox.shrink(),
-    };
   }
 
   Widget _buildChunkedBottomBar(ChunkedState? state) {
@@ -494,77 +440,4 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen>
       ],
     );
   }
-
-  Widget _buildPipelineStep({
-    required String label,
-    required _PipelineStatus status,
-    Widget? inlineContent,
-  }) {
-    final Color dotColor;
-    final IconData? icon;
-
-    switch (status) {
-      case _PipelineStatus.done:
-        dotColor = AppColors.good;
-        icon = Icons.check;
-      case _PipelineStatus.active:
-        dotColor = AppColors.accent;
-        icon = null;
-      case _PipelineStatus.error:
-        dotColor = AppColors.bad;
-        icon = Icons.error_outline;
-      case _PipelineStatus.pending:
-        dotColor = AppColors.inkTertiary;
-        icon = null;
-    }
-
-    final dotWidget = Container(
-      width: 20,
-      height: 20,
-      decoration: BoxDecoration(
-        color: dotColor,
-        shape: BoxShape.circle,
-      ),
-      child: icon != null
-          ? Icon(icon, color: Colors.white, size: 14)
-          : null,
-    );
-
-    final stepRow = Row(
-      children: [
-        if (status == _PipelineStatus.active)
-          AnimatedBuilder(
-            animation: _pulseController,
-            builder: (context, child) {
-              return Transform.scale(
-                scale: _scaleAnimation.value,
-                child: Opacity(
-                  opacity: _opacityAnimation.value,
-                  child: child,
-                ),
-              );
-            },
-            child: dotWidget,
-          )
-        else
-          dotWidget,
-        const SizedBox(width: AppSpacing.md),
-        Text(label, style: AppTextStyles.body),
-      ],
-    );
-
-    if (inlineContent != null) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          stepRow,
-          inlineContent,
-        ],
-      );
-    }
-
-    return stepRow;
-  }
 }
-
-enum _PipelineStatus { done, active, error, pending }
