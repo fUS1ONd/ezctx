@@ -69,6 +69,7 @@ class _ApiKeysScreenState extends ConsumerState<ApiKeysScreen> {
       await ref.read(apiKeyRepoProvider).addKey(rawKey);
       ref.read(groqKeyPoolProvider).addKey(rawKey);
       _inputController.clear();
+      ref.invalidate(apiKeysProvider);
       await _loadKeys();
     } on ValidationException catch (e) {
       setState(() => _errorMessage = e.message);
@@ -101,6 +102,7 @@ class _ApiKeysScreenState extends ConsumerState<ApiKeysScreen> {
     if (confirmed == true) {
       await ref.read(apiKeyRepoProvider).removeKey(key.raw);
       ref.read(groqKeyPoolProvider).removeKey(key.raw);
+      ref.invalidate(apiKeysProvider);
       await _loadKeys();
     }
   }
