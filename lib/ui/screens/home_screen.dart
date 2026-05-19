@@ -8,6 +8,7 @@ import '../../core/constants/design_tokens.dart';
 import '../../core/error/app_exception.dart';
 import '../../core/providers/repository_providers.dart';
 import '../../features/settings/transcription_options_repository.dart';
+import '../widgets/scaffold_with_nav_bar.dart';
 import '../../features/transcription/audio_chunking_service.dart';
 import '../../features/transcription/audio_metadata.dart';
 import '../../features/transcription/file_picker_service.dart';
@@ -178,7 +179,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               icon: Icons.settings_outlined,
                               semanticLabel: 'Настройки',
                               onPressed: () =>
-                                  Navigator.pushNamed(context, AppConstants.routeSettings),
+                                  ScaffoldWithNavBar.of(context)?.switchTab(2),
                             ),
                           ],
                         ),

@@ -3,10 +3,9 @@ import 'package:flutter/material.dart';
 import '../core/constants/app_constants.dart';
 import '../core/constants/design_tokens.dart';
 import 'screens/api_keys_screen.dart';
-import 'screens/home_screen.dart';
 import 'screens/processing_screen.dart';
 import 'screens/result_screen.dart';
-import 'screens/settings_screen.dart';
+import 'widgets/scaffold_with_nav_bar.dart';
 
 /// Корневой виджет приложения. Регистрирует именованные маршруты и тему.
 class EzCtxApp extends StatelessWidget {
@@ -27,15 +26,12 @@ class EzCtxApp extends StatelessWidget {
           labelSmall: AppTextStyles.label,
         ),
       ),
-      initialRoute: AppConstants.routeHome,
-      // Fade-переходы 300 мс easeInOut между всеми именованными маршрутами
+      // ScaffoldWithNavBar — корневой shell с тремя вкладками (IndexedStack).
+      // ProcessingScreen и ResultScreen пушатся поверх через Navigator.push.
+      home: const ScaffoldWithNavBar(),
       onGenerateRoute: (settings) {
         Widget page;
         switch (settings.name) {
-          case AppConstants.routeHome:
-            page = const HomeScreen();
-          case AppConstants.routeSettings:
-            page = const SettingsScreen();
           case AppConstants.routeApiKeys:
             page = const ApiKeysScreen();
           case AppConstants.routeProcessing:

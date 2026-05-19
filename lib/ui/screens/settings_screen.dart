@@ -5,6 +5,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/constants/design_tokens.dart';
 import '../../core/providers/repository_providers.dart';
 import '../widgets/glass_card.dart';
+import '../widgets/scaffold_with_nav_bar.dart';
 import '../widgets/glass_icon_btn.dart';
 import '../widgets/glass_tile.dart';
 import '../widgets/gradient_background.dart';
@@ -60,7 +61,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     GlassIconBtn(
                       icon: Icons.arrow_back,
                       semanticLabel: 'Назад',
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: () =>
+                          ScaffoldWithNavBar.of(context)?.switchTab(0),
                     ),
                   ],
                 ),
