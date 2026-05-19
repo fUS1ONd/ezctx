@@ -7,19 +7,16 @@ import '../../core/constants/app_constants.dart';
 import '../../core/constants/design_tokens.dart';
 import '../../core/error/app_exception.dart';
 import '../../core/providers/repository_providers.dart';
-import '../../features/settings/transcription_options_repository.dart';
-import '../widgets/scaffold_with_nav_bar.dart';
 import '../../features/transcription/audio_chunking_service.dart';
 import '../../features/transcription/audio_metadata.dart';
 import '../../features/transcription/file_picker_service.dart';
 import '../../features/transcription/processing_args.dart';
 import '../../features/transcription/selected_audio_file.dart';
-import '../../features/transcription/transcription_options.dart';
-import '../widgets/glass_card.dart';
-import '../widgets/glass_icon_btn.dart';
 import '../widgets/glass_tile.dart';
+import '../widgets/glass_icon_btn.dart';
 import '../widgets/gradient_background.dart';
 import '../widgets/primary_button.dart';
+import '../widgets/scaffold_with_nav_bar.dart';
 
 /// Главный экран: empty state → file preview → кнопка «Транскрибировать».
 class HomeScreen extends ConsumerStatefulWidget {
@@ -30,35 +27,11 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  /// Текущие настройки транскрибации (модель и язык).
-  TranscriptionOptions _options = const TranscriptionOptions.defaults();
-
-  /// Репозиторий для сохранения и загрузки настроек транскрибации.
-  final _optionsRepo = TranscriptionOptionsRepository();
-
   SelectedAudioFile? _selectedFile;
   AudioMetadata? _metadata;
   bool _loadingMetadata = false;
   String? _errorMessage;
   bool _picking = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadOptions();
-  }
-
-  Future<void> _loadOptions() async {
-    final saved = await _optionsRepo.load();
-    if (mounted) setState(() => _options = saved);
-  }
-
-  /// Сохраняет новые настройки и обновляет state, если значения изменились.
-  Future<void> _onOptionsChanged(TranscriptionOptions updated) async {
-    if (updated == _options) return;
-    setState(() => _options = updated);
-    await _optionsRepo.save(updated);
-  }
 
   Future<void> _onUploadTap() async {
     if (_picking) return;
@@ -106,33 +79,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Future<void> _onTranscribeTap() async {
     if (_selectedFile == null) return;
 
-    // Pre-flight: есть ли хотя бы один API-ключ?
     final keys = await ref.read(apiKeyRepoProvider).listKeys();
     if (!mounted) return;
 
     if (keys.isEmpty) {
-      final goToSettings = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Добавьте API-ключ'),
-          content: const Text('Для работы нужен ключ Groq. Это бесплатно.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Отмена'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Перейти в настройки'),
-            ),
-          ],
-        ),
-      );
-      if (goToSettings == true && mounted) {
-        Navigator.pushNamed(context, AppConstants.routeApiKeys);
-      }
+      ScaffoldWithNavBar.of(context)?.switchTab(2);
       return;
     }
+
+    final options = await ref.read(transcriptionOptionsRepoProvider).load();
+    if (!mounted) return;
 
     Navigator.pushNamed(
       context,
@@ -140,13 +96,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       arguments: ProcessingArgs(
         file: _selectedFile!,
         metadata: _metadata,
-        options: _options,
+        options: options,
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final keysAsync = ref.watch(apiKeysProvider);
+    final hasNoKeys = keysAsync.maybeWhen(
+      data: (keys) => keys.isEmpty,
+      orElse: () => false,
+    );
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: GradientBackground(
@@ -190,7 +152,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           'Загрузите аудиозапись лекции и получите готовый текст',
                           style: AppTextStyles.body.copyWith(color: AppColors.inkSecondary),
                         ),
-                        const SizedBox(height: AppSpacing.xxl),
+                        const SizedBox(height: AppSpacing.lg),
+
+                        // Баннер «нет ключей» — появляется реактивно
+                        if (hasNoKeys) ...[
+                          _buildNoKeysBanner(),
+                          const SizedBox(height: AppSpacing.md),
+                        ],
+
+                        const SizedBox(height: AppSpacing.md),
                         SizedBox(
                           width: double.infinity,
                           child: GestureDetector(
@@ -214,8 +184,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           ),
                         ],
                         const SizedBox(height: AppSpacing.xl),
-                        _buildModelAndLanguageCard(),
-                        const SizedBox(height: AppSpacing.xl),
                       ],
                     ),
                   ),
@@ -235,79 +203,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  /// Карточка выбора модели Whisper и языка распознавания.
-  Widget _buildModelAndLanguageCard() {
-    return GlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildNoKeysBanner() {
+    return GlassTile(
+      child: Row(
         children: [
-          Row(
-            children: [
-              Text('Модель', style: AppTextStyles.body),
-              const Spacer(),
-              SegmentedButton<WhisperModel>(
-                segments: const [
-                  ButtonSegment(
-                    value: WhisperModel.largeV3,
-                    label: Text('large-v3'),
-                  ),
-                  ButtonSegment(
-                    value: WhisperModel.turbo,
-                    label: Text('turbo'),
-                  ),
-                ],
-                selected: {_options.model},
-                onSelectionChanged: (sel) =>
-                    _onOptionsChanged(_options.copyWith(model: sel.first)),
-                style: const ButtonStyle(
-                  visualDensity: VisualDensity.compact,
-                ),
-              ),
-            ],
+          const Icon(
+            Icons.key_off_outlined,
+            color: AppColors.accent,
+            size: 28,
           ),
-          const SizedBox(height: AppSpacing.sm),
-          Row(
-            children: [
-              Text('Язык', style: AppTextStyles.body),
-              const Spacer(),
-              DropdownButton<TranscriptionLanguage>(
-                value: _options.language,
-                underline: const SizedBox.shrink(),
-                isDense: true,
-                items: _languageItems,
-                onChanged: (lang) {
-                  if (lang != null) {
-                    _onOptionsChanged(_options.copyWith(language: lang));
-                  }
-                },
-              ),
-            ],
+          const SizedBox(width: AppSpacing.md),
+          const Expanded(
+            child: Text(
+              'Добавьте API-ключ Groq для транскрибации',
+              style: AppTextStyles.body,
+            ),
+          ),
+          TextButton(
+            onPressed: () => ScaffoldWithNavBar.of(context)?.switchTab(2),
+            child: Text(
+              'Открыть настройки',
+              style: AppTextStyles.label.copyWith(color: AppColors.accent),
+            ),
           ),
         ],
       ),
     );
   }
-
-  static String _languageLabel(TranscriptionLanguage lang) => switch (lang) {
-    TranscriptionLanguage.auto => 'Авто',
-    TranscriptionLanguage.ru   => 'Русский',
-    TranscriptionLanguage.en   => 'English',
-    TranscriptionLanguage.de   => 'Deutsch',
-    TranscriptionLanguage.fr   => 'Français',
-    TranscriptionLanguage.es   => 'Español',
-    TranscriptionLanguage.uk   => 'Українська',
-    TranscriptionLanguage.zh   => '中文',
-    TranscriptionLanguage.ja   => '日本語',
-    TranscriptionLanguage.ko   => '한국어',
-    TranscriptionLanguage.ar   => 'العربية',
-  };
-
-  static final _languageItems = TranscriptionLanguage.values
-      .map((lang) => DropdownMenuItem(
-            value: lang,
-            child: Text(_languageLabel(lang)),
-          ))
-      .toList();
 
   Widget _buildEmptyCard() {
     return Column(

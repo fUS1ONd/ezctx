@@ -42,6 +42,7 @@ class AppConstants {
   // Secure storage keys
   static const String storageKeyApiKeys = 'groq_api_keys_v1';
   static const String storageKeyTranscriptionOptions = 'transcription_options_v1';
+  static const String storageKeyThemeMode = 'app_theme_mode';
 
   // Маршруты приложения
   static const String routeHome = '/';

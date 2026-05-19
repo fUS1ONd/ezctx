@@ -1,23 +1,40 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/constants/app_constants.dart';
 import '../core/constants/design_tokens.dart';
+import '../core/providers/theme_provider.dart';
 import 'screens/api_keys_screen.dart';
 import 'screens/processing_screen.dart';
 import 'screens/result_screen.dart';
 import 'widgets/scaffold_with_nav_bar.dart';
 
 /// Корневой виджет приложения. Регистрирует именованные маршруты и тему.
-class EzCtxApp extends StatelessWidget {
+class EzCtxApp extends ConsumerWidget {
   const EzCtxApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
+
     return MaterialApp(
       title: 'ezctx',
       debugShowCheckedModeBanner: false,
+      themeMode: themeMode,
       theme: ThemeData(
         useMaterial3: true,
+        brightness: Brightness.light,
+        scaffoldBackgroundColor: Colors.transparent,
+        textTheme: const TextTheme(
+          displayLarge: AppTextStyles.display,
+          titleLarge: AppTextStyles.heading,
+          bodyLarge: AppTextStyles.body,
+          labelSmall: AppTextStyles.label,
+        ),
+      ),
+      darkTheme: ThemeData(
+        useMaterial3: true,
+        brightness: Brightness.dark,
         scaffoldBackgroundColor: Colors.transparent,
         textTheme: const TextTheme(
           displayLarge: AppTextStyles.display,

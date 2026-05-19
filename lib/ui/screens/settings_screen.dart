@@ -4,13 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/design_tokens.dart';
 import '../../core/providers/repository_providers.dart';
+import '../../core/providers/theme_provider.dart';
+import '../../features/settings/transcription_options_repository.dart';
+import '../../features/transcription/transcription_options.dart';
 import '../widgets/glass_card.dart';
-import '../widgets/scaffold_with_nav_bar.dart';
-import '../widgets/glass_icon_btn.dart';
-import '../widgets/glass_tile.dart';
 import '../widgets/gradient_background.dart';
 
-/// Экран настроек.
+/// Переработанный экран настроек: Подключение / Внешний вид / Уведомления.
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
@@ -20,22 +20,35 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   int _keyCount = 0;
-  bool _loading = true;
+  bool _loadingKeys = true;
+  TranscriptionOptions _options = const TranscriptionOptions.defaults();
+  bool _notificationsEnabled = true;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _loadKeys();
+    _loadOptions();
   }
 
-  Future<void> _load() async {
+  Future<void> _loadKeys() async {
     final keys = await ref.read(apiKeyRepoProvider).listKeys();
     if (mounted) {
       setState(() {
         _keyCount = keys.length;
-        _loading = false;
+        _loadingKeys = false;
       });
     }
+  }
+
+  Future<void> _loadOptions() async {
+    final saved = await TranscriptionOptionsRepository().load();
+    if (mounted) setState(() => _options = saved);
+  }
+
+  Future<void> _saveOptions(TranscriptionOptions updated) async {
+    setState(() => _options = updated);
+    await TranscriptionOptionsRepository().save(updated);
   }
 
   String _keyCountLabel(int count) {
@@ -44,35 +57,53 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return '$count активных';
   }
 
+  String _modelLabel(WhisperModel model) => switch (model) {
+    WhisperModel.largeV3 => 'Whisper Large v3',
+    WhisperModel.turbo => 'Whisper Turbo',
+  };
+
+  String _languageLabel(TranscriptionLanguage lang) => switch (lang) {
+    TranscriptionLanguage.auto => 'Авто',
+    TranscriptionLanguage.ru => 'Русский',
+    TranscriptionLanguage.en => 'English',
+    TranscriptionLanguage.de => 'Deutsch',
+    TranscriptionLanguage.fr => 'Français',
+    TranscriptionLanguage.es => 'Español',
+    TranscriptionLanguage.uk => 'Українська',
+    TranscriptionLanguage.zh => '中文',
+    TranscriptionLanguage.ja => '日本語',
+    TranscriptionLanguage.ko => '한국어',
+    TranscriptionLanguage.ar => 'العربية',
+  };
+
   @override
   Widget build(BuildContext context) {
+    final themeMode = ref.watch(themeModeProvider);
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: GradientBackground(
         child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.md,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: AppSpacing.md),
-                Row(
-                  children: [
-                    GlassIconBtn(
-                      icon: Icons.arrow_back,
-                      semanticLabel: 'Назад',
-                      onPressed: () =>
-                          ScaffoldWithNavBar.of(context)?.switchTab(0),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.xl),
                 const Text('Настройки', style: AppTextStyles.display),
                 const SizedBox(height: AppSpacing.lg),
-                if (!_loading && _keyCount > 0) ...[
-                  _buildGroqStatusCard(),
-                  const SizedBox(height: AppSpacing.md),
-                ],
+
+                // ── Блок «Подключение» ────────────────────────────────────
+                Text(
+                  'Подключение',
+                  style: AppTextStyles.label.copyWith(
+                    color: AppColors.inkTertiary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
                 GlassCard(
                   padding: EdgeInsets.zero,
                   child: Column(
@@ -82,12 +113,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           Icons.key_outlined,
                           color: AppColors.inkPrimary,
                         ),
-                        title: const Text(
-                          'API-ключи',
-                          style: AppTextStyles.body,
-                        ),
+                        title: const Text('API-ключи', style: AppTextStyles.body),
                         subtitle: Text(
-                          _loading ? '...' : _keyCountLabel(_keyCount),
+                          _loadingKeys ? '...' : _keyCountLabel(_keyCount),
                           style: AppTextStyles.label,
                         ),
                         trailing: const Icon(
@@ -99,65 +127,153 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             context,
                             AppConstants.routeApiKeys,
                           );
-                          _load();
+                          _loadKeys();
                         },
+                      ),
+                      const Divider(height: 1),
+                      ListTile(
+                        leading: const Icon(
+                          Icons.graphic_eq_outlined,
+                          color: AppColors.inkPrimary,
+                        ),
+                        title: const Text('Модель', style: AppTextStyles.body),
+                        trailing: DropdownButton<WhisperModel>(
+                          value: _options.model,
+                          underline: const SizedBox.shrink(),
+                          isDense: true,
+                          items: WhisperModel.values
+                              .map((m) => DropdownMenuItem(
+                                    value: m,
+                                    child: Text(
+                                      _modelLabel(m),
+                                      style: AppTextStyles.label,
+                                    ),
+                                  ))
+                              .toList(),
+                          onChanged: (m) {
+                            if (m != null) {
+                              _saveOptions(_options.copyWith(model: m));
+                            }
+                          },
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      ListTile(
+                        leading: const Icon(
+                          Icons.translate_outlined,
+                          color: AppColors.inkPrimary,
+                        ),
+                        title: const Text('Язык', style: AppTextStyles.body),
+                        trailing: DropdownButton<TranscriptionLanguage>(
+                          value: _options.language,
+                          underline: const SizedBox.shrink(),
+                          isDense: true,
+                          items: TranscriptionLanguage.values
+                              .map((l) => DropdownMenuItem(
+                                    value: l,
+                                    child: Text(
+                                      _languageLabel(l),
+                                      style: AppTextStyles.label,
+                                    ),
+                                  ))
+                              .toList(),
+                          onChanged: (l) {
+                            if (l != null) {
+                              _saveOptions(_options.copyWith(language: l));
+                            }
+                          },
+                        ),
                       ),
                     ],
                   ),
                 ),
+
+                const SizedBox(height: AppSpacing.lg),
+
+                // ── Блок «Внешний вид» ────────────────────────────────────
+                Text(
+                  'Внешний вид',
+                  style: AppTextStyles.label.copyWith(
+                    color: AppColors.inkTertiary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                GlassCard(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Тема', style: AppTextStyles.body),
+                      const SizedBox(height: AppSpacing.sm),
+                      SegmentedButton<ThemeMode>(
+                        segments: const [
+                          ButtonSegment(
+                            value: ThemeMode.system,
+                            label: Text('Авто'),
+                          ),
+                          ButtonSegment(
+                            value: ThemeMode.light,
+                            label: Text('Светлая'),
+                          ),
+                          ButtonSegment(
+                            value: ThemeMode.dark,
+                            label: Text('Тёмная'),
+                          ),
+                        ],
+                        selected: {themeMode},
+                        onSelectionChanged: (sel) =>
+                            ref.read(themeModeProvider.notifier).setTheme(sel.first),
+                        style: const ButtonStyle(
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                      const Divider(height: AppSpacing.lg),
+                      // Placeholder — реальная смена иконки требует activity-alias
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Иконка приложения', style: AppTextStyles.body),
+                        subtitle: const Text(
+                          'Ночная версия (скоро)',
+                          style: AppTextStyles.label,
+                        ),
+                        value: false,
+                        onChanged: null,
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: AppSpacing.lg),
+
+                // ── Блок «Уведомления» ────────────────────────────────────
+                Text(
+                  'Уведомления',
+                  style: AppTextStyles.label.copyWith(
+                    color: AppColors.inkTertiary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                GlassCard(
+                  padding: EdgeInsets.zero,
+                  child: SwitchListTile(
+                    title: const Text(
+                      'Уведомления о завершении',
+                      style: AppTextStyles.body,
+                    ),
+                    subtitle: const Text(
+                      'Когда транскрибация завершена',
+                      style: AppTextStyles.label,
+                    ),
+                    value: _notificationsEnabled,
+                    onChanged: (v) => setState(() => _notificationsEnabled = v),
+                  ),
+                ),
+
+                const SizedBox(height: AppSpacing.xl),
               ],
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildGroqStatusCard() {
-    return GlassTile(
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              gradient: AppGradients.accent,
-              borderRadius: BorderRadius.circular(AppRadius.icon),
-            ),
-            child: const Icon(
-              Icons.vpn_key_rounded,
-              color: Colors.white,
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Подключено к Groq', style: AppTextStyles.heading),
-                const SizedBox(height: AppSpacing.xs),
-                Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: AppColors.good,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Text(
-                      'API ключ активен',
-                      style: AppTextStyles.label,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

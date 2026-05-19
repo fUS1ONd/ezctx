@@ -11,3 +11,8 @@ final apiKeyRepoProvider = Provider<ApiKeyRepository>(
 final transcriptionOptionsRepoProvider = Provider<TranscriptionOptionsRepository>(
   (ref) => TranscriptionOptionsRepository(),
 );
+
+/// Реактивный список ключей для баннера на HomeScreen.
+final apiKeysProvider = FutureProvider<List<ApiKeyView>>((ref) async {
+  return ref.watch(apiKeyRepoProvider).listKeys();
+});
