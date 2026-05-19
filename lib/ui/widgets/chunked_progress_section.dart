@@ -49,11 +49,11 @@ class ChunkedProgressSection extends StatelessWidget {
               const SizedBox(height: AppSpacing.sm),
               Text(
                 '$completedCount из $totalCount чанков',
-                style: AppTextStyles.label,
+                style: AppTextStyles.label.copyWith(color: palette.ink2),
               ),
               const SizedBox(height: AppSpacing.sm),
               ExpansionTile(
-                title: Text('Детали чанков', style: AppTextStyles.label),
+                title: Text('Детали чанков', style: AppTextStyles.label.copyWith(color: palette.ink2)),
                 initiallyExpanded: true,
                 tilePadding: EdgeInsets.zero,
                 childrenPadding: EdgeInsets.zero,

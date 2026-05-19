@@ -195,7 +195,7 @@ class _ApiKeysScreenState extends ConsumerState<ApiKeysScreen> {
                   Icon(Icons.vpn_key_outlined, size: 24, color: palette.ink2),
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
-                    child: Text(key.masked, style: AppTextStyles.mono),
+                    child: Text(key.masked, style: AppTextStyles.mono.copyWith(color: palette.ink1)),
                   ),
                   KeyStatusTile(
                     status: pool.getStatusForKey(key.raw),
@@ -221,6 +221,7 @@ class _ApiKeysScreenState extends ConsumerState<ApiKeysScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: GradientBackground(
@@ -239,7 +240,7 @@ class _ApiKeysScreenState extends ConsumerState<ApiKeysScreen> {
                       onPressed: () => Navigator.pop(context),
                     ),
                     const SizedBox(width: AppSpacing.sm),
-                    const Text('API-ключи', style: AppTextStyles.heading),
+                    Text('API-ключи', style: AppTextStyles.heading.copyWith(color: context.palette.ink1)),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.lg),
@@ -260,14 +261,14 @@ class _ApiKeysScreenState extends ConsumerState<ApiKeysScreen> {
                         ),
                       ),
                       const SizedBox(width: AppSpacing.md),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Groq API', style: AppTextStyles.heading),
+                            Text('Groq API', style: AppTextStyles.heading.copyWith(color: palette.ink1)),
                             Text(
                               'Ключи хранятся в защищённом хранилище устройства',
-                              style: AppTextStyles.label,
+                              style: AppTextStyles.label.copyWith(color: palette.ink2),
                             ),
                           ],
                         ),
@@ -292,7 +293,7 @@ class _ApiKeysScreenState extends ConsumerState<ApiKeysScreen> {
                             color: context.palette.ink3,
                           ),
                         ),
-                        style: AppTextStyles.mono,
+                        style: AppTextStyles.mono.copyWith(color: palette.ink1),
                         keyboardType: TextInputType.visiblePassword,
                         autocorrect: false,
                         enableSuggestions: false,

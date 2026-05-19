@@ -227,7 +227,7 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen>
                           Navigator.popUntil(context, (r) => r.isFirst),
                     ),
                     const SizedBox(width: AppSpacing.sm),
-                    const Text('Обработка', style: AppTextStyles.heading),
+                    Text('Обработка', style: AppTextStyles.heading.copyWith(color: context.palette.ink1)),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.xl),
@@ -256,13 +256,13 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen>
                             children: [
                               Text(
                                 _file!.name,
-                                style: AppTextStyles.heading,
+                                style: AppTextStyles.heading.copyWith(color: context.palette.ink1),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
                               Text(
                                 '${_file!.sizeFormatted} · ${_file!.extension.toUpperCase()}',
-                                style: AppTextStyles.label,
+                                style: AppTextStyles.label.copyWith(color: context.palette.ink2),
                               ),
                             ],
                           ),
@@ -358,7 +358,7 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(_formatElapsed(_elapsed), style: AppTextStyles.mono),
+              Text(_formatElapsed(_elapsed), style: AppTextStyles.mono.copyWith(color: palette.ink1)),
               TextButton(
                 onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
                 child: Text(

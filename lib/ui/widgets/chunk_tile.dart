@@ -47,7 +47,7 @@ class ChunkTile extends StatelessWidget {
           // Номер чанка
           Text(
             'Чанк ${state.index + 1}',
-            style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w700),
+            style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w700, color: palette.ink1),
           ),
 
           const SizedBox(width: AppSpacing.sm),

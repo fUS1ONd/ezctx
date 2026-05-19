@@ -46,7 +46,7 @@ class _TranscriptViewState extends State<_TranscriptView> {
         padding: const EdgeInsets.only(bottom: AppSpacing.sm),
         child: SelectableText(
           _segments[i],
-          style: AppTextStyles.body,
+          style: AppTextStyles.body.copyWith(color: context.palette.ink1),
         ),
       ),
     );
@@ -208,11 +208,11 @@ class _ResultScreenState extends State<ResultScreen> {
                 const SizedBox(height: AppSpacing.lg),
 
                 // Имя файла + метаданные
-                Text(file.name, style: AppTextStyles.heading),
+                Text(file.name, style: AppTextStyles.heading.copyWith(color: context.palette.ink1)),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
                   '${file.sizeFormatted} · ${file.extension.toUpperCase()} · ${_formatDuration(r.duration)}',
-                  style: AppTextStyles.mono,
+                  style: AppTextStyles.mono.copyWith(color: context.palette.ink2),
                 ),
                 const SizedBox(height: AppSpacing.lg),
 

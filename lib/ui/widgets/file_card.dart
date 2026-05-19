@@ -85,12 +85,14 @@ class FileCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Row(
-                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            _metaLine(),
-                            style: AppTextStyles.mono
-                                .copyWith(color: palette.ink2),
+                          Flexible(
+                            child: Text(
+                              _metaLine(),
+                              style: AppTextStyles.mono
+                                  .copyWith(color: palette.ink2),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                           if (loadingMetadata) ...[
                             const SizedBox(width: 8),

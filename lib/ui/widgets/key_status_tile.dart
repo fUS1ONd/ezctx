@@ -68,7 +68,7 @@ class _KeyStatusTileState extends State<KeyStatusTile> {
       children: [
         Icon(Icons.circle, size: 8, color: palette.good),
         const SizedBox(width: AppSpacing.xs),
-        Text('Активен', style: AppTextStyles.label),
+        Text('Активен', style: AppTextStyles.label.copyWith(color: palette.ink2)),
       ],
     );
   }

@@ -405,9 +405,12 @@ class _StatusCard extends StatelessWidget {
                   color: connected ? palette.good : palette.bad,
                 ),
                 const SizedBox(width: 6),
-                Text(
-                  connected ? modelName : 'Добавьте ключ для транскрибации',
-                  style: TextStyle(fontSize: 13, color: palette.ink2),
+                Flexible(
+                  child: Text(
+                    connected ? modelName : 'Добавьте ключ для транскрибации',
+                    style: TextStyle(fontSize: 13, color: palette.ink2),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ]),
             ],

@@ -75,7 +75,7 @@ class PipelineStepTile extends StatelessWidget {
         else
           dotWidget,
         const SizedBox(width: AppSpacing.md),
-        Text(label, style: AppTextStyles.body),
+        Text(label, style: AppTextStyles.body.copyWith(color: palette.ink1)),
       ],
     );
 
