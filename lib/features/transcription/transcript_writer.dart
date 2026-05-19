@@ -104,6 +104,9 @@ class TranscriptWriter {
     n = n.replaceAll(RegExp(r'[^\w\- ]+'), '_').trim();
     // Если имя после очистки пустое — используем имя по умолчанию.
     if (n.isEmpty) n = 'transcript';
+    // Ограничиваем длину: ext4 на Android допускает 255 байт,
+    // оставляем запас на расширение (.srt/.txt = 4 символа) + _timestamped.txt (17).
+    if (n.length > 200) n = n.substring(0, 200);
     return n;
   }
 }
