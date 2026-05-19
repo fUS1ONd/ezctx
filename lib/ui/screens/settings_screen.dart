@@ -21,7 +21,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   int _keyCount = 0;
   bool _loadingKeys = true;
   TranscriptionOptions _options = const TranscriptionOptions.defaults();
-  bool _notificationsEnabled = true;
 
   @override
   void initState() {
@@ -260,11 +259,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       style: AppTextStyles.body,
                     ),
                     subtitle: const Text(
-                      'Когда транскрибация завершена',
+                      'Скоро',
                       style: AppTextStyles.label,
                     ),
-                    value: _notificationsEnabled,
-                    onChanged: (v) => setState(() => _notificationsEnabled = v),
+                    value: false,
+                    onChanged: null,
                   ),
                 ),
 
