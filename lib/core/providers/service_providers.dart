@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/transcription/audio_chunking_service.dart';
+import '../../features/transcription/file_picker_service.dart';
 import '../../features/transcription/groq_api_service.dart';
 import '../../features/transcription/groq_key_pool.dart';
 
@@ -15,4 +16,8 @@ final groqApiServiceProvider = Provider<GroqApiService>(
 
 final audioChunkingServiceProvider = Provider<AudioChunkingService>(
   (ref) => AudioChunkingService(),
+);
+
+final filePickerServiceProvider = Provider<FilePickerService>(
+  (ref) => const FilePickerService(),
 );

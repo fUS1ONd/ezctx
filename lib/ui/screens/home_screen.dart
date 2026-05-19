@@ -7,7 +7,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/constants/design_tokens.dart';
 import '../../core/error/app_exception.dart';
 import '../../core/providers/repository_providers.dart';
-import '../../features/transcription/audio_chunking_service.dart';
+import '../../core/providers/service_providers.dart';
 import '../../features/transcription/audio_metadata.dart';
 import '../../features/transcription/file_picker_service.dart';
 import '../../features/transcription/processing_args.dart';
@@ -40,7 +40,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _errorMessage = null;
     });
     try {
-      final result = await const FilePickerService().pickAudioFile();
+      final result = await ref.read(filePickerServiceProvider).pickAudioFile();
       switch (result) {
         case FilePickPicked(file: final f):
           if (mounted) {
@@ -67,7 +67,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (!mounted) return;
     setState(() => _loadingMetadata = true);
     try {
-      final meta = await AudioChunkingService().getMetadata(file.path);
+      final meta = await ref.read(audioChunkingServiceProvider).getMetadata(file.path);
       if (mounted) setState(() => _metadata = meta);
     } catch (_) {
       // Тихо: если ffprobe не удался, метаданные показываем без длительности.
