@@ -493,12 +493,15 @@ class _ProcessingScreenState extends State<ProcessingScreen>
                 style: AppTextStyles.label,
               ),
               const SizedBox(height: AppSpacing.sm),
-              // Список чанков — свёрнут по умолчанию, чтобы не занимать много места.
+              // Список чанков виден сразу: пользователь должен наблюдать
+              // прогресс каждой части без дополнительного тапа. Складывается
+              // вручную, если занимает слишком много места.
               ExpansionTile(
                 title: Text(
                   'Детали чанков',
                   style: AppTextStyles.label,
                 ),
+                initiallyExpanded: true,
                 tilePadding: EdgeInsets.zero,
                 childrenPadding: EdgeInsets.zero,
                 children: [
