@@ -69,6 +69,9 @@ class _ResultScreenState extends State<ResultScreen> {
   bool _copied = false;
   String? _savedPath;
 
+  /// Флаг защиты от повторного вызова _saveTranscripts (race condition при back+forward).
+  bool _transcriptsSaved = false;
+
   /// true = показываем текст с таймкодами; false = plain text.
   /// Изначально true только если в результате есть таймкоды.
   bool _showTimestamps = true;
@@ -98,6 +101,9 @@ class _ResultScreenState extends State<ResultScreen> {
   }
 
   Future<void> _saveTranscripts() async {
+    // Защита от повторного сохранения при быстром navigate-back+forward.
+    if (_transcriptsSaved) return;
+    _transcriptsSaved = true;
     try {
       // Сохраняем оба формата: plain (для LLM) и с таймкодами (для истории).
       final paths = await const TranscriptWriter().writeBoth(
