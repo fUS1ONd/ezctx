@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../../core/constants/design_tokens.dart';
 import '../screens/history_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/settings_screen.dart';
+import 'liquid_glass_tab_bar.dart';
 
 /// Shell-виджет с Bottom Navigation: IndexedStack (без пересоздания экранов)
-/// и кастомным BottomNavigationBar в стиле проекта.
+/// и плавающая Liquid Glass панель снизу.
 ///
 /// ProcessingScreen и ResultScreen пушатся поверх через Navigator.push —
 /// они не вкладки.
@@ -32,6 +32,8 @@ class ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
+      // extendBody: true — чтобы под панелью просвечивал градиент/обои.
+      extendBody: true,
       body: IndexedStack(
         index: _currentIndex,
         children: const [
@@ -40,33 +42,13 @@ class ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
           SettingsScreen(),
         ],
       ),
-      bottomNavigationBar: _buildBottomNav(),
-    );
-  }
-
-  Widget _buildBottomNav() {
-    return BottomNavigationBar(
-      currentIndex: _currentIndex,
-      onTap: (i) => setState(() => _currentIndex = i),
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      type: BottomNavigationBarType.fixed,
-      selectedItemColor: AppColors.accent,
-      unselectedItemColor: AppColors.inkTertiary,
-      items: const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.home_outlined),
-          label: 'Главная',
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: LiquidGlassTabBar(
+          activeIndex: _currentIndex,
+          onChanged: switchTab,
         ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.history_outlined),
-          label: 'История',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.settings_outlined),
-          label: 'Настройки',
-        ),
-      ],
+      ),
     );
   }
 }

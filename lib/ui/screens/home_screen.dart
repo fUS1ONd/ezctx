@@ -194,7 +194,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ? null
                       : () => _onTranscribeTap(),
                 ),
-                const SizedBox(height: AppSpacing.md),
+                // Отступ под капсулу LiquidGlassTabBar (48 высота + 30 margin).
+                const SizedBox(height: 96),
               ],
             ),
           ),
