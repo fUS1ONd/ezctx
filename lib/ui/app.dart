@@ -1,52 +1,36 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/constants/app_constants.dart';
 import '../core/constants/design_tokens.dart';
-import '../features/transcription/groq_key_pool.dart';
+import '../core/providers/theme_provider.dart';
 import 'screens/api_keys_screen.dart';
-import 'screens/home_screen.dart';
 import 'screens/processing_screen.dart';
 import 'screens/result_screen.dart';
-import 'screens/settings_screen.dart';
+import 'widgets/scaffold_with_nav_bar.dart';
 
 /// Корневой виджет приложения. Регистрирует именованные маршруты и тему.
-/// Принимает [groqKeyPool] — singleton пул ключей, созданный в main.dart.
-class EzCtxApp extends StatelessWidget {
-  const EzCtxApp({super.key, required this.groqKeyPool});
-
-  /// Singleton пул Groq API-ключей, передаётся в контроллеры транскрибации.
-  final GroqKeyPool groqKeyPool;
+class EzCtxApp extends ConsumerWidget {
+  const EzCtxApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
+
     return MaterialApp(
       title: 'ezctx',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        scaffoldBackgroundColor: Colors.transparent,
-        textTheme: const TextTheme(
-          displayLarge: AppTextStyles.display,
-          titleLarge: AppTextStyles.heading,
-          bodyLarge: AppTextStyles.body,
-          labelSmall: AppTextStyles.label,
-        ),
-      ),
-      initialRoute: AppConstants.routeHome,
-      // Fade-переходы 300 мс easeInOut между всеми именованными маршрутами
+      themeMode: themeMode,
+      theme: _buildTheme(Brightness.light),
+      darkTheme: _buildTheme(Brightness.dark),
+      home: const ScaffoldWithNavBar(),
       onGenerateRoute: (settings) {
         Widget page;
         switch (settings.name) {
-          case AppConstants.routeHome:
-            page = const HomeScreen();
-          case AppConstants.routeSettings:
-            page = const SettingsScreen();
           case AppConstants.routeApiKeys:
-            // Pool передаётся в ApiKeysScreen для реактивного обновления статусов.
-            page = ApiKeysScreen(pool: groqKeyPool);
+            page = const ApiKeysScreen();
           case AppConstants.routeProcessing:
-            // Pool передаётся в ProcessingScreen для инициализации контроллеров.
-            page = ProcessingScreen(groqKeyPool: groqKeyPool);
+            page = const ProcessingScreen();
           case AppConstants.routeResult:
             page = const ResultScreen();
           default:
@@ -67,6 +51,36 @@ class EzCtxApp extends StatelessWidget {
           },
         );
       },
+    );
+  }
+
+  ThemeData _buildTheme(Brightness brightness) {
+    final palette = brightness == Brightness.dark
+        ? AppPalette.dark
+        : AppPalette.light;
+
+    final base = ThemeData(
+      useMaterial3: true,
+      brightness: brightness,
+      scaffoldBackgroundColor: Colors.transparent,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: palette.accent,
+        brightness: brightness,
+      ).copyWith(
+        surface: brightness == Brightness.dark
+            ? const Color(0xFF16111F)
+            : const Color(0xFFFFF3EA),
+        onSurface: palette.ink1,
+      ),
+    );
+
+    return base.copyWith(
+      textTheme: base.textTheme.copyWith(
+        displayLarge: AppTextStyles.display.copyWith(color: palette.ink1),
+        titleLarge: AppTextStyles.heading.copyWith(color: palette.ink1),
+        bodyLarge: AppTextStyles.body.copyWith(color: palette.ink1),
+        labelSmall: AppTextStyles.label.copyWith(color: palette.ink2),
+      ),
     );
   }
 }

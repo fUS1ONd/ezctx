@@ -30,24 +30,29 @@ class PrimaryButton extends StatefulWidget {
 class _PrimaryButtonState extends State<PrimaryButton> {
   bool _isPressed = false;
 
-  LinearGradient _activeGradient() {
+  LinearGradient _activeGradient(AppPalette palette) {
     return switch (widget.variant) {
-      PrimaryButtonVariant.accent => AppGradients.accent,
-      PrimaryButtonVariant.good => const LinearGradient(
-          colors: [Color(0xFF3FCB9A), AppColors.good],
+      PrimaryButtonVariant.accent => LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [palette.accent2, palette.accent],
+        ),
+      PrimaryButtonVariant.good => LinearGradient(
+          colors: [const Color(0xFF3FCB9A), palette.good],
         ),
     };
   }
 
-  Color _shadowColor() {
+  Color _shadowColor(AppPalette palette) {
     return switch (widget.variant) {
-      PrimaryButtonVariant.accent => AppColors.accent,
-      PrimaryButtonVariant.good => AppColors.good,
+      PrimaryButtonVariant.accent => palette.accent,
+      PrimaryButtonVariant.good => palette.good,
     };
   }
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
     final isDisabled = widget.onPressed == null;
 
     final gradient = isDisabled
@@ -56,7 +61,7 @@ class _PrimaryButtonState extends State<PrimaryButton> {
             end: Alignment.bottomRight,
             colors: [Color(0xFFB0B0B0), Color(0xFF888888)],
           )
-        : _activeGradient();
+        : _activeGradient(palette);
 
     return GestureDetector(
       onTapDown: isDisabled ? null : (_) => setState(() => _isPressed = true),
@@ -84,7 +89,7 @@ class _PrimaryButtonState extends State<PrimaryButton> {
                 ? null
                 : [
                     BoxShadow(
-                      color: _shadowColor().withValues(alpha: 0.32),
+                      color: _shadowColor(palette).withValues(alpha: 0.32),
                       blurRadius: 18,
                       offset: const Offset(0, 8),
                     ),

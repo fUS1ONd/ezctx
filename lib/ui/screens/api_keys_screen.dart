@@ -1,11 +1,14 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants/design_tokens.dart';
 import '../../core/error/app_exception.dart';
-import '../../core/storage/secure_storage_service.dart';
+import '../../core/providers/repository_providers.dart';
+import '../../core/providers/service_providers.dart';
 import '../../features/settings/api_key_repository.dart';
-import '../../features/transcription/groq_key_pool.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_icon_btn.dart';
 import '../widgets/glass_tile.dart';
@@ -14,22 +17,14 @@ import '../widgets/key_status_tile.dart';
 import '../widgets/primary_button.dart';
 
 /// Экран управления API-ключами Groq.
-/// Поддерживает добавление, маскированное отображение и удаление ключей.
-/// Подписан на [GroqKeyPool] через ListenableBuilder для реактивного UI.
-class ApiKeysScreen extends StatefulWidget {
-  const ApiKeysScreen({super.key, required this.pool});
-
-  /// Пул ключей — источник статусов для каждого ключа.
-  final GroqKeyPool pool;
+class ApiKeysScreen extends ConsumerStatefulWidget {
+  const ApiKeysScreen({super.key});
 
   @override
-  State<ApiKeysScreen> createState() => _ApiKeysScreenState();
+  ConsumerState<ApiKeysScreen> createState() => _ApiKeysScreenState();
 }
 
-class _ApiKeysScreenState extends State<ApiKeysScreen> {
-  // Единственный экземпляр репозитория на весь lifecycle экрана.
-  final ApiKeyRepository _repository = ApiKeyRepository(SecureStorageServiceImpl());
-
+class _ApiKeysScreenState extends ConsumerState<ApiKeysScreen> {
   List<ApiKeyView> _keys = [];
   bool _loading = true;
   String? _errorMessage;
@@ -50,7 +45,7 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
 
   Future<void> _loadKeys() async {
     setState(() => _loading = true);
-    final keys = await _repository.listKeys();
+    final keys = await ref.read(apiKeyRepoProvider).listKeys();
     if (mounted) {
       setState(() {
         _keys = keys;
@@ -64,7 +59,6 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
       _saving = true;
       _errorMessage = null;
     });
-    // trim() убирает случайные пробелы/переносы; пустую строку проверяем явно.
     final rawKey = _inputController.text.trim();
     if (rawKey.isEmpty) {
       setState(() {
@@ -74,10 +68,10 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
       return;
     }
     try {
-      await _repository.addKey(rawKey);
-      // Синхронизируем пул — репозиторий хранит ключи, пул управляет статусами.
-      widget.pool.addKey(rawKey);
+      await ref.read(apiKeyRepoProvider).addKey(rawKey);
+      ref.read(groqKeyPoolProvider).addKey(rawKey);
       _inputController.clear();
+      ref.invalidate(apiKeysProvider);
       await _loadKeys();
     } on ValidationException catch (e) {
       setState(() => _errorMessage = e.message);
@@ -89,46 +83,104 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
   }
 
   Future<void> _confirmDelete(ApiKeyView key) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGeneralDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Удалить ключ?'),
-        content: const Text('Это действие нельзя отменить.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Отмена'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.bad),
-            child: const Text('Удалить'),
-          ),
-        ],
+      barrierDismissible: true,
+      barrierLabel: 'Закрыть',
+      barrierColor: Colors.black.withValues(alpha: 0.45),
+      transitionDuration: const Duration(milliseconds: 260),
+      transitionBuilder: (ctx, anim, _, child) => FadeTransition(
+        opacity: CurvedAnimation(parent: anim, curve: Curves.easeOut),
+        child: child,
       ),
+      pageBuilder: (ctx, _, __) {
+        final palette = ctx.palette;
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Material(
+              color: Colors.transparent,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(28),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 34, sigmaY: 34),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: palette.glassBgDeep,
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(color: palette.glassRim, width: 0.5),
+                      boxShadow: [palette.shadowDeep],
+                    ),
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          'Удалить ключ?',
+                          style: AppTextStyles.heading.copyWith(color: palette.ink1),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Это действие нельзя отменить.',
+                          style: AppTextStyles.body.copyWith(color: palette.ink2),
+                        ),
+                        const SizedBox(height: 24),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextButton(
+                                onPressed: () => Navigator.pop(ctx, false),
+                                child: Text(
+                                  'Отмена',
+                                  style: AppTextStyles.label.copyWith(color: palette.ink1),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextButton(
+                                onPressed: () => Navigator.pop(ctx, true),
+                                child: Text(
+                                  'Удалить',
+                                  style: AppTextStyles.label.copyWith(color: palette.bad),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
     if (confirmed == true) {
-      await _repository.removeKey(key.raw);
-      // Синхронизируем пул после удаления из репозитория.
-      widget.pool.removeKey(key.raw);
+      await ref.read(apiKeyRepoProvider).removeKey(key.raw);
+      ref.read(groqKeyPoolProvider).removeKey(key.raw);
+      ref.invalidate(apiKeysProvider);
       await _loadKeys();
     }
   }
 
   Widget _buildKeysList() {
+    final palette = context.palette;
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
     if (_keys.isEmpty) {
       return Text(
         'Нет добавленных ключей',
-        style: AppTextStyles.label.copyWith(color: AppColors.inkTertiary),
+        style: AppTextStyles.label.copyWith(color: palette.ink3),
       );
     }
-    // ListenableBuilder переподписывает виджет при каждом notifyListeners() из пула.
-    // Пул нотифицирует при добавлении/удалении ключа и при смене статуса (rate-limit).
+    final pool = ref.read(groqKeyPoolProvider);
     return ListenableBuilder(
-      listenable: widget.pool,
+      listenable: pool,
       builder: (context, _) => Column(
         children: _keys.map((key) {
           return Padding(
@@ -140,14 +192,13 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.vpn_key_outlined, size: 24, color: AppColors.inkSecondary),
+                  Icon(Icons.vpn_key_outlined, size: 24, color: palette.ink2),
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
-                    child: Text(key.masked, style: AppTextStyles.mono),
+                    child: Text(key.masked, style: AppTextStyles.mono.copyWith(color: palette.ink1)),
                   ),
-                  // Статус ключа: «Активен» или «До HH:MM:SS»
                   KeyStatusTile(
-                    status: widget.pool.getStatusForKey(key.raw),
+                    status: pool.getStatusForKey(key.raw),
                   ),
                   const SizedBox(width: AppSpacing.sm),
                   Semantics(
@@ -155,7 +206,7 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
                     button: true,
                     child: IconButton(
                       icon: const Icon(Icons.delete_outline),
-                      color: AppColors.bad,
+                      color: palette.bad,
                       onPressed: () => _confirmDelete(key),
                     ),
                   ),
@@ -170,6 +221,7 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: GradientBackground(
@@ -180,7 +232,6 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: AppSpacing.md),
-                // Шапка
                 Row(
                   children: [
                     GlassIconBtn(
@@ -189,11 +240,10 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
                       onPressed: () => Navigator.pop(context),
                     ),
                     const SizedBox(width: AppSpacing.sm),
-                    const Text('API-ключи', style: AppTextStyles.heading),
+                    Text('API-ключи', style: AppTextStyles.heading.copyWith(color: context.palette.ink1)),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.lg),
-                // Hero-карточка Groq
                 GlassTile(
                   child: Row(
                     children: [
@@ -211,14 +261,14 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
                         ),
                       ),
                       const SizedBox(width: AppSpacing.md),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Groq API', style: AppTextStyles.heading),
+                            Text('Groq API', style: AppTextStyles.heading.copyWith(color: palette.ink1)),
                             Text(
                               'Ключи хранятся в защищённом хранилище устройства',
-                              style: AppTextStyles.label,
+                              style: AppTextStyles.label.copyWith(color: palette.ink2),
                             ),
                           ],
                         ),
@@ -227,10 +277,8 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.lg),
-                // Список ключей
                 _buildKeysList(),
                 const SizedBox(height: AppSpacing.lg),
-                // Форма добавления
                 GlassCard(
                   padding: const EdgeInsets.all(AppSpacing.md),
                   child: Column(
@@ -242,10 +290,10 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
                           border: InputBorder.none,
                           hintText: 'gsk_••••••••••••••••••••...',
                           hintStyle: AppTextStyles.mono.copyWith(
-                            color: AppColors.inkTertiary,
+                            color: context.palette.ink3,
                           ),
                         ),
-                        style: AppTextStyles.mono,
+                        style: AppTextStyles.mono.copyWith(color: palette.ink1),
                         keyboardType: TextInputType.visiblePassword,
                         autocorrect: false,
                         enableSuggestions: false,
@@ -255,7 +303,7 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
                         Text(
                           _errorMessage!,
                           style: AppTextStyles.label.copyWith(
-                            color: AppColors.bad,
+                            color: context.palette.bad,
                           ),
                         ),
                       ],
@@ -268,7 +316,6 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                // Footer
                 GestureDetector(
                   onTap: () => launchUrl(
                     Uri.parse('https://console.groq.com/keys'),
@@ -277,9 +324,9 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
                   child: Text(
                     'Получить ключ на console.groq.com',
                     style: AppTextStyles.label.copyWith(
-                      color: AppColors.accent,
+                      color: context.palette.accent,
                       decoration: TextDecoration.underline,
-                      decorationColor: AppColors.accent,
+                      decorationColor: context.palette.accent,
                     ),
                   ),
                 ),

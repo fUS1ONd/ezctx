@@ -1,67 +1,43 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/design_tokens.dart';
 import '../../core/error/app_exception.dart';
-import '../../core/storage/secure_storage_service.dart';
-import '../../features/settings/api_key_repository.dart';
-import '../../features/settings/transcription_options_repository.dart';
-import '../../features/transcription/audio_chunking_service.dart';
+import '../../core/providers/repository_providers.dart';
+import '../../core/providers/service_providers.dart';
 import '../../features/transcription/audio_metadata.dart';
 import '../../features/transcription/file_picker_service.dart';
 import '../../features/transcription/processing_args.dart';
 import '../../features/transcription/selected_audio_file.dart';
-import '../../features/transcription/transcription_options.dart';
-import '../widgets/glass_card.dart';
-import '../widgets/glass_icon_btn.dart';
-import '../widgets/glass_tile.dart';
+import '../widgets/file_card.dart';
 import '../widgets/gradient_background.dart';
-import '../widgets/primary_button.dart';
+import '../widgets/no_keys_dialog.dart';
+import '../widgets/scaffold_with_nav_bar.dart';
+import '../widgets/theme_toggle_button.dart';
 
-/// Главный экран: empty state → file preview → кнопка «Транскрибировать».
-class HomeScreen extends StatefulWidget {
+/// Главный экран. Изменения относительно предыдущей версии:
+///  • CTA «Транскрибировать» живёт ВНУТРИ карточки файла (не плавающий внизу).
+///  • Карточка с файлом ужимается до контента; пустая карточка занимает
+///    оставшееся место (с dashed dropzone).
+///  • Кнопка переключения темы заменила шестерню в шапке.
+///  • Баннер «нет ключей» убран — вместо него полноэкранная liquid-модалка
+///    срабатывает по тапу на CTA (когда ключей нет).
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  // Единственный экземпляр репозитория на весь lifecycle экрана.
-  final ApiKeyRepository _repository = ApiKeyRepository(SecureStorageServiceImpl());
-
-  /// Текущие настройки транскрибации (модель и язык).
-  TranscriptionOptions _options = const TranscriptionOptions.defaults();
-
-  /// Репозиторий для сохранения и загрузки настроек транскрибации.
-  final _optionsRepo = TranscriptionOptionsRepository();
-
+class _HomeScreenState extends ConsumerState<HomeScreen> {
   SelectedAudioFile? _selectedFile;
   AudioMetadata? _metadata;
   bool _loadingMetadata = false;
   String? _errorMessage;
   bool _picking = false;
-
-  @override
-  void initState() {
-    super.initState();
-    // Загружаем сохранённые настройки транскрибации при старте экрана.
-    _loadOptions();
-  }
-
-  Future<void> _loadOptions() async {
-    final saved = await _optionsRepo.load();
-    if (mounted) setState(() => _options = saved);
-  }
-
-  /// Сохраняет новые настройки и обновляет state, если значения изменились.
-  Future<void> _onOptionsChanged(TranscriptionOptions updated) async {
-    if (updated == _options) return;
-    setState(() => _options = updated);
-    await _optionsRepo.save(updated);
-  }
 
   Future<void> _onUploadTap() async {
     if (_picking) return;
@@ -70,7 +46,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _errorMessage = null;
     });
     try {
-      final result = await const FilePickerService().pickAudioFile();
+      final result = await ref.read(filePickerServiceProvider).pickAudioFile();
       switch (result) {
         case FilePickPicked(file: final f):
           if (mounted) {
@@ -93,13 +69,13 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  /// Асинхронно загружает метаданные файла через ffprobe.
-  /// Тихо обрабатывает ошибки — карточка показывается без длительности.
   Future<void> _loadMetadata(SelectedAudioFile file) async {
     if (!mounted) return;
     setState(() => _loadingMetadata = true);
     try {
-      final meta = await AudioChunkingService().getMetadata(file.path);
+      final meta = await ref
+          .read(audioChunkingServiceProvider)
+          .getMetadata(file.path);
       if (mounted) setState(() => _metadata = meta);
     } catch (_) {
       // Тихо: если ffprobe не удался, метаданные показываем без длительности.
@@ -111,33 +87,20 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _onTranscribeTap() async {
     if (_selectedFile == null) return;
 
-    // Pre-flight: есть ли хотя бы один API-ключ?
-    final keys = await _repository.listKeys();
+    final keys = await ref.read(apiKeyRepoProvider).listKeys();
     if (!mounted) return;
 
     if (keys.isEmpty) {
-      final goToSettings = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Добавьте API-ключ'),
-          content: const Text('Для работы нужен ключ Groq. Это бесплатно.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Отмена'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Перейти в настройки'),
-            ),
-          ],
-        ),
-      );
-      if (goToSettings == true && mounted) {
-        Navigator.pushNamed(context, AppConstants.routeApiKeys);
+      final goToSettings = await NoKeysDialog.show(context);
+      if (!mounted) return;
+      if (goToSettings == true) {
+        ScaffoldWithNavBar.of(context)?.switchTab(2);
       }
       return;
     }
+
+    final options = await ref.read(transcriptionOptionsRepoProvider).load();
+    if (!mounted) return;
 
     Navigator.pushNamed(
       context,
@@ -145,103 +108,103 @@ class _HomeScreenState extends State<HomeScreen> {
       arguments: ProcessingArgs(
         file: _selectedFile!,
         metadata: _metadata,
-        options: _options,
+        options: options,
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: GradientBackground(
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-            // Внешняя колонка: прокручиваемый контент + кнопка, прибитая снизу.
-            // Это исправляет BOTTOM OVERFLOWED после добавления model/language карточки.
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Прокручиваемый контент занимает всё свободное пространство.
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: AppSpacing.md),
-                        // Шапка: логотип + название + кнопка настроек
-                        Row(
-                          children: [
-                            Container(
-                              width: 36,
-                              height: 36,
-                              decoration: BoxDecoration(
-                                gradient: AppGradients.accent,
-                                borderRadius: BorderRadius.circular(11),
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.sm),
-                            Text('Слух', style: AppTextStyles.heading),
-                            const Spacer(),
-                            GlassIconBtn(
-                              icon: Icons.settings_outlined,
-                              semanticLabel: 'Настройки',
-                              onPressed: () =>
-                                  Navigator.pushNamed(context, AppConstants.routeSettings),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.xl),
-                        // Display заголовок
-                        const Text('Расшифруй\nлюбой звук', style: AppTextStyles.display),
-                        const SizedBox(height: AppSpacing.md),
-                        // Subtitle
-                        Text(
-                          'Загрузите аудиозапись лекции и получите готовый текст',
-                          style: AppTextStyles.body.copyWith(color: AppColors.inkSecondary),
-                        ),
-                        const SizedBox(height: AppSpacing.xxl),
-                        // Upload card / file preview — ConstrainedBox гарантирует minHeight=260
-                        SizedBox(
-                          width: double.infinity,
-                          child: GestureDetector(
-                            onTap: _picking ? null : _onUploadTap,
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(minHeight: 260),
-                              child: GlassTile(
-                                padding: const EdgeInsets.all(AppSpacing.lg),
-                                child: _selectedFile == null
-                                    ? _buildEmptyCard()
-                                    : _buildFilePreview(_selectedFile!),
-                              ),
-                            ),
-                          ),
-                        ),
-                        // Сообщение об ошибке
-                        if (_errorMessage != null) ...[
-                          const SizedBox(height: AppSpacing.sm),
-                          Text(
-                            _errorMessage!,
-                            style: AppTextStyles.label.copyWith(color: AppColors.bad),
+                const SizedBox(height: AppSpacing.md),
+
+                // ── Шапка: лого + название + кнопка темы ──
+                Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        gradient: AppGradients.accent,
+                        borderRadius: BorderRadius.circular(11),
+                        boxShadow: [
+                          BoxShadow(
+                            color: palette.accent.withValues(alpha: 0.28),
+                            blurRadius: 14,
+                            offset: const Offset(0, 6),
                           ),
                         ],
-                        const SizedBox(height: AppSpacing.xl),
-                        // Настройки: выбор модели и языка распознавания
-                        _buildModelAndLanguageCard(),
-                        const SizedBox(height: AppSpacing.xl),
-                      ],
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Text(
+                      'Слух',
+                      style: AppTextStyles.heading.copyWith(color: palette.ink1),
+                    ),
+                    const Spacer(),
+                    const ThemeToggleButton(),
+                  ],
                 ),
-                // Кнопка «Транскрибировать» прибита к нижнему краю экрана.
-                PrimaryButton(
-                  label: 'Транскрибировать',
-                  onPressed: _selectedFile == null
-                      ? null
-                      : () => _onTranscribeTap(),
+
+                const SizedBox(height: AppSpacing.xl),
+
+                // ── Заголовок и подзаголовок ──
+                Text(
+                  'Расшифруй\nлюбой звук',
+                  style: AppTextStyles.display.copyWith(color: palette.ink1),
                 ),
                 const SizedBox(height: AppSpacing.md),
+                Text(
+                  'Загрузите аудиозапись и через пару минут получите готовый текст.',
+                  style: AppTextStyles.body.copyWith(color: palette.ink2),
+                ),
+
+                const SizedBox(height: AppSpacing.lg),
+
+                // ── Содержимое ──
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                    child: _selectedFile == null
+                        ? _EmptyDropzone(
+                            picking: _picking,
+                            onTap: _onUploadTap,
+                          )
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              FileCard(
+                                file: _selectedFile!,
+                                metadata: _metadata,
+                                loadingMetadata: _loadingMetadata,
+                                onReplace: _onUploadTap,
+                                onTranscribe: _onTranscribeTap,
+                              ),
+                              if (_errorMessage != null) ...[
+                                const SizedBox(height: AppSpacing.sm),
+                                Text(
+                                  _errorMessage!,
+                                  style: AppTextStyles.label
+                                      .copyWith(color: palette.bad),
+                                ),
+                              ],
+                            ],
+                          ),
+                  ),
+                ),
+
+                // Отступ под капсулу LiquidGlassTabBar (48 высота + 30 margin).
+                const SizedBox(height: 96),
               ],
             ),
           ),
@@ -249,213 +212,111 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+}
 
-  /// Карточка выбора модели Whisper и языка распознавания.
-  Widget _buildModelAndLanguageCard() {
-    return GlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Переключатель модели Whisper
-          Row(
-            children: [
-              Text('Модель', style: AppTextStyles.body),
-              const Spacer(),
-              SegmentedButton<WhisperModel>(
-                segments: const [
-                  ButtonSegment(
-                    value: WhisperModel.largeV3,
-                    label: Text('large-v3'),
-                  ),
-                  ButtonSegment(
-                    value: WhisperModel.turbo,
-                    label: Text('turbo'),
-                  ),
-                ],
-                selected: {_options.model},
-                onSelectionChanged: (sel) =>
-                    _onOptionsChanged(_options.copyWith(model: sel.first)),
-                style: const ButtonStyle(
-                  visualDensity: VisualDensity.compact,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          // Выпадающий список языков распознавания
-          Row(
-            children: [
-              Text('Язык', style: AppTextStyles.body),
-              const Spacer(),
-              DropdownButton<TranscriptionLanguage>(
-                value: _options.language,
-                underline: const SizedBox.shrink(),
-                isDense: true,
-                items: _languageItems,
-                onChanged: (lang) {
-                  if (lang != null) {
-                    _onOptionsChanged(_options.copyWith(language: lang));
-                  }
-                },
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+/// Пустое состояние с пунктирной dropzone-рамкой. Растягивается на доступное
+/// пространство, центрирует содержимое.
+class _EmptyDropzone extends StatelessWidget {
+  const _EmptyDropzone({required this.picking, required this.onTap});
 
-  /// Человекочитаемое название языка. Exhaustive switch — компилятор потребует
-  /// обновить метод при добавлении нового значения в [TranscriptionLanguage].
-  static String _languageLabel(TranscriptionLanguage lang) => switch (lang) {
-    TranscriptionLanguage.auto => 'Авто',
-    TranscriptionLanguage.ru   => 'Русский',
-    TranscriptionLanguage.en   => 'English',
-    TranscriptionLanguage.de   => 'Deutsch',
-    TranscriptionLanguage.fr   => 'Français',
-    TranscriptionLanguage.es   => 'Español',
-    TranscriptionLanguage.uk   => 'Українська',
-    TranscriptionLanguage.zh   => '中文',
-    TranscriptionLanguage.ja   => '日本語',
-    TranscriptionLanguage.ko   => '한국어',
-    TranscriptionLanguage.ar   => 'العربية',
-  };
+  final bool picking;
+  final VoidCallback onTap;
 
-  /// Элементы дропдауна языков, вычисленные из enum (exhaustive).
-  static final _languageItems = TranscriptionLanguage.values
-      .map((lang) => DropdownMenuItem(
-            value: lang,
-            child: Text(_languageLabel(lang)),
-          ))
-      .toList();
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
 
-  Widget _buildEmptyCard() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Stack(
-          alignment: Alignment.center,
-          children: [
-            // Пунктирная рамка accent-цвета вокруг иконки загрузки
-            CustomPaint(
-              painter: _DashedBorderPainter(
-                color: AppColors.accent.withValues(alpha: 0.55),
-                strokeWidth: 1.5,
-                dashWidth: 6,
-                gapWidth: 4,
-                borderRadius: 26,
-              ),
-              child: const SizedBox(width: 88, height: 88),
-            ),
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                gradient: AppGradients.accent,
-                borderRadius: BorderRadius.circular(22),
-              ),
-              child: const Icon(Icons.upload_outlined, color: Colors.white, size: 36),
-            ),
-            if (_picking)
-              const SizedBox(
-                width: 80,
-                height: 80,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.md),
-        const Text('Выберите файл', style: AppTextStyles.heading),
-        const SizedBox(height: AppSpacing.xs),
-        Text(
-          'mp3, wav, m4a, ogg, flac',
-          style: AppTextStyles.label,
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        // Pill-метка «Из файлов» под подсказкой о форматах
-        Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.xs,
-          ),
+    return GestureDetector(
+      onTap: picking ? null : onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(30),
+        child: Container(
+          width: double.infinity,
           decoration: BoxDecoration(
-            color: AppColors.accent.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.all(Radius.circular(AppRadius.pill)),
+            color: palette.glassBg,
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(color: palette.glassRim, width: 0.5),
+            boxShadow: [palette.shadow],
           ),
-          child: Text(
-            'Из файлов',
-            style: AppTextStyles.label.copyWith(color: AppColors.accent),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFilePreview(SelectedAudioFile file) {
-    return Row(
-      children: [
-        Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            gradient: AppGradients.accent,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: const Icon(Icons.audiotrack, color: Colors.white, size: 28),
-        ),
-        const SizedBox(width: AppSpacing.md),
-        Expanded(
+          padding: const EdgeInsets.all(AppSpacing.lg),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                file.name,
-                style: AppTextStyles.heading,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              // Подстрока с размером и длительностью / индикатором загрузки.
-              if (_loadingMetadata)
-                Row(
+              SizedBox(
+                width: 120,
+                height: 120,
+                child: Stack(
+                  alignment: Alignment.center,
                   children: [
-                    Text(
-                      '${file.sizeFormatted} · ${file.extension.toUpperCase()}',
-                      style: AppTextStyles.label,
+                    CustomPaint(
+                      painter: _DashedBorderPainter(
+                        color: palette.accent.withValues(alpha: 0.55),
+                        strokeWidth: 1.5,
+                        dashWidth: 6,
+                        gapWidth: 4,
+                        borderRadius: 26,
+                      ),
+                      child: const SizedBox(width: 112, height: 112),
                     ),
-                    const SizedBox(width: AppSpacing.xs),
-                    const SizedBox(
-                      width: 12,
-                      height: 12,
-                      child: CircularProgressIndicator(strokeWidth: 1.5),
+                    Container(
+                      width: 88,
+                      height: 88,
+                      decoration: BoxDecoration(
+                        gradient: AppGradients.accent,
+                        borderRadius: BorderRadius.circular(26),
+                        boxShadow: [
+                          BoxShadow(
+                            color: palette.accent.withValues(alpha: 0.34),
+                            blurRadius: 24,
+                            offset: const Offset(0, 14),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(Icons.upload_outlined,
+                          color: Colors.white, size: 36),
                     ),
+                    if (picking)
+                      const SizedBox(
+                        width: 100,
+                        height: 100,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
                   ],
-                )
-              else if (_metadata != null)
-                Text(
-                  '${_metadata!.sizeFormatted} · ${_metadata!.durationFormatted}',
-                  style: AppTextStyles.label,
-                )
-              else
-                Text(
-                  '${file.sizeFormatted} · ${file.extension.toUpperCase()}',
-                  style: AppTextStyles.label,
                 ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Text('Выберите файл',
+                  style: AppTextStyles.heading.copyWith(color: palette.ink1)),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                'mp3 · wav · m4a · ogg · flac',
+                style: AppTextStyles.label.copyWith(color: palette.ink2),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+                decoration: BoxDecoration(
+                  color: palette.accent.withValues(alpha: 0.12),
+                  borderRadius:
+                      const BorderRadius.all(Radius.circular(AppRadius.pill)),
+                ),
+                child: Text(
+                  'Из файлов',
+                  style: AppTextStyles.label.copyWith(
+                    color: palette.accent,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
             ],
           ),
         ),
-        Text(
-          'Заменить',
-          style: AppTextStyles.label.copyWith(color: AppColors.accent),
-        ),
-      ],
+      ),
     );
   }
 }
 
-/// CustomPainter для пунктирной рамки с заданным радиусом скругления.
-/// Рисует пунктир accent-цвета вокруг прямоугольника с rounded corners.
 class _DashedBorderPainter extends CustomPainter {
   const _DashedBorderPainter({
     required this.color,
@@ -479,7 +340,6 @@ class _DashedBorderPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
 
-    // Путь вокруг скруглённого прямоугольника
     final rrect = RRect.fromRectAndRadius(
       Rect.fromLTWH(0, 0, size.width, size.height),
       Radius.circular(borderRadius),
@@ -487,9 +347,7 @@ class _DashedBorderPainter extends CustomPainter {
 
     final path = Path()..addRRect(rrect);
 
-    // Вычисляем общую длину контура и рисуем пунктир
-    final metrics = path.computeMetrics().toList();
-    for (final metric in metrics) {
+    for (final metric in path.computeMetrics().toList()) {
       double distance = 0;
       while (distance < metric.length) {
         final end = math.min(distance + dashWidth, metric.length);
@@ -500,11 +358,11 @@ class _DashedBorderPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_DashedBorderPainter oldDelegate) {
-    return oldDelegate.color != color ||
-        oldDelegate.strokeWidth != strokeWidth ||
-        oldDelegate.dashWidth != dashWidth ||
-        oldDelegate.gapWidth != gapWidth ||
-        oldDelegate.borderRadius != borderRadius;
+  bool shouldRepaint(_DashedBorderPainter old) {
+    return old.color != color ||
+        old.strokeWidth != strokeWidth ||
+        old.dashWidth != dashWidth ||
+        old.gapWidth != gapWidth ||
+        old.borderRadius != borderRadius;
   }
 }

@@ -43,3 +43,20 @@ class AllKeysBlockedException extends AppException {
     super.message = 'Все ключи заблокированы. Ожидание…',
   ]);
 }
+
+/// Человекочитаемые сообщения для отображения ошибок пользователю.
+extension AppExceptionUserMessage on AppException {
+  String get userMessage => switch (this) {
+    RateLimitException(:final retryAfterSeconds) =>
+        'Превышен лимит Groq. Попробуйте через $retryAfterSeconds с.',
+    AllKeysBlockedException() =>
+        'Все API-ключи заблокированы лимитом. Подождите или добавьте ещё ключи.',
+    AuthException() =>
+        'Неверный API-ключ. Проверьте настройки.',
+    NetworkException() =>
+        'Нет подключения к интернету.',
+    ValidationException(:final message) => message,
+    InternalException() =>
+        'Внутренняя ошибка. Попробуйте ещё раз.',
+  };
+}

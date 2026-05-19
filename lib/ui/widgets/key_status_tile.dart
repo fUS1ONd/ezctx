@@ -62,26 +62,26 @@ class _KeyStatusTileState extends State<KeyStatusTile> {
     return '$h:$m:$s';
   }
 
-  Widget _activeBadge() {
+  Widget _activeBadge(AppPalette palette) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.circle, size: 8, color: AppColors.good),
+        Icon(Icons.circle, size: 8, color: palette.good),
         const SizedBox(width: AppSpacing.xs),
-        Text('Активен', style: AppTextStyles.label),
+        Text('Активен', style: AppTextStyles.label.copyWith(color: palette.ink2)),
       ],
     );
   }
 
-  Widget _blockedBadge(String countdown) {
+  Widget _blockedBadge(String countdown, AppPalette palette) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.circle, size: 8, color: AppColors.bad),
+        Icon(Icons.circle, size: 8, color: palette.bad),
         const SizedBox(width: AppSpacing.xs),
         Text(
           'До $countdown',
-          style: AppTextStyles.label.copyWith(color: AppColors.bad),
+          style: AppTextStyles.label.copyWith(color: palette.bad),
         ),
       ],
     );
@@ -89,15 +89,16 @@ class _KeyStatusTileState extends State<KeyStatusTile> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
     final s = widget.status;
     if (s is BlockedKeyStatus) {
       // Используем clock.now() вместо DateTime.now() — согласованность с пулом
       // и тестируемость через FakeClock (иначе тесты с FakeClock будут флакить).
       final remaining = s.blockedUntil.difference(clock.now());
       // Если блокировка истекла — показываем как активный
-      if (remaining.isNegative) return _activeBadge();
-      return _blockedBadge(_formatRemaining(remaining));
+      if (remaining.isNegative) return _activeBadge(palette);
+      return _blockedBadge(_formatRemaining(remaining), palette);
     }
-    return _activeBadge();
+    return _activeBadge(palette);
   }
 }
