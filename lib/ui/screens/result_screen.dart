@@ -82,7 +82,7 @@ class _ResultScreenState extends State<ResultScreen> {
         // Если таймкодов нет (single-shot plain), стартуем в plain-режиме.
         _showTimestamps = _hasTimestamps(raw.result.text);
         // OUT-02: автоматически сохраняем txt после открытия экрана
-        _saveTranscriptTxt();
+        _saveTranscripts();
       } else {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) Navigator.popUntil(context, (r) => r.isFirst);
@@ -96,7 +96,7 @@ class _ResultScreenState extends State<ResultScreen> {
     return RegExp(r'\[\d{2}:\d{2}:\d{2}\]').hasMatch(text);
   }
 
-  Future<void> _saveTranscriptTxt() async {
+  Future<void> _saveTranscripts() async {
     try {
       // Сохраняем оба формата: plain (для LLM) и с таймкодами (для истории).
       final paths = await const TranscriptWriter().writeBoth(
@@ -104,15 +104,20 @@ class _ResultScreenState extends State<ResultScreen> {
         plainText: _args!.result.plainText,
         timestampedText: _args!.result.text,
       );
+      // OUT-01: генерируем SRT если есть сегменты с таймкодами
+      await const TranscriptWriter().writeSrt(
+        baseName: _args!.file.name,
+        segments: _args!.result.segments,
+      );
       if (mounted) {
-        // Показываем папку (не полный путь), так как файлов теперь два.
+        // Показываем папку (не полный путь), так как файлов теперь несколько.
         final sep = paths.plainPath.lastIndexOf('/');
         final folderPath =
             sep > 0 ? paths.plainPath.substring(0, sep) : paths.plainPath;
         setState(() => _savedPath = folderPath);
       }
     } catch (e, st) {
-      debugPrint('_saveTranscriptTxt: $e\n$st');
+      debugPrint('_saveTranscripts: $e\n$st');
     }
   }
 
