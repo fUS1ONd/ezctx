@@ -34,6 +34,13 @@ void main() {
           expect(req.body, contains('whisper-large-v3'));
           expect(req.body, contains('verbose_json'));
           expect(req.body, contains('timestamp_granularities[]'));
+          // Bug 1: single-shot должен запрашивать segment-level таймкоды,
+          // иначе Groq не возвращает segments[] и переключатель «С метками /
+          // Без меток» на ResultScreen теряет разницу.
+          final granularityBlock = RegExp(
+            r'name="timestamp_granularities\[\]"\r?\n\r?\n([a-z]+)',
+          ).firstMatch(req.body);
+          expect(granularityBlock?.group(1), 'segment');
           return http.Response(
             jsonEncode({
               'text': 'Привет мир',
