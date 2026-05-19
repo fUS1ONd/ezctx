@@ -6,7 +6,12 @@ import 'package:path_provider/path_provider.dart';
 import 'transcription_result.dart';
 
 /// Сохраняет расшифровку в постоянное хранилище приложения (OUT-02).
-/// Путь: `<app docs>/transcripts/<baseName>.txt`
+///
+/// На Android — app-specific external storage
+/// (`/storage/emulated/0/Android/data/com.ezctx.app/files/transcripts`),
+/// видно через USB и системный файловый менеджер.
+/// На остальных платформах (или если external недоступен) — fallback на
+/// `getApplicationDocumentsDirectory()`.
 class TranscriptWriter {
   const TranscriptWriter();
 
@@ -15,11 +20,7 @@ class TranscriptWriter {
     required String baseName,
     required String text,
   }) async {
-    final docs = await getApplicationDocumentsDirectory();
-    final dir = Directory('${docs.path}/transcripts');
-    if (!await dir.exists()) {
-      await dir.create(recursive: true);
-    }
+    final dir = await _resolveTranscriptsDir();
     final safeBaseName = _sanitize(baseName);
     final file = File('${dir.path}/$safeBaseName.txt');
     await file.writeAsString(text, flush: true);
@@ -27,17 +28,13 @@ class TranscriptWriter {
   }
 
   /// Сохраняет оба формата (plain и с таймкодами) и возвращает оба пути.
-  /// Пути: `<app docs>/transcripts/<baseName>.txt` и `<baseName>_timestamped.txt`.
+  /// Имена: `<baseName>.txt` и `<baseName>_timestamped.txt`.
   Future<({String plainPath, String timestampedPath})> writeBoth({
     required String baseName,
     required String plainText,
     required String timestampedText,
   }) async {
-    final docs = await getApplicationDocumentsDirectory();
-    final dir = Directory('${docs.path}/transcripts');
-    if (!await dir.exists()) {
-      await dir.create(recursive: true);
-    }
+    final dir = await _resolveTranscriptsDir();
     final safe = _sanitize(baseName);
     final plainFile = File('${dir.path}/$safe.txt');
     final tsFile = File('${dir.path}/${safe}_timestamped.txt');
@@ -52,13 +49,31 @@ class TranscriptWriter {
     required List<TranscriptionSegment> segments,
   }) async {
     if (segments.isEmpty) return null;
-    final dir = await getApplicationDocumentsDirectory();
-    final transcripts = Directory('${dir.path}/transcripts');
-    if (!await transcripts.exists()) await transcripts.create(recursive: true);
+    final dir = await _resolveTranscriptsDir();
     final safe = _sanitize(baseName);
-    final file = File('${transcripts.path}/$safe.srt');
+    final file = File('${dir.path}/$safe.srt');
     await file.writeAsString(_segmentsToSrt(segments), flush: true);
     return file.path;
+  }
+
+  /// Выбирает каталог для расшифровок: external (видно через USB) → fallback internal.
+  ///
+  /// `getExternalStorageDirectory()` возвращает null на не-Android и при
+  /// отсутствии external volume; в этом случае откатываемся к внутреннему
+  /// хранилищу, чтобы файлы всё равно сохранились.
+  static Future<Directory> _resolveTranscriptsDir() async {
+    Directory? base;
+    try {
+      base = await getExternalStorageDirectory();
+    } catch (_) {
+      base = null;
+    }
+    base ??= await getApplicationDocumentsDirectory();
+    final dir = Directory('${base.path}/transcripts');
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    return dir;
   }
 
   /// Публичный доступ для тестов.
