@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../core/services/clipboard_service.dart';
 
 import '../../core/constants/design_tokens.dart';
@@ -129,6 +130,19 @@ class _ResultScreenState extends State<ResultScreen> {
     return _showTimestamps ? r.text : r.plainText;
   }
 
+  /// Открывает системный диалог «Поделиться» с текстом расшифровки.
+  Future<void> _onShareTap() async {
+    if (_args == null) return;
+    try {
+      await Share.share(_currentText);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка общего доступа: $e')),
+      );
+    }
+  }
+
   Future<void> _onCopyTap() async {
     if (_args == null) return;
     // Используем ClipboardService (super_clipboard) — обходит Android Binder-лимит для длинных транскрипций.
@@ -206,6 +220,18 @@ class _ResultScreenState extends State<ResultScreen> {
                         ? PrimaryButtonVariant.good
                         : PrimaryButtonVariant.accent,
                     onPressed: _onCopyTap,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+
+                // OUT-04: кнопка «Поделиться» — отправить расшифровку в другое приложение.
+                Semantics(
+                  label: 'Поделиться расшифровкой',
+                  child: PrimaryButton(
+                    label: 'Поделиться',
+                    icon: Icons.share_outlined,
+                    variant: PrimaryButtonVariant.accent,
+                    onPressed: _onShareTap,
                   ),
                 ),
                 const SizedBox(height: AppSpacing.sm),
