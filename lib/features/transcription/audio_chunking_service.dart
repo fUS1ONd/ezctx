@@ -86,15 +86,23 @@ class AudioChunkingService {
       );
     }
 
+    // Защита от command injection: отклоняем пути со спецсимволами ffmpeg/shell.
+    // Проверяем до shortcircuit, чтобы инвариант работал для любой длительности.
+    if (filePath.contains(RegExp(r'''["'`$\\!]'''))) {
+      throw InternalException('Путь к файлу содержит недопустимые символы: $filePath');
+    }
+
+    // Shortcircuit для n=1: 32 kbps CBR × 4920с ≈ 19.68 MB ≤ 25 MB лимита Groq.
+    // Возвращаем исходный файл без ffmpeg-сегментации, чтобы -c:a copy не создавал
+    // хвостовой чанк по границе аудио-кадров.
+    if (totalDurationSeconds <= AppConstants.kChunkThresholdSeconds) {
+      return [File(filePath)];
+    }
+
     // Вычисляем оптимальное число чанков и длительность каждого
     final n =
         (totalDurationSeconds / AppConstants.kChunkThresholdSeconds).ceil();
     final optimalDuration = totalDurationSeconds / n;
-
-    // Защита от command injection: отклоняем пути со спецсимволами ffmpeg/shell.
-    if (filePath.contains(RegExp(r'''["'`$\\!]'''))) {
-      throw InternalException('Путь к файлу содержит недопустимые символы: $filePath');
-    }
 
     // Создаём уникальную временную директорию для чанков
     final tmpBase = outputDir ??
