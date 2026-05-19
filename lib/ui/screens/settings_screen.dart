@@ -368,7 +368,7 @@ class _StatusCard extends StatelessWidget {
             gradient: AppGradients.accent,
             boxShadow: [
               BoxShadow(
-                color: AppColors.accent.withValues(alpha: 0.30),
+                color: palette.accent.withValues(alpha: 0.30),
                 blurRadius: 14,
                 offset: const Offset(0, 8),
               ),
@@ -402,7 +402,7 @@ class _StatusCard extends StatelessWidget {
                 Icon(
                   Icons.circle,
                   size: 8,
-                  color: connected ? AppColors.good : AppColors.bad,
+                  color: connected ? palette.good : palette.bad,
                 ),
                 const SizedBox(width: 6),
                 Text(
@@ -495,8 +495,8 @@ class _OptionsSheet<T> extends StatelessWidget {
                         ),
                       ),
                       if (o == value)
-                        const Icon(Icons.check_rounded,
-                            color: AppColors.accent, size: 22),
+                        Icon(Icons.check_rounded,
+                            color: palette.accent, size: 22),
                     ]),
                   ),
                 ),

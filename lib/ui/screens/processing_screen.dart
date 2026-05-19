@@ -278,7 +278,7 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen>
                   const SizedBox(height: AppSpacing.sm),
                   Text(
                     'Подготовка аудио…',
-                    style: AppTextStyles.body.copyWith(color: AppColors.inkSecondary),
+                    style: AppTextStyles.body.copyWith(color: context.palette.ink2),
                   ),
                   const SizedBox(height: AppSpacing.lg),
                 ],
@@ -347,6 +347,7 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen>
   }
 
   Widget _buildChunkedBottomBar(ChunkedState? state) {
+    final palette = context.palette;
     return switch (state) {
       ChunkedSplitting() || ChunkedProcessing() => GlassCard(
           borderRadius: AppRadius.pill,
@@ -362,7 +363,7 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen>
                 onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
                 child: Text(
                   'Отменить обработку',
-                  style: AppTextStyles.label.copyWith(color: AppColors.bad),
+                  style: AppTextStyles.label.copyWith(color: palette.bad),
                 ),
               ),
             ],
@@ -374,7 +375,7 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen>
           children: [
             Text(
               message,
-              style: AppTextStyles.label.copyWith(color: AppColors.bad),
+              style: AppTextStyles.label.copyWith(color: palette.bad),
             ),
             const SizedBox(height: AppSpacing.sm),
             if (retryable && _file != null)
@@ -402,7 +403,7 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen>
           children: [
             Text(
               'Добавьте API-ключ Groq для начала транскрибации',
-              style: AppTextStyles.label.copyWith(color: AppColors.bad),
+              style: AppTextStyles.label.copyWith(color: palette.bad),
             ),
             const SizedBox(height: AppSpacing.sm),
             PrimaryButton(
@@ -418,12 +419,13 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen>
   }
 
   Widget _buildNormalizationError(String message) {
+    final palette = context.palette;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
           message,
-          style: AppTextStyles.label.copyWith(color: AppColors.bad),
+          style: AppTextStyles.label.copyWith(color: palette.bad),
         ),
         const SizedBox(height: AppSpacing.sm),
         PrimaryButton(

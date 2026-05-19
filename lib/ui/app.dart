@@ -64,7 +64,7 @@ class EzCtxApp extends ConsumerWidget {
       brightness: brightness,
       scaffoldBackgroundColor: Colors.transparent,
       colorScheme: ColorScheme.fromSeed(
-        seedColor: AppColors.accent,
+        seedColor: palette.accent,
         brightness: brightness,
       ).copyWith(
         surface: brightness == Brightness.dark

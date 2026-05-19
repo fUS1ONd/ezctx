@@ -192,7 +192,7 @@ class _ErrorState extends StatelessWidget {
         child: Text(
           'Не удалось загрузить историю: $message',
           textAlign: TextAlign.center,
-          style: AppTextStyles.body.copyWith(color: AppColors.bad),
+          style: AppTextStyles.body.copyWith(color: context.palette.bad),
         ),
       ),
     );

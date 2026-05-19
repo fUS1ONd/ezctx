@@ -139,7 +139,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         borderRadius: BorderRadius.circular(11),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.accent.withValues(alpha: 0.28),
+                            color: palette.accent.withValues(alpha: 0.28),
                             blurRadius: 14,
                             offset: const Offset(0, 6),
                           ),
@@ -195,7 +195,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 Text(
                                   _errorMessage!,
                                   style: AppTextStyles.label
-                                      .copyWith(color: AppColors.bad),
+                                      .copyWith(color: palette.bad),
                                 ),
                               ],
                             ],
@@ -250,7 +250,7 @@ class _EmptyDropzone extends StatelessWidget {
                   children: [
                     CustomPaint(
                       painter: _DashedBorderPainter(
-                        color: AppColors.accent.withValues(alpha: 0.55),
+                        color: palette.accent.withValues(alpha: 0.55),
                         strokeWidth: 1.5,
                         dashWidth: 6,
                         gapWidth: 4,
@@ -266,7 +266,7 @@ class _EmptyDropzone extends StatelessWidget {
                         borderRadius: BorderRadius.circular(26),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.accent.withValues(alpha: 0.34),
+                            color: palette.accent.withValues(alpha: 0.34),
                             blurRadius: 24,
                             offset: const Offset(0, 14),
                           ),
@@ -297,14 +297,14 @@ class _EmptyDropzone extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.md, vertical: AppSpacing.xs),
                 decoration: BoxDecoration(
-                  color: AppColors.accent.withValues(alpha: 0.12),
+                  color: palette.accent.withValues(alpha: 0.12),
                   borderRadius:
                       const BorderRadius.all(Radius.circular(AppRadius.pill)),
                 ),
                 child: Text(
                   'Из файлов',
                   style: AppTextStyles.label.copyWith(
-                    color: AppColors.accent,
+                    color: palette.accent,
                     fontWeight: FontWeight.w600,
                   ),
                 ),

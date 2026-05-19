@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -81,23 +83,81 @@ class _ApiKeysScreenState extends ConsumerState<ApiKeysScreen> {
   }
 
   Future<void> _confirmDelete(ApiKeyView key) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGeneralDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Удалить ключ?'),
-        content: const Text('Это действие нельзя отменить.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Отмена'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.bad),
-            child: const Text('Удалить'),
-          ),
-        ],
+      barrierDismissible: true,
+      barrierLabel: 'Закрыть',
+      barrierColor: Colors.black.withValues(alpha: 0.45),
+      transitionDuration: const Duration(milliseconds: 260),
+      transitionBuilder: (ctx, anim, _, child) => FadeTransition(
+        opacity: CurvedAnimation(parent: anim, curve: Curves.easeOut),
+        child: child,
       ),
+      pageBuilder: (ctx, _, __) {
+        final palette = ctx.palette;
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Material(
+              color: Colors.transparent,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(28),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 34, sigmaY: 34),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: palette.glassBgDeep,
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(color: palette.glassRim, width: 0.5),
+                      boxShadow: [palette.shadowDeep],
+                    ),
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          'Удалить ключ?',
+                          style: AppTextStyles.heading.copyWith(color: palette.ink1),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Это действие нельзя отменить.',
+                          style: AppTextStyles.body.copyWith(color: palette.ink2),
+                        ),
+                        const SizedBox(height: 24),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextButton(
+                                onPressed: () => Navigator.pop(ctx, false),
+                                child: Text(
+                                  'Отмена',
+                                  style: AppTextStyles.label.copyWith(color: palette.ink1),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextButton(
+                                onPressed: () => Navigator.pop(ctx, true),
+                                child: Text(
+                                  'Удалить',
+                                  style: AppTextStyles.label.copyWith(color: palette.bad),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
     if (confirmed == true) {
       await ref.read(apiKeyRepoProvider).removeKey(key.raw);
@@ -108,13 +168,14 @@ class _ApiKeysScreenState extends ConsumerState<ApiKeysScreen> {
   }
 
   Widget _buildKeysList() {
+    final palette = context.palette;
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
     if (_keys.isEmpty) {
       return Text(
         'Нет добавленных ключей',
-        style: AppTextStyles.label.copyWith(color: AppColors.inkTertiary),
+        style: AppTextStyles.label.copyWith(color: palette.ink3),
       );
     }
     final pool = ref.read(groqKeyPoolProvider);
@@ -131,7 +192,7 @@ class _ApiKeysScreenState extends ConsumerState<ApiKeysScreen> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.vpn_key_outlined, size: 24, color: AppColors.inkSecondary),
+                  Icon(Icons.vpn_key_outlined, size: 24, color: palette.ink2),
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: Text(key.masked, style: AppTextStyles.mono),
@@ -145,7 +206,7 @@ class _ApiKeysScreenState extends ConsumerState<ApiKeysScreen> {
                     button: true,
                     child: IconButton(
                       icon: const Icon(Icons.delete_outline),
-                      color: AppColors.bad,
+                      color: palette.bad,
                       onPressed: () => _confirmDelete(key),
                     ),
                   ),
@@ -228,7 +289,7 @@ class _ApiKeysScreenState extends ConsumerState<ApiKeysScreen> {
                           border: InputBorder.none,
                           hintText: 'gsk_••••••••••••••••••••...',
                           hintStyle: AppTextStyles.mono.copyWith(
-                            color: AppColors.inkTertiary,
+                            color: context.palette.ink3,
                           ),
                         ),
                         style: AppTextStyles.mono,
@@ -241,7 +302,7 @@ class _ApiKeysScreenState extends ConsumerState<ApiKeysScreen> {
                         Text(
                           _errorMessage!,
                           style: AppTextStyles.label.copyWith(
-                            color: AppColors.bad,
+                            color: context.palette.bad,
                           ),
                         ),
                       ],
@@ -262,9 +323,9 @@ class _ApiKeysScreenState extends ConsumerState<ApiKeysScreen> {
                   child: Text(
                     'Получить ключ на console.groq.com',
                     style: AppTextStyles.label.copyWith(
-                      color: AppColors.accent,
+                      color: context.palette.accent,
                       decoration: TextDecoration.underline,
-                      decorationColor: AppColors.accent,
+                      decorationColor: context.palette.accent,
                     ),
                   ),
                 ),

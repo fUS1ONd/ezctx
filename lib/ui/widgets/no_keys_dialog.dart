@@ -66,14 +66,14 @@ class NoKeysDialog extends StatelessWidget {
                     height: 64,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(22),
-                      gradient: const LinearGradient(
+                      gradient: LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [AppColors.accentGradientStart, AppColors.accent],
+                        colors: [palette.accent2, palette.accent],
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.accent.withValues(alpha: 0.40),
+                          color: palette.accent.withValues(alpha: 0.40),
                           blurRadius: 22,
                           offset: const Offset(0, 12),
                         ),

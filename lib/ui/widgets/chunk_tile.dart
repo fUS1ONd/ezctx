@@ -13,7 +13,8 @@ class ChunkTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (color, icon, statusText) = _resolveVisuals();
+    final palette = context.palette;
+    final (color, icon, statusText) = _resolveVisuals(palette);
 
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.xs),
@@ -22,9 +23,9 @@ class ChunkTile extends StatelessWidget {
         vertical: AppSpacing.sm,
       ),
       decoration: BoxDecoration(
-        color: AppColors.glassSurface,
+        color: palette.glassBg,
         borderRadius: BorderRadius.circular(AppRadius.row),
-        border: Border.all(color: AppColors.inkDivider),
+        border: Border.all(color: palette.inkLine),
       ),
       child: Row(
         children: [
@@ -65,36 +66,36 @@ class ChunkTile extends StatelessWidget {
   }
 
   /// Возвращает (цвет, иконку, текст статуса) по типу [state].
-  (Color, IconData, String) _resolveVisuals() {
+  (Color, IconData, String) _resolveVisuals(AppPalette palette) {
     return switch (state) {
       ChunkWaiting() => (
-          AppColors.inkTertiary,
+          palette.ink3,
           Icons.hourglass_empty,
           'Ожидает',
         ),
       ChunkUploading() => (
-          AppColors.accent,
+          palette.accent,
           Icons.upload, // иконка не используется, но нужна для паттерна
           'Отправляется...',
         ),
       ChunkDone() => (
-          AppColors.good,
+          palette.good,
           Icons.check_circle_outline,
           'Готов',
         ),
       ChunkRetrying(:final attempt, :final maxAttempts) => (
-          AppColors.bad, // warn — используем bad как наиболее близкий к warn
+          palette.bad, // warn — используем bad как наиболее близкий к warn
           Icons.refresh,
           'Повтор $attempt/$maxAttempts',
         ),
       ChunkFailed(:final error) => (
-          AppColors.bad,
+          palette.bad,
           Icons.error_outline,
           'Ошибка: $error',
         ),
       // Все ключи временно заблокированы — ожидаем разблокировки пула.
       ChunkWaitingForKey() => (
-          AppColors.inkTertiary,
+          palette.ink3,
           Icons.key_off,
           'Ожидание ключа...',
         ),

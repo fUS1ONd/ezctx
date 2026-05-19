@@ -201,7 +201,7 @@ class _ResultScreenState extends State<ResultScreen> {
                     Text(
                       formattedDate,
                       style: AppTextStyles.body
-                          .copyWith(color: AppColors.inkSecondary),
+                          .copyWith(color: context.palette.ink2),
                     ),
                   ],
                 ),
@@ -266,13 +266,13 @@ class _ResultScreenState extends State<ResultScreen> {
                   Text(
                     'Сохранено в:',
                     style: AppTextStyles.label
-                        .copyWith(color: AppColors.inkTertiary),
+                        .copyWith(color: context.palette.ink3),
                   ),
                   const SizedBox(height: 2),
                   SelectableText(
                     _savedPath!,
                     style: AppTextStyles.label
-                        .copyWith(color: AppColors.inkSecondary),
+                        .copyWith(color: context.palette.ink2),
                   ),
                 ],
                 const SizedBox(height: AppSpacing.md),
@@ -291,7 +291,7 @@ class _ResultScreenState extends State<ResultScreen> {
       children: [
         Text(
           'Вид:',
-          style: AppTextStyles.label.copyWith(color: AppColors.inkSecondary),
+          style: AppTextStyles.label.copyWith(color: context.palette.ink2),
         ),
         const SizedBox(width: AppSpacing.sm),
         // Используем ChoiceChip-пару для наглядного переключения.
@@ -350,9 +350,9 @@ class _ResultScreenState extends State<ResultScreen> {
     final h = total ~/ 3600;
     final m = (total % 3600) ~/ 60;
     final s = total % 60;
-    if (h > 0) return '${h}ч ${m}мин';
-    if (m > 0) return '${m}мин ${s}с';
-    return '${s}с';
+    if (h > 0) return '$hч $mмин';
+    if (m > 0) return '$mмин $sс';
+    return '$sс';
   }
 }
 
@@ -370,6 +370,7 @@ class _FormatChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -380,20 +381,20 @@ class _FormatChip extends StatelessWidget {
         ),
         decoration: BoxDecoration(
           color: selected
-              ? AppColors.accent.withValues(alpha: 0.15)
+              ? palette.accent.withValues(alpha: 0.15)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(AppRadius.pill),
           border: Border.all(
             color: selected
-                ? AppColors.accent.withValues(alpha: 0.5)
-                : AppColors.inkDivider,
+                ? palette.accent.withValues(alpha: 0.5)
+                : palette.inkLine,
             width: 1,
           ),
         ),
         child: Text(
           label,
           style: AppTextStyles.label.copyWith(
-            color: selected ? AppColors.accent : AppColors.inkSecondary,
+            color: selected ? palette.accent : palette.ink2,
             fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
           ),
         ),

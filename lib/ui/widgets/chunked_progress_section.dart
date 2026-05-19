@@ -14,6 +14,7 @@ class ChunkedProgressSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
     return switch (state) {
       ChunkedSplitting() => Padding(
           padding: const EdgeInsets.only(top: AppSpacing.sm),
@@ -24,7 +25,7 @@ class ChunkedProgressSection extends StatelessWidget {
               const SizedBox(height: AppSpacing.sm),
               Text(
                 'Разбиваем на чанки…',
-                style: AppTextStyles.body.copyWith(color: AppColors.inkSecondary),
+                style: AppTextStyles.body.copyWith(color: palette.ink2),
               ),
             ],
           ),
@@ -41,8 +42,8 @@ class ChunkedProgressSection extends StatelessWidget {
                 child: LinearProgressIndicator(
                   value: totalCount == 0 ? 0.0 : completedCount / totalCount,
                   minHeight: 6,
-                  backgroundColor: AppColors.inkDivider,
-                  color: AppColors.accent,
+                  backgroundColor: palette.inkLine,
+                  color: palette.accent,
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),

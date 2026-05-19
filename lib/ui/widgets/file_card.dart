@@ -62,7 +62,7 @@ class FileCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.accent.withValues(alpha: 0.30),
+                        color: palette.accent.withValues(alpha: 0.30),
                         blurRadius: 14,
                         offset: const Offset(0, 8),
                       ),
@@ -108,7 +108,7 @@ class FileCard extends StatelessWidget {
                 TextButton(
                   onPressed: onReplace,
                   style: TextButton.styleFrom(
-                    foregroundColor: AppColors.accent,
+                    foregroundColor: palette.accent,
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                   ),
                   child: const Text(
@@ -122,9 +122,15 @@ class FileCard extends StatelessWidget {
 
           // ── Декоративная волна ──
           const SizedBox(height: 12),
-          const SizedBox(
+          SizedBox(
             height: 56,
-            child: CustomPaint(painter: _WaveformPainter(), size: Size.infinite),
+            child: CustomPaint(
+              painter: _WaveformPainter(
+                accent: palette.accent,
+                accent2: palette.accent2,
+              ),
+              size: Size.infinite,
+            ),
           ),
           const SizedBox(height: 14),
 
@@ -140,7 +146,10 @@ class FileCard extends StatelessWidget {
 }
 
 class _WaveformPainter extends CustomPainter {
-  const _WaveformPainter();
+  const _WaveformPainter({required this.accent, required this.accent2});
+
+  final Color accent;
+  final Color accent2;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -166,8 +175,8 @@ class _WaveformPainter extends CustomPainter {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            AppColors.accentGradientStart.withValues(alpha: 0.55 + v * 0.40),
-            AppColors.accent.withValues(alpha: 0.35 + v * 0.40),
+            accent2.withValues(alpha: 0.55 + v * 0.40),
+            accent.withValues(alpha: 0.35 + v * 0.40),
           ],
         ).createShader(rect.outerRect);
       canvas.drawRRect(rect, paint);
@@ -175,5 +184,6 @@ class _WaveformPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter old) => false;
+  bool shouldRepaint(_WaveformPainter old) =>
+      old.accent != accent || old.accent2 != accent2;
 }

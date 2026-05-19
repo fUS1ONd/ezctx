@@ -27,21 +27,22 @@ class PipelineStepTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
     final Color dotColor;
     final IconData? icon;
 
     switch (status) {
       case PipelineStatus.done:
-        dotColor = AppColors.good;
+        dotColor = palette.good;
         icon = Icons.check;
       case PipelineStatus.active:
-        dotColor = AppColors.accent;
+        dotColor = palette.accent;
         icon = null;
       case PipelineStatus.error:
-        dotColor = AppColors.bad;
+        dotColor = palette.bad;
         icon = Icons.error_outline;
       case PipelineStatus.pending:
-        dotColor = AppColors.inkTertiary;
+        dotColor = palette.ink3;
         icon = null;
     }
 

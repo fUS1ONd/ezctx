@@ -34,6 +34,7 @@ class _ShimmerBarState extends State<ShimmerBar>
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
     return AnimatedBuilder(
       animation: _animation,
       builder: (_, __) {
@@ -46,7 +47,7 @@ class _ShimmerBarState extends State<ShimmerBar>
                 // Фоновая полоса
                 Container(
                   decoration: BoxDecoration(
-                    color: AppColors.glassDeep,
+                    color: palette.glassBgDeep,
                   ),
                 ),
                 // Движущийся яркий сегмент
@@ -59,11 +60,11 @@ class _ShimmerBarState extends State<ShimmerBar>
                       0,
                     ),
                     child: Container(
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
                             Colors.transparent,
-                            AppColors.accent,
+                            palette.accent.withValues(alpha: 0.18),
                             Colors.transparent,
                           ],
                         ),
