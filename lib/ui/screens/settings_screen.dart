@@ -5,7 +5,6 @@ import '../../core/constants/app_constants.dart';
 import '../../core/constants/design_tokens.dart';
 import '../../core/providers/repository_providers.dart';
 import '../../core/providers/theme_provider.dart';
-import '../../features/settings/transcription_options_repository.dart';
 import '../../features/transcription/transcription_options.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/gradient_background.dart';
@@ -42,13 +41,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _loadOptions() async {
-    final saved = await TranscriptionOptionsRepository().load();
+    final saved = await ref.read(transcriptionOptionsRepoProvider).load();
     if (mounted) setState(() => _options = saved);
   }
 
   Future<void> _saveOptions(TranscriptionOptions updated) async {
     setState(() => _options = updated);
-    await TranscriptionOptionsRepository().save(updated);
+    await ref.read(transcriptionOptionsRepoProvider).save(updated);
   }
 
   String _keyCountLabel(int count) {

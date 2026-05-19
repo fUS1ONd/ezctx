@@ -8,10 +8,8 @@ import '../../core/constants/app_constants.dart';
 import '../../core/constants/design_tokens.dart';
 import '../../core/error/app_exception.dart';
 import '../../core/providers/service_providers.dart';
-import '../../features/transcription/audio_chunking_service.dart';
 import '../../features/transcription/audio_normalization_service.dart';
 import '../../features/transcription/chunked_transcription_controller.dart';
-import '../../features/transcription/groq_api_service.dart';
 import '../../features/transcription/normalized_audio_file.dart';
 import '../../features/transcription/processing_args.dart';
 import '../../features/transcription/result_args.dart';
@@ -126,8 +124,8 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen>
 
     _chunkedController = ChunkedTranscriptionController(
       pool: ref.read(groqKeyPoolProvider),
-      apiService: GroqApiService(),
-      chunkingService: AudioChunkingService(),
+      apiService: ref.read(groqApiServiceProvider),
+      chunkingService: ref.read(audioChunkingServiceProvider),
     );
     _chunkedController!.addListener(_onChunkedStateChange);
     await _chunkedController!.start(_normalizedFile!, options: _transcriptionOptions);
