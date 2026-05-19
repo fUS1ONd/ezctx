@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../core/services/clipboard_service.dart';
 
 import '../../core/constants/design_tokens.dart';
@@ -68,6 +69,9 @@ class _ResultScreenState extends State<ResultScreen> {
   bool _copied = false;
   String? _savedPath;
 
+  /// Флаг защиты от повторного вызова _saveTranscripts (race condition при back+forward).
+  bool _transcriptsSaved = false;
+
   /// true = показываем текст с таймкодами; false = plain text.
   /// Изначально true только если в результате есть таймкоды.
   bool _showTimestamps = true;
@@ -82,7 +86,7 @@ class _ResultScreenState extends State<ResultScreen> {
         // Если таймкодов нет (single-shot plain), стартуем в plain-режиме.
         _showTimestamps = _hasTimestamps(raw.result.text);
         // OUT-02: автоматически сохраняем txt после открытия экрана
-        _saveTranscriptTxt();
+        _saveTranscripts();
       } else {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) Navigator.popUntil(context, (r) => r.isFirst);
@@ -96,7 +100,10 @@ class _ResultScreenState extends State<ResultScreen> {
     return RegExp(r'\[\d{2}:\d{2}:\d{2}\]').hasMatch(text);
   }
 
-  Future<void> _saveTranscriptTxt() async {
+  Future<void> _saveTranscripts() async {
+    // Защита от повторного сохранения при быстром navigate-back+forward.
+    if (_transcriptsSaved) return;
+    _transcriptsSaved = true;
     try {
       // Сохраняем оба формата: plain (для LLM) и с таймкодами (для истории).
       final paths = await const TranscriptWriter().writeBoth(
@@ -104,15 +111,20 @@ class _ResultScreenState extends State<ResultScreen> {
         plainText: _args!.result.plainText,
         timestampedText: _args!.result.text,
       );
+      // OUT-01: генерируем SRT если есть сегменты с таймкодами
+      await const TranscriptWriter().writeSrt(
+        baseName: _args!.file.name,
+        segments: _args!.result.segments,
+      );
       if (mounted) {
-        // Показываем папку (не полный путь), так как файлов теперь два.
+        // Показываем папку (не полный путь), так как файлов теперь несколько.
         final sep = paths.plainPath.lastIndexOf('/');
         final folderPath =
             sep > 0 ? paths.plainPath.substring(0, sep) : paths.plainPath;
         setState(() => _savedPath = folderPath);
       }
     } catch (e, st) {
-      debugPrint('_saveTranscriptTxt: $e\n$st');
+      debugPrint('_saveTranscripts: $e\n$st');
     }
   }
 
@@ -122,6 +134,20 @@ class _ResultScreenState extends State<ResultScreen> {
     // Если тексты совпадают (single-shot или нет таймкодов) — всегда возвращаем text.
     if (r.text == r.plainText) return r.text;
     return _showTimestamps ? r.text : r.plainText;
+  }
+
+  /// Открывает системный диалог «Поделиться» с текстом расшифровки.
+  Future<void> _onShareTap() async {
+    if (_args == null) return;
+    try {
+      await Share.share(_currentText);
+    } catch (e, st) {
+      debugPrint('_onShareTap error: $e\n$st');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Не удалось поделиться. Попробуйте ещё раз.')),
+      );
+    }
   }
 
   Future<void> _onCopyTap() async {
@@ -205,6 +231,18 @@ class _ResultScreenState extends State<ResultScreen> {
                 ),
                 const SizedBox(height: AppSpacing.sm),
 
+                // OUT-04: кнопка «Поделиться» — отправить расшифровку в другое приложение.
+                Semantics(
+                  label: 'Поделиться расшифровкой',
+                  child: PrimaryButton(
+                    label: 'Поделиться',
+                    icon: Icons.share_outlined,
+                    variant: PrimaryButtonVariant.accent,
+                    onPressed: _onShareTap,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+
                 // Переключатель формата (Bug-2): всегда виден.
                 _buildFormatToggle(),
                 const SizedBox(height: AppSpacing.sm),
@@ -221,16 +259,20 @@ class _ResultScreenState extends State<ResultScreen> {
                   ),
                 ),
 
-                // Путь к сохранённому файлу
+                // Путь к сохранённому файлу — показываем полностью (без ellipsis),
+                // чтобы пользователь видел актуальное местоположение (external storage).
                 if (_savedPath != null) ...[
                   const SizedBox(height: AppSpacing.sm),
                   Text(
-                    // _savedPath содержит путь к папке (два файла: plain + timestamped).
-                    'Сохранено: $_savedPath',
+                    'Сохранено в:',
                     style: AppTextStyles.label
                         .copyWith(color: AppColors.inkTertiary),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  SelectableText(
+                    _savedPath!,
+                    style: AppTextStyles.label
+                        .copyWith(color: AppColors.inkSecondary),
                   ),
                 ],
                 const SizedBox(height: AppSpacing.md),

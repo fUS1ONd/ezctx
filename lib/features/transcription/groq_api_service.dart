@@ -215,7 +215,7 @@ class GroqApiService {
       if (response.statusCode == 401) {
         throw const AuthException(_authErrorMessage);
       }
-      // 429 / 503: пробрасываем RateLimitException — TranscriptionController
+      // 429 / 503: пробрасываем RateLimitException — ChunkedTranscriptionController
       // должен сообщить пулу о блокировке через pool.reportRateLimited().
       // Идентично обработке в transcribeChunk().
       if (response.statusCode == 429 || response.statusCode == 503) {

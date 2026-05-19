@@ -14,7 +14,6 @@ import '../../features/transcription/normalized_audio_file.dart';
 import '../../features/transcription/processing_args.dart';
 import '../../features/transcription/result_args.dart';
 import '../../features/transcription/selected_audio_file.dart';
-import '../../features/transcription/transcription_controller.dart';
 import '../../features/transcription/transcription_options.dart';
 import '../widgets/chunk_tile.dart';
 import '../widgets/glass_card.dart';
@@ -38,13 +37,7 @@ class ProcessingScreen extends StatefulWidget {
 
 class _ProcessingScreenState extends State<ProcessingScreen>
     with SingleTickerProviderStateMixin {
-  late final TranscriptionController _controller;
-
-  /// Контроллер для chunked-режима (большие файлы ≥ 19 МБ).
   ChunkedTranscriptionController? _chunkedController;
-
-  /// true — длительность нормализованного mp3 > kChunkThresholdSeconds.
-  bool _isChunked = false;
 
   /// true — идёт нормализация аудио.
   bool _normalizing = false;
@@ -75,13 +68,6 @@ class _ProcessingScreenState extends State<ProcessingScreen>
   @override
   void initState() {
     super.initState();
-    // Используем pool из widget — singleton создан в main.dart.
-    _controller = TranscriptionController(
-      pool: widget.groqKeyPool,
-      apiService: GroqApiService(),
-    );
-    _controller.addListener(_onStateChange);
-
     // Инициализация пульс-анимации активной точки pipeline (1200 мс, зацикленная).
     _pulseController = AnimationController(
       vsync: this,
@@ -131,7 +117,7 @@ class _ProcessingScreenState extends State<ProcessingScreen>
     }
   }
 
-  /// Основной pipeline: нормализация → (chunked | single) транскрибация.
+  /// Основной pipeline: нормализация → chunked транскрибация.
   Future<void> _startProcessing() async {
     if (!mounted) return;
     setState(() {
@@ -141,8 +127,6 @@ class _ProcessingScreenState extends State<ProcessingScreen>
 
     try {
       _normalizedFile = await AudioNormalizationService().normalize(_file!.path);
-      _isChunked =
-          _normalizedFile!.durationSeconds > AppConstants.kChunkThresholdSeconds;
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -155,27 +139,15 @@ class _ProcessingScreenState extends State<ProcessingScreen>
     if (!mounted) return;
     setState(() => _normalizing = false);
 
-    if (_isChunked) {
-      // Chunked-режим: создаём ChunkedTranscriptionController с pool из widget.
-      _chunkedController = ChunkedTranscriptionController(
-        pool: widget.groqKeyPool,
-        apiService: GroqApiService(),
-        chunkingService: AudioChunkingService(),
-      );
-      _chunkedController!.addListener(_onChunkedStateChange);
-      // await: некропотанные исключения внутри start() долетят до try/catch
-      // этого метода, а не будут молча проглочены как unhandled Future rejection.
-      await _chunkedController!.start(_normalizedFile!, options: _transcriptionOptions);
-    } else {
-      // Стандартный режим: TranscriptionController с нормализованным файлом.
-      final normalizedAudioFile = SelectedAudioFile(
-        path: _normalizedFile!.path,
-        name: _file!.name,
-        sizeBytes: File(_normalizedFile!.path).statSync().size,
-        extension: 'mp3',
-      );
-      await _controller.start(normalizedAudioFile, options: _transcriptionOptions);
-    }
+    _chunkedController = ChunkedTranscriptionController(
+      pool: widget.groqKeyPool,
+      apiService: GroqApiService(),
+      chunkingService: AudioChunkingService(),
+    );
+    _chunkedController!.addListener(_onChunkedStateChange);
+    // await: некропотанные исключения внутри start() долетят до try/catch
+    // этого метода, а не будут молча проглочены как unhandled Future rejection.
+    await _chunkedController!.start(_normalizedFile!, options: _transcriptionOptions);
   }
 
   /// Callback при изменении состояния ChunkedTranscriptionController.
@@ -201,29 +173,6 @@ class _ProcessingScreenState extends State<ProcessingScreen>
     if (mounted) setState(() {});
   }
 
-  void _onStateChange() {
-    final s = _controller.state;
-    if (s is TranscriptionSuccess) {
-      _ticker?.cancel();
-      if (mounted) {
-        // Показываем "Готово" (done) на 300 мс, затем переходим на экран результата.
-        setState(() {});
-        Future.delayed(const Duration(milliseconds: 300), () {
-          if (mounted) {
-            Navigator.pushReplacementNamed(
-              context,
-              AppConstants.routeResult,
-              arguments: ResultArgs(file: _file!, result: s.result),
-            );
-          }
-        });
-      }
-      // Предотвращаем повторный setState ниже при успехе.
-      return;
-    }
-    if (mounted) setState(() {});
-  }
-
   /// Перезапускает таймер и pipeline при повторной попытке.
   void _restart() {
     _ticker?.cancel();
@@ -235,7 +184,6 @@ class _ProcessingScreenState extends State<ProcessingScreen>
       _startedAt = DateTime.now();
       _normalizationError = null;
       _normalizedFile = null;
-      _isChunked = false;
       _chunkedController = null;
     });
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -248,8 +196,6 @@ class _ProcessingScreenState extends State<ProcessingScreen>
   void dispose() {
     _ticker?.cancel();
     _pulseController.dispose();
-    _controller.removeListener(_onStateChange);
-    _controller.dispose();
     _chunkedController?.removeListener(_onChunkedStateChange);
     _chunkedController?.dispose();
     // Удаляем временный нормализованный файл.
@@ -269,42 +215,18 @@ class _ProcessingScreenState extends State<ProcessingScreen>
 
   @override
   Widget build(BuildContext context) {
-    // Единый scaffold для single и chunked режимов.
-    final singleState = _controller.state;
     final chunkedState = _chunkedController?.state;
 
-    // Флаги для single-режима.
-    final isSingleError = !_isChunked && !_normalizing && singleState is TranscriptionError;
-    final isSingleMissingKey = !_isChunked && !_normalizing && singleState is TranscriptionMissingKey;
-
     // Статус шага "Распознавание".
-    final _PipelineStatus recognitionStatus;
-    if (_isChunked) {
-      recognitionStatus = switch (chunkedState) {
-        ChunkedProcessing() || ChunkedSplitting() => _PipelineStatus.active,
-        ChunkedSuccess() => _PipelineStatus.done,
-        ChunkedError() => _PipelineStatus.error,
-        _ => _normalizedFile != null ? _PipelineStatus.active : _PipelineStatus.pending,
-      };
-    } else {
-      recognitionStatus = isSingleError
-          ? _PipelineStatus.error
-          : (singleState is TranscriptionLoading
-              ? _PipelineStatus.active
-              : isSingleMissingKey
-                  ? _PipelineStatus.pending
-                  : (singleState is TranscriptionSuccess
-                      ? _PipelineStatus.done
-                      : _PipelineStatus.pending));
-    }
+    final _PipelineStatus recognitionStatus = switch (chunkedState) {
+      ChunkedProcessing() || ChunkedSplitting() => _PipelineStatus.active,
+      ChunkedSuccess() => _PipelineStatus.done,
+      ChunkedError() => _PipelineStatus.error,
+      _ => _normalizedFile != null ? _PipelineStatus.active : _PipelineStatus.pending,
+    };
 
-    // "Готово" становится done при успехе в обоих режимах.
-    final bool isDone = singleState is TranscriptionSuccess ||
-        chunkedState is ChunkedSuccess;
-
-    // ShimmerBar видна при нормализации или single-загрузке.
-    final bool showShimmer = _normalizing ||
-        (!_isChunked && singleState is TranscriptionLoading);
+    final bool isDone = chunkedState is ChunkedSuccess;
+    final bool showShimmer = _normalizing;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -414,7 +336,7 @@ class _ProcessingScreenState extends State<ProcessingScreen>
                           _buildPipelineStep(
                             label: 'Распознавание',
                             status: recognitionStatus,
-                            inlineContent: _isChunked && chunkedState != null
+                            inlineContent: chunkedState != null
                                 ? _buildChunkedInline(chunkedState)
                                 : null,
                           ),
@@ -437,11 +359,8 @@ class _ProcessingScreenState extends State<ProcessingScreen>
                 if (_normalizationError != null)
                   _buildNormalizationError(_normalizationError!),
 
-                // Нижняя панель зависит от режима.
                 if (_normalizationError == null)
-                  _isChunked
-                      ? _buildChunkedBottomBar(chunkedState)
-                      : _buildBottomBar(singleState),
+                  _buildChunkedBottomBar(chunkedState),
 
                 // Безопасный нижний отступ с учётом системной панели навигации
                 SizedBox(height: MediaQuery.of(context).padding.bottom + 32),
@@ -493,12 +412,15 @@ class _ProcessingScreenState extends State<ProcessingScreen>
                 style: AppTextStyles.label,
               ),
               const SizedBox(height: AppSpacing.sm),
-              // Список чанков — свёрнут по умолчанию, чтобы не занимать много места.
+              // Список чанков виден сразу: пользователь должен наблюдать
+              // прогресс каждой части без дополнительного тапа. Складывается
+              // вручную, если занимает слишком много места.
               ExpansionTile(
                 title: Text(
                   'Детали чанков',
                   style: AppTextStyles.label,
                 ),
+                initiallyExpanded: true,
                 tilePadding: EdgeInsets.zero,
                 childrenPadding: EdgeInsets.zero,
                 children: [
@@ -692,75 +614,6 @@ class _ProcessingScreenState extends State<ProcessingScreen>
     return stepRow;
   }
 
-  Widget _buildBottomBar(TranscriptionState state) {
-    if (state is TranscriptionLoading) {
-      // Floating glass pill с таймером и кнопкой отмены
-      return GlassCard(
-        borderRadius: AppRadius.pill,
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.sm,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            // Elapsed time в формате mm:ss
-            Text(_formatElapsed(_elapsed), style: AppTextStyles.mono),
-            TextButton(
-              onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
-              child: Text(
-                'Отменить обработку',
-                style: AppTextStyles.label.copyWith(color: AppColors.bad),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (state is TranscriptionError) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            state.message,
-            style: AppTextStyles.label.copyWith(color: AppColors.bad),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          if (state.retryable && _file != null)
-            PrimaryButton(
-              label: 'Повторить',
-              onPressed: _restart,
-            ),
-          const SizedBox(height: AppSpacing.sm),
-          TextButton(
-            onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
-            child: const Text('Назад'),
-          ),
-        ],
-      );
-    }
-
-    if (state is TranscriptionMissingKey) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            'Сначала добавьте API-ключ в настройках',
-            style: AppTextStyles.label.copyWith(color: AppColors.bad),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          PrimaryButton(
-            label: 'Перейти в настройки',
-            onPressed: () =>
-                Navigator.pushNamed(context, AppConstants.routeApiKeys),
-          ),
-        ],
-      );
-    }
-
-    return const SizedBox.shrink();
-  }
 }
 
 enum _PipelineStatus { done, active, error, pending }

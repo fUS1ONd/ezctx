@@ -190,8 +190,9 @@ void main() {
         },
       );
 
+      // 5040s > kChunkThresholdSeconds → shortcircuit не срабатывает, ffmpeg вызывается
       await expectLater(
-        () => service.split('/fake/input.mp3', 3600.0, outputDir: outDir.path),
+        () => service.split('/fake/input.mp3', 5040.0, outputDir: outDir.path),
         throwsA(isA<InternalException>()),
       );
     });
@@ -204,6 +205,46 @@ void main() {
 
       await expectLater(
         () => service.split('/fake/input.mp3', 0.0, outputDir: outDir.path),
+        throwsA(isA<InternalException>()),
+      );
+    });
+  });
+
+  group('AudioChunkingService.split — shortcircuit (n=1)', () {
+    // R1: короткий файл → без ffmpeg, возвращается исходный путь
+    test('R1: duration < kChunkThresholdSeconds → исходный файл без вызова ffmpeg', () async {
+      var ffmpegCalled = false;
+      final service = AudioChunkingService(
+        ffmpegOverride: (_) async { ffmpegCalled = true; },
+      );
+      final result = await service.split('/tmp/fake.mp3', 300.0);
+      expect(ffmpegCalled, isFalse);
+      expect(result, hasLength(1));
+      expect(result.first.path, equals('/tmp/fake.mp3'));
+    });
+
+    // R2: граничный случай — duration == kChunkThresholdSeconds попадает в shortcircuit
+    test('R2: duration == kChunkThresholdSeconds → shortcircuit, ffmpeg не вызван', () async {
+      var ffmpegCalled = false;
+      final service = AudioChunkingService(
+        ffmpegOverride: (_) async { ffmpegCalled = true; },
+      );
+      const threshold = 4920.0; // AppConstants.kChunkThresholdSeconds
+      final result = await service.split('/tmp/fake.mp3', threshold);
+      expect(ffmpegCalled, isFalse);
+      expect(result, hasLength(1));
+      expect(result.first.path, equals('/tmp/fake.mp3'));
+    });
+
+    // R5: валидация спецсимволов работает ДО shortcircuit
+    test('R5: пути со спецсимволами отклоняются даже для коротких файлов', () async {
+      final service = AudioChunkingService();
+      await expectLater(
+        () => service.split('/tmp/bad"name.mp3', 300.0),
+        throwsA(isA<InternalException>()),
+      );
+      await expectLater(
+        () => service.split('/tmp/bad\$name.mp3', 300.0),
         throwsA(isA<InternalException>()),
       );
     });
