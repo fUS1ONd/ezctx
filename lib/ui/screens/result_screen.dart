@@ -259,16 +259,20 @@ class _ResultScreenState extends State<ResultScreen> {
                   ),
                 ),
 
-                // Путь к сохранённому файлу
+                // Путь к сохранённому файлу — показываем полностью (без ellipsis),
+                // чтобы пользователь видел актуальное местоположение (external storage).
                 if (_savedPath != null) ...[
                   const SizedBox(height: AppSpacing.sm),
                   Text(
-                    // _savedPath содержит путь к папке (два файла: plain + timestamped).
-                    'Сохранено: $_savedPath',
+                    'Сохранено в:',
                     style: AppTextStyles.label
                         .copyWith(color: AppColors.inkTertiary),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  SelectableText(
+                    _savedPath!,
+                    style: AppTextStyles.label
+                        .copyWith(color: AppColors.inkSecondary),
                   ),
                 ],
                 const SizedBox(height: AppSpacing.md),
