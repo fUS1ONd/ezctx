@@ -71,6 +71,13 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1600));
   });
 
+  testWidgets('ResultScreen содержит кнопку «Поделиться»', (tester) async {
+    await tester.pumpWidget(buildScreen());
+    await tester.pumpAndSettle();
+
+    expect(find.text('Поделиться'), findsOneWidget);
+  });
+
   testWidgets('После tap «Скопировать» кнопка показывает «Скопировано»',
       (tester) async {
     await tester.pumpWidget(buildScreen());
