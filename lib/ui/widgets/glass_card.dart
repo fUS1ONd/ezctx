@@ -4,55 +4,39 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/design_tokens.dart';
 
-/// Стеклянная карточка с BackdropFilter и ClipRRect.
-/// RepaintBoundary обязателен для производительности (RESEARCH Pitfall 4).
+/// Glass-карточка с BackdropFilter и rim-границами.
+/// Цвета берёт из `context.palette` — корректно в обеих темах.
 class GlassCard extends StatelessWidget {
   const GlassCard({
     super.key,
     required this.child,
     this.borderRadius = AppRadius.card,
     this.padding = const EdgeInsets.all(16),
+    this.deep = false,
   });
 
   final Widget child;
   final double borderRadius;
   final EdgeInsets padding;
 
+  /// Глубже стекло (выше насыщенность) — для модалок и status-карточек.
+  final bool deep;
+
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
+    final bg = deep ? palette.glassBgDeep : palette.glassBg;
+
     return RepaintBoundary(
       child: ClipRRect(
         borderRadius: BorderRadius.circular(borderRadius),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+          filter: ImageFilter.blur(sigmaX: deep ? 34 : 28, sigmaY: deep ? 34 : 28),
           child: Container(
             decoration: BoxDecoration(
-              color: AppColors.glassSurface,
-              border: Border(
-                top: BorderSide(
-                  color: Colors.white.withValues(alpha: 0.85),
-                  width: 0.5,
-                ),
-                bottom: BorderSide(
-                  color: Colors.white.withValues(alpha: 0.12),
-                  width: 0.5,
-                ),
-                left: BorderSide(
-                  color: Colors.white.withValues(alpha: 0.58),
-                  width: 0.5,
-                ),
-                right: BorderSide(
-                  color: Colors.white.withValues(alpha: 0.16),
-                  width: 0.5,
-                ),
-              ),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x1A140A1E),
-                  blurRadius: 24,
-                  offset: Offset(0, 10),
-                ),
-              ],
+              color: bg,
+              border: Border.all(color: palette.glassRim, width: 0.5),
+              boxShadow: [deep ? palette.shadowDeep : palette.shadow],
             ),
             padding: padding,
             child: child,

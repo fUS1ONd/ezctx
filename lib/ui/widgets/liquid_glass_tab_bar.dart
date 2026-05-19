@@ -1,22 +1,13 @@
-// Liquid Glass нижняя панель навигации.
+// Liquid Glass нижняя панель навигации (тема-aware).
 // 3 таба: Главная · История · Настройки. Активный — оранжевая «пилюля».
 //
-// Зависимости: только flutter/material — иконки нарисованы CustomPainter,
-// чтобы 1-в-1 совпадало с HTML-дизайном.
+// Цвета берёт из context.palette — переключается с темой автоматически.
 
 import 'dart:ui';
 import 'package:flutter/material.dart';
 
-// ─── Палитра «Слух» ─────────────────────────────────────────
-class SluhColors {
-  static const accent = Color(0xFFFF5B3A);
-  static const accent2 = Color(0xFFFF8A4D);
-  static const ink = Color(0xFF1A1421);
-  static const ink2 = Color(0x9E1A1421); // .62
-  static const inkLine = Color(0x141A1421); // .08
-}
+import '../../core/constants/design_tokens.dart';
 
-// ─── Сама панель ────────────────────────────────────────────
 class LiquidGlassTabBar extends StatelessWidget {
   final int activeIndex;
   final ValueChanged<int> onChanged;
@@ -37,6 +28,8 @@ class LiquidGlassTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
+
     return Padding(
       padding: margin,
       child: ClipRRect(
@@ -47,24 +40,9 @@ class LiquidGlassTabBar extends StatelessWidget {
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(9999),
-              color: const Color(0x7AFFFFFF), // .48
-              // «стеклянный» край + лёгкая тень под капсулой
-              border: Border.all(
-                color: const Color(0xD9FFFFFF), // rim
-                width: 0.5,
-              ),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x1A140A1E),
-                  blurRadius: 24,
-                  offset: Offset(0, 10),
-                ),
-                BoxShadow(
-                  color: Color(0x0F140A1E),
-                  blurRadius: 2,
-                  offset: Offset(0, 1),
-                ),
-              ],
+              color: palette.glassBg,
+              border: Border.all(color: palette.glassRim, width: 0.5),
+              boxShadow: [palette.shadow],
             ),
             child: Row(
               children: [
@@ -93,7 +71,6 @@ class TabItem {
 
 enum TabIconKind { home, doc, gear }
 
-// ─── Отдельная «пилюля»-таб ─────────────────────────────────
 class _TabPill extends StatelessWidget {
   final TabItem item;
   final bool active;
@@ -107,6 +84,9 @@ class _TabPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
+    final inactiveColor = palette.ink2;
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
@@ -120,7 +100,7 @@ class _TabPill extends StatelessWidget {
           boxShadow: active
               ? const [
                   BoxShadow(
-                    color: Color(0x57FF5B3A), // .34
+                    color: Color(0x57FF5B3A),
                     blurRadius: 12,
                     offset: Offset(0, 4),
                   ),
@@ -138,7 +118,7 @@ class _TabPill extends StatelessWidget {
               size: const Size(22, 22),
               painter: _TabIconPainter(
                 kind: item.icon,
-                color: active ? Colors.white : SluhColors.ink2,
+                color: active ? Colors.white : inactiveColor,
               ),
             ),
             const SizedBox(width: 6),
@@ -148,7 +128,7 @@ class _TabPill extends StatelessWidget {
                 fontSize: 13,
                 fontWeight: active ? FontWeight.w600 : FontWeight.w500,
                 letterSpacing: -0.13,
-                color: active ? Colors.white : SluhColors.ink2,
+                color: active ? Colors.white : inactiveColor,
               ),
             ),
           ],
@@ -158,7 +138,6 @@ class _TabPill extends StatelessWidget {
   }
 }
 
-// ─── Иконки: контур, strokeWidth 1.8 ────────────────────────
 class _TabIconPainter extends CustomPainter {
   final TabIconKind kind;
   final Color color;
@@ -166,7 +145,6 @@ class _TabIconPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // viewBox 24×24 → масштаб к нашему 22×22
     final scale = size.width / 24;
     canvas.scale(scale);
 
