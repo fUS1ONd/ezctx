@@ -83,8 +83,9 @@ class TranscriptWriter {
 
   /// Форматирует секунды в строку SRT-формата `HH:MM:SS,mmm`.
   /// НЕ использует Duration.toString() — тот даёт точку вместо запятой.
+  /// Отрицательные значения зажимаются до нуля (защита от шума Groq/смещения чанка).
   static String _srtTime(double totalSeconds) {
-    final ms = (totalSeconds * 1000).round();
+    final ms = (totalSeconds.clamp(0.0, double.infinity) * 1000).round();
     final h = ms ~/ 3600000;
     final m = (ms % 3600000) ~/ 60000;
     final s = (ms % 60000) ~/ 1000;
