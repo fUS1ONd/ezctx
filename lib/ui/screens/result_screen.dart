@@ -135,10 +135,11 @@ class _ResultScreenState extends State<ResultScreen> {
     if (_args == null) return;
     try {
       await Share.share(_currentText);
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('_onShareTap error: $e\n$st');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка общего доступа: $e')),
+        const SnackBar(content: Text('Не удалось поделиться. Попробуйте ещё раз.')),
       );
     }
   }
