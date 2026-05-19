@@ -18,25 +18,12 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  int _keyCount = 0;
-  bool _loadingKeys = true;
   TranscriptionOptions _options = const TranscriptionOptions.defaults();
 
   @override
   void initState() {
     super.initState();
-    _loadKeys();
     _loadOptions();
-  }
-
-  Future<void> _loadKeys() async {
-    final keys = await ref.read(apiKeyRepoProvider).listKeys();
-    if (mounted) {
-      setState(() {
-        _keyCount = keys.length;
-        _loadingKeys = false;
-      });
-    }
   }
 
   Future<void> _loadOptions() async {
@@ -77,6 +64,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
+    final keysAsync = ref.watch(apiKeysProvider);
+    final keyCountLabel = keysAsync.when(
+      data: (keys) => _keyCountLabel(keys.length),
+      loading: () => '...',
+      error: (_, __) => '—',
+    );
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -113,20 +106,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                         title: const Text('API-ключи', style: AppTextStyles.body),
                         subtitle: Text(
-                          _loadingKeys ? '...' : _keyCountLabel(_keyCount),
+                          keyCountLabel,
                           style: AppTextStyles.label,
                         ),
                         trailing: const Icon(
                           Icons.chevron_right,
                           color: AppColors.inkTertiary,
                         ),
-                        onTap: () async {
-                          await Navigator.pushNamed(
-                            context,
-                            AppConstants.routeApiKeys,
-                          );
-                          _loadKeys();
-                        },
+                        onTap: () => Navigator.pushNamed(
+                          context,
+                          AppConstants.routeApiKeys,
+                        ),
                       ),
                       const Divider(height: 1),
                       ListTile(
