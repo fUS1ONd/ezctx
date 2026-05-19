@@ -4,6 +4,7 @@ import 'package:ezctx/features/transcription/selected_audio_file.dart';
 import 'package:ezctx/features/transcription/transcription_result.dart';
 import 'package:ezctx/ui/screens/result_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/mockito.dart';
 
@@ -19,11 +20,25 @@ void main() {
     when(mockClipboard.write(any)).thenAnswer((_) async {});
     ClipboardService.clipboardOverride = mockClipboard;
     ClipboardService.simulateUnavailable = false;
+
+    // Мокируем share_plus MethodChannel — без этого tap «Поделиться» бросает
+    // MissingPluginException в тестовом окружении.
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel('dev.fluttercommunity.plus/share'),
+      (call) async => null,
+    );
   });
 
   tearDown(() {
     ClipboardService.clipboardOverride = null;
     ClipboardService.simulateUnavailable = false;
+    // Сбрасываем мок share_plus после каждого теста.
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel('dev.fluttercommunity.plus/share'),
+      null,
+    );
   });
 
   ResultArgs makeArgs() => const ResultArgs(
@@ -97,5 +112,31 @@ void main() {
 
     // Очищаем pending timer
     await tester.pump(const Duration(milliseconds: 1600));
+  });
+
+  testWidgets('Tap «Поделиться» не бросает исключение и вызывает share_plus',
+      (tester) async {
+    // Устанавливаем мок, захватывающий аргументы вызова Share.share.
+    String? capturedText;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel('dev.fluttercommunity.plus/share'),
+      (call) async {
+        // share_plus передаёт текст через поле 'text' в arguments.
+        if (call.method == 'share') {
+          capturedText = (call.arguments as Map?)?['text'] as String?;
+        }
+        return null;
+      },
+    );
+
+    await tester.pumpWidget(buildScreen());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Поделиться'));
+    await tester.pumpAndSettle();
+
+    // Ошибок быть не должно; Share.share должен был вызваться с текстом расшифровки.
+    expect(capturedText, equals(transcriptText));
   });
 }
