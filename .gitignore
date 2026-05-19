@@ -51,3 +51,6 @@ app.*.map.json
 # Claude Code runtime / GSD framework (dev tools, not app source)
 .claude/
 .planning/
+
+# Дизайн-макеты (только локально, не в репо)
+design/
