@@ -21,30 +21,8 @@ class EzCtxApp extends ConsumerWidget {
       title: 'ezctx',
       debugShowCheckedModeBanner: false,
       themeMode: themeMode,
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.light,
-        scaffoldBackgroundColor: Colors.transparent,
-        textTheme: const TextTheme(
-          displayLarge: AppTextStyles.display,
-          titleLarge: AppTextStyles.heading,
-          bodyLarge: AppTextStyles.body,
-          labelSmall: AppTextStyles.label,
-        ),
-      ),
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: Colors.transparent,
-        textTheme: const TextTheme(
-          displayLarge: AppTextStyles.display,
-          titleLarge: AppTextStyles.heading,
-          bodyLarge: AppTextStyles.body,
-          labelSmall: AppTextStyles.label,
-        ),
-      ),
-      // ScaffoldWithNavBar — корневой shell с тремя вкладками (IndexedStack).
-      // ProcessingScreen и ResultScreen пушатся поверх через Navigator.push.
+      theme: _buildTheme(Brightness.light),
+      darkTheme: _buildTheme(Brightness.dark),
       home: const ScaffoldWithNavBar(),
       onGenerateRoute: (settings) {
         Widget page;
@@ -73,6 +51,36 @@ class EzCtxApp extends ConsumerWidget {
           },
         );
       },
+    );
+  }
+
+  ThemeData _buildTheme(Brightness brightness) {
+    final palette = brightness == Brightness.dark
+        ? AppPalette.dark
+        : AppPalette.light;
+
+    final base = ThemeData(
+      useMaterial3: true,
+      brightness: brightness,
+      scaffoldBackgroundColor: Colors.transparent,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: AppColors.accent,
+        brightness: brightness,
+      ).copyWith(
+        surface: brightness == Brightness.dark
+            ? const Color(0xFF16111F)
+            : const Color(0xFFFFF3EA),
+        onSurface: palette.ink1,
+      ),
+    );
+
+    return base.copyWith(
+      textTheme: base.textTheme.copyWith(
+        displayLarge: AppTextStyles.display.copyWith(color: palette.ink1),
+        titleLarge: AppTextStyles.heading.copyWith(color: palette.ink1),
+        bodyLarge: AppTextStyles.body.copyWith(color: palette.ink1),
+        labelSmall: AppTextStyles.label.copyWith(color: palette.ink2),
+      ),
     );
   }
 }
