@@ -163,10 +163,9 @@ class BlobView {
 List<BlobView> blobsOf(AppPalette p) =>
     p.blobs.map(BlobView.new).toList(growable: false);
 
-// ─── Legacy constants ─────────────────────────────────────
-// Сохранены как «светлая палитра по умолчанию» — не удалять.
-// Старый код (тесты, screen-ы вне Liquid-рефреша) продолжает их читать.
-
+// ─── Брендовые константы ──────────────────────────────────
+// Только акцент и статусные цвета — одинаковые в обеих темах.
+// Не использовать в новом коде вне Widget-дерева; в виджетах — context.palette.
 class AppColors {
   AppColors._();
 
@@ -175,14 +174,6 @@ class AppColors {
 
   static const Color good = Color(0xFF2DB585);
   static const Color bad = Color(0xFFE0395A);
-
-  static const Color inkPrimary = Color(0xFF1A1421);
-  static const Color inkSecondary = Color(0x9E1A1421);
-  static const Color inkTertiary = Color(0x611A1421);
-  static const Color inkDivider = Color(0x141A1421);
-
-  static const Color glassSurface = Color(0x7AFFFFFF);
-  static const Color glassDeep = Color(0xA8FFFFFF);
 }
 
 class AppRadius {
@@ -208,18 +199,23 @@ class AppSpacing {
 class AppTextStyles {
   AppTextStyles._();
 
+  // Базовые цвета — fallback для light-темы. В виджетах всегда copyWith(color: palette.inkX).
+  static const _ink1 = Color(0xFF1A1421);
+  static const _ink2 = Color(0x9E1A1421);
+  static const _ink3 = Color(0x611A1421);
+
   static const TextStyle display = TextStyle(
     fontSize: 34,
     fontWeight: FontWeight.w700,
     letterSpacing: -1.2,
-    color: AppColors.inkPrimary,
+    color: _ink1,
     height: 1.08,
   );
 
   static const TextStyle heading = TextStyle(
     fontSize: 20,
     fontWeight: FontWeight.w700,
-    color: AppColors.inkPrimary,
+    color: _ink1,
     height: 1.2,
   );
 
@@ -227,14 +223,14 @@ class AppTextStyles {
     fontSize: 16,
     fontWeight: FontWeight.w400,
     letterSpacing: -0.16,
-    color: AppColors.inkPrimary,
+    color: _ink1,
     height: 1.5,
   );
 
   static const TextStyle label = TextStyle(
     fontSize: 13,
     fontWeight: FontWeight.w400,
-    color: AppColors.inkSecondary,
+    color: _ink2,
     height: 1.3,
   );
 
@@ -242,14 +238,14 @@ class AppTextStyles {
     fontSize: 13,
     fontWeight: FontWeight.w400,
     fontFamily: 'RobotoMono',
-    color: AppColors.inkSecondary,
+    color: _ink2,
   );
 
   static const TextStyle eyebrow = TextStyle(
     fontSize: 12,
     fontWeight: FontWeight.w600,
     letterSpacing: 1.0,
-    color: AppColors.inkTertiary,
+    color: _ink3,
   );
 }
 
