@@ -9,7 +9,10 @@ class AppConstants {
   static const String groqDefaultModel = 'whisper-large-v3';
   static const String groqTurboModel = 'whisper-large-v3-turbo';
   static const String groqResponseFormat = 'verbose_json';
-  static const String groqTimestampGranularity = 'word';
+  // segment, а не word: при 'word' Groq не всегда возвращает segments[],
+  // и переключатель «С метками / Без меток» на ResultScreen теряет разницу.
+  // Chunked-путь хардкодит 'segment' в groq_api_service.dart (там не нужны word-таймкоды).
+  static const String groqTimestampGranularity = 'segment';
 
   // Лимиты файлов
   // 19 MB — консервативная граница; реальный лимит Groq Free Tier = 25 MB.
