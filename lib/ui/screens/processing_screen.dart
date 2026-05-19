@@ -2,14 +2,15 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/design_tokens.dart';
+import '../../core/providers/service_providers.dart';
 import '../../features/transcription/audio_chunking_service.dart';
 import '../../features/transcription/audio_normalization_service.dart';
 import '../../features/transcription/chunked_transcription_controller.dart';
 import '../../features/transcription/groq_api_service.dart';
-import '../../features/transcription/groq_key_pool.dart';
 import '../../features/transcription/normalized_audio_file.dart';
 import '../../features/transcription/processing_args.dart';
 import '../../features/transcription/result_args.dart';
@@ -24,28 +25,19 @@ import '../widgets/primary_button.dart';
 import '../widgets/shimmer_bar.dart';
 
 /// Экран обработки: запускает транскрибацию, показывает pipeline, обрабатывает ошибки.
-/// Принимает [groqKeyPool] — singleton пул ключей из main.dart.
-class ProcessingScreen extends StatefulWidget {
-  const ProcessingScreen({super.key, required this.groqKeyPool});
-
-  /// Singleton пул Groq API-ключей, передаётся в контроллеры транскрибации.
-  final GroqKeyPool groqKeyPool;
+class ProcessingScreen extends ConsumerStatefulWidget {
+  const ProcessingScreen({super.key});
 
   @override
-  State<ProcessingScreen> createState() => _ProcessingScreenState();
+  ConsumerState<ProcessingScreen> createState() => _ProcessingScreenState();
 }
 
-class _ProcessingScreenState extends State<ProcessingScreen>
+class _ProcessingScreenState extends ConsumerState<ProcessingScreen>
     with SingleTickerProviderStateMixin {
   ChunkedTranscriptionController? _chunkedController;
 
-  /// true — идёт нормализация аудио.
   bool _normalizing = false;
-
-  /// Результат нормализации (нормализованный временный файл).
   NormalizedAudioFile? _normalizedFile;
-
-  /// Ошибка нормализации.
   String? _normalizationError;
 
   /// Настройки транскрибации, переданные с HomeScreen через ProcessingArgs.
@@ -56,19 +48,13 @@ class _ProcessingScreenState extends State<ProcessingScreen>
   Timer? _ticker;
   Duration _elapsed = Duration.zero;
 
-  /// Контроллер для пульс-анимации активной точки pipeline.
   late final AnimationController _pulseController;
-
-  /// Анимация масштаба: 1.0 → 1.25.
   late final Animation<double> _scaleAnimation;
-
-  /// Анимация прозрачности: 0.6 → 1.0.
   late final Animation<double> _opacityAnimation;
 
   @override
   void initState() {
     super.initState();
-    // Инициализация пульс-анимации активной точки pipeline (1200 мс, зацикленная).
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
@@ -94,7 +80,6 @@ class _ProcessingScreenState extends State<ProcessingScreen>
         file = args.file;
         _transcriptionOptions = args.options;
       } else if (args is SelectedAudioFile) {
-        // Обратная совместимость — старый путь без ProcessingArgs.
         file = args;
       }
 
@@ -107,7 +92,6 @@ class _ProcessingScreenState extends State<ProcessingScreen>
           }
         });
 
-        // Запускаем pipeline через postFrameCallback, чтобы контекст был готов.
         WidgetsBinding.instance.addPostFrameCallback((_) => _startProcessing());
       } else {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -117,7 +101,6 @@ class _ProcessingScreenState extends State<ProcessingScreen>
     }
   }
 
-  /// Основной pipeline: нормализация → chunked транскрибация.
   Future<void> _startProcessing() async {
     if (!mounted) return;
     setState(() {
@@ -140,17 +123,14 @@ class _ProcessingScreenState extends State<ProcessingScreen>
     setState(() => _normalizing = false);
 
     _chunkedController = ChunkedTranscriptionController(
-      pool: widget.groqKeyPool,
+      pool: ref.read(groqKeyPoolProvider),
       apiService: GroqApiService(),
       chunkingService: AudioChunkingService(),
     );
     _chunkedController!.addListener(_onChunkedStateChange);
-    // await: некропотанные исключения внутри start() долетят до try/catch
-    // этого метода, а не будут молча проглочены как unhandled Future rejection.
     await _chunkedController!.start(_normalizedFile!, options: _transcriptionOptions);
   }
 
-  /// Callback при изменении состояния ChunkedTranscriptionController.
   void _onChunkedStateChange() {
     final s = _chunkedController?.state;
     if (s is ChunkedSuccess) {
@@ -167,16 +147,13 @@ class _ProcessingScreenState extends State<ProcessingScreen>
           }
         });
       }
-      // return: предотвращаем повторный setState ниже для пути ChunkedSuccess.
       return;
     }
     if (mounted) setState(() {});
   }
 
-  /// Перезапускает таймер и pipeline при повторной попытке.
   void _restart() {
     _ticker?.cancel();
-    // Утилизируем старый chunked-контроллер перед сбросом состояния.
     _chunkedController?.removeListener(_onChunkedStateChange);
     _chunkedController?.dispose();
     setState(() {
@@ -198,7 +175,6 @@ class _ProcessingScreenState extends State<ProcessingScreen>
     _pulseController.dispose();
     _chunkedController?.removeListener(_onChunkedStateChange);
     _chunkedController?.dispose();
-    // Удаляем временный нормализованный файл.
     if (_normalizedFile != null) {
       try {
         File(_normalizedFile!.path).deleteSync();
@@ -217,7 +193,6 @@ class _ProcessingScreenState extends State<ProcessingScreen>
   Widget build(BuildContext context) {
     final chunkedState = _chunkedController?.state;
 
-    // Статус шага "Распознавание".
     final _PipelineStatus recognitionStatus = switch (chunkedState) {
       ChunkedProcessing() || ChunkedSplitting() => _PipelineStatus.active,
       ChunkedSuccess() => _PipelineStatus.done,
@@ -238,7 +213,6 @@ class _ProcessingScreenState extends State<ProcessingScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: AppSpacing.md),
-                // Шапка
                 Row(
                   children: [
                     GlassIconBtn(
@@ -253,7 +227,6 @@ class _ProcessingScreenState extends State<ProcessingScreen>
                 ),
                 const SizedBox(height: AppSpacing.xl),
 
-                // Карточка файла: GlassTile (r=30px) вместо GlassCard (r=22px)
                 if (_file != null)
                   GlassTile(
                     child: Row(
@@ -295,7 +268,6 @@ class _ProcessingScreenState extends State<ProcessingScreen>
 
                 const SizedBox(height: AppSpacing.lg),
 
-                // ShimmerBar — виден при нормализации или single-загрузке
                 if (showShimmer) ...[
                   const ShimmerBar(),
                   const SizedBox(height: AppSpacing.sm),
@@ -308,9 +280,6 @@ class _ProcessingScreenState extends State<ProcessingScreen>
                   const SizedBox(height: AppSpacing.lg),
                 ],
 
-                // Pipeline (единый для single и chunked).
-                // Expanded + SingleChildScrollView: карточка может расти при
-                // раскрытии списка чанков без overflow.
                 Expanded(
                   child: SingleChildScrollView(
                     child: GlassCard(
@@ -355,14 +324,12 @@ class _ProcessingScreenState extends State<ProcessingScreen>
 
                 const SizedBox(height: AppSpacing.md),
 
-                // Ошибка нормализации
                 if (_normalizationError != null)
                   _buildNormalizationError(_normalizationError!),
 
                 if (_normalizationError == null)
                   _buildChunkedBottomBar(chunkedState),
 
-                // Безопасный нижний отступ с учётом системной панели навигации
                 SizedBox(height: MediaQuery.of(context).padding.bottom + 32),
               ],
             ),
@@ -372,7 +339,6 @@ class _ProcessingScreenState extends State<ProcessingScreen>
     );
   }
 
-  /// Inline-контент шага "Распознавание" для chunked-режима.
   Widget _buildChunkedInline(ChunkedState state) {
     return switch (state) {
       ChunkedSplitting() => Padding(
@@ -396,7 +362,6 @@ class _ProcessingScreenState extends State<ProcessingScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Прогресс-бар
               ClipRRect(
                 borderRadius: BorderRadius.circular(AppRadius.pill),
                 child: LinearProgressIndicator(
@@ -412,9 +377,6 @@ class _ProcessingScreenState extends State<ProcessingScreen>
                 style: AppTextStyles.label,
               ),
               const SizedBox(height: AppSpacing.sm),
-              // Список чанков виден сразу: пользователь должен наблюдать
-              // прогресс каждой части без дополнительного тапа. Складывается
-              // вручную, если занимает слишком много места.
               ExpansionTile(
                 title: Text(
                   'Детали чанков',
@@ -436,15 +398,12 @@ class _ProcessingScreenState extends State<ProcessingScreen>
           ),
         ),
 
-      // В остальных состояниях inline-контент не нужен.
       _ => const SizedBox.shrink(),
     };
   }
 
-  /// Нижняя панель для chunked-режима.
   Widget _buildChunkedBottomBar(ChunkedState? state) {
     return switch (state) {
-      // Идёт обработка — показываем таймер и кнопку отмены.
       ChunkedSplitting() || ChunkedProcessing() => GlassCard(
           borderRadius: AppRadius.pill,
           padding: const EdgeInsets.symmetric(
@@ -466,7 +425,6 @@ class _ProcessingScreenState extends State<ProcessingScreen>
           ),
         ),
 
-      // Ошибка chunked-транскрибации.
       ChunkedError(:final message, :final retryable) => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -495,7 +453,6 @@ class _ProcessingScreenState extends State<ProcessingScreen>
           ],
         ),
 
-      // Нет ключа.
       ChunkedMissingKey() => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -512,12 +469,10 @@ class _ProcessingScreenState extends State<ProcessingScreen>
           ],
         ),
 
-      // Idle / Success / null — ничего не показываем.
       _ => const SizedBox.shrink(),
     };
   }
 
-  /// Панель ошибки нормализации с кнопкой «Повторить».
   Widget _buildNormalizationError(String message) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -543,7 +498,6 @@ class _ProcessingScreenState extends State<ProcessingScreen>
   Widget _buildPipelineStep({
     required String label,
     required _PipelineStatus status,
-    /// Необязательный виджет, показываемый под строкой шага (для chunked inline).
     Widget? inlineContent,
   }) {
     final Color dotColor;
@@ -564,7 +518,6 @@ class _ProcessingScreenState extends State<ProcessingScreen>
         icon = null;
     }
 
-    // Активная точка получает пульс-анимацию масштаба и прозрачности.
     final dotWidget = Container(
       width: 20,
       height: 20,
@@ -600,7 +553,6 @@ class _ProcessingScreenState extends State<ProcessingScreen>
       ],
     );
 
-    // Если есть inline-контент — оборачиваем в Column.
     if (inlineContent != null) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -613,7 +565,6 @@ class _ProcessingScreenState extends State<ProcessingScreen>
 
     return stepRow;
   }
-
 }
 
 enum _PipelineStatus { done, active, error, pending }

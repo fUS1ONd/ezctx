@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants/design_tokens.dart';
 import '../../core/error/app_exception.dart';
-import '../../core/storage/secure_storage_service.dart';
+import '../../core/providers/repository_providers.dart';
+import '../../core/providers/service_providers.dart';
 import '../../features/settings/api_key_repository.dart';
-import '../../features/transcription/groq_key_pool.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_icon_btn.dart';
 import '../widgets/glass_tile.dart';
@@ -14,22 +15,14 @@ import '../widgets/key_status_tile.dart';
 import '../widgets/primary_button.dart';
 
 /// Экран управления API-ключами Groq.
-/// Поддерживает добавление, маскированное отображение и удаление ключей.
-/// Подписан на [GroqKeyPool] через ListenableBuilder для реактивного UI.
-class ApiKeysScreen extends StatefulWidget {
-  const ApiKeysScreen({super.key, required this.pool});
-
-  /// Пул ключей — источник статусов для каждого ключа.
-  final GroqKeyPool pool;
+class ApiKeysScreen extends ConsumerStatefulWidget {
+  const ApiKeysScreen({super.key});
 
   @override
-  State<ApiKeysScreen> createState() => _ApiKeysScreenState();
+  ConsumerState<ApiKeysScreen> createState() => _ApiKeysScreenState();
 }
 
-class _ApiKeysScreenState extends State<ApiKeysScreen> {
-  // Единственный экземпляр репозитория на весь lifecycle экрана.
-  final ApiKeyRepository _repository = ApiKeyRepository(SecureStorageServiceImpl());
-
+class _ApiKeysScreenState extends ConsumerState<ApiKeysScreen> {
   List<ApiKeyView> _keys = [];
   bool _loading = true;
   String? _errorMessage;
@@ -50,7 +43,7 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
 
   Future<void> _loadKeys() async {
     setState(() => _loading = true);
-    final keys = await _repository.listKeys();
+    final keys = await ref.read(apiKeyRepoProvider).listKeys();
     if (mounted) {
       setState(() {
         _keys = keys;
@@ -64,7 +57,6 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
       _saving = true;
       _errorMessage = null;
     });
-    // trim() убирает случайные пробелы/переносы; пустую строку проверяем явно.
     final rawKey = _inputController.text.trim();
     if (rawKey.isEmpty) {
       setState(() {
@@ -74,9 +66,8 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
       return;
     }
     try {
-      await _repository.addKey(rawKey);
-      // Синхронизируем пул — репозиторий хранит ключи, пул управляет статусами.
-      widget.pool.addKey(rawKey);
+      await ref.read(apiKeyRepoProvider).addKey(rawKey);
+      ref.read(groqKeyPoolProvider).addKey(rawKey);
       _inputController.clear();
       await _loadKeys();
     } on ValidationException catch (e) {
@@ -108,9 +99,8 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
       ),
     );
     if (confirmed == true) {
-      await _repository.removeKey(key.raw);
-      // Синхронизируем пул после удаления из репозитория.
-      widget.pool.removeKey(key.raw);
+      await ref.read(apiKeyRepoProvider).removeKey(key.raw);
+      ref.read(groqKeyPoolProvider).removeKey(key.raw);
       await _loadKeys();
     }
   }
@@ -125,10 +115,9 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
         style: AppTextStyles.label.copyWith(color: AppColors.inkTertiary),
       );
     }
-    // ListenableBuilder переподписывает виджет при каждом notifyListeners() из пула.
-    // Пул нотифицирует при добавлении/удалении ключа и при смене статуса (rate-limit).
+    final pool = ref.read(groqKeyPoolProvider);
     return ListenableBuilder(
-      listenable: widget.pool,
+      listenable: pool,
       builder: (context, _) => Column(
         children: _keys.map((key) {
           return Padding(
@@ -140,14 +129,13 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.vpn_key_outlined, size: 24, color: AppColors.inkSecondary),
+                  const Icon(Icons.vpn_key_outlined, size: 24, color: AppColors.inkSecondary),
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: Text(key.masked, style: AppTextStyles.mono),
                   ),
-                  // Статус ключа: «Активен» или «До HH:MM:SS»
                   KeyStatusTile(
-                    status: widget.pool.getStatusForKey(key.raw),
+                    status: pool.getStatusForKey(key.raw),
                   ),
                   const SizedBox(width: AppSpacing.sm),
                   Semantics(
@@ -180,7 +168,6 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: AppSpacing.md),
-                // Шапка
                 Row(
                   children: [
                     GlassIconBtn(
@@ -193,7 +180,6 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
                   ],
                 ),
                 const SizedBox(height: AppSpacing.lg),
-                // Hero-карточка Groq
                 GlassTile(
                   child: Row(
                     children: [
@@ -227,10 +213,8 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.lg),
-                // Список ключей
                 _buildKeysList(),
                 const SizedBox(height: AppSpacing.lg),
-                // Форма добавления
                 GlassCard(
                   padding: const EdgeInsets.all(AppSpacing.md),
                   child: Column(
@@ -268,7 +252,6 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                // Footer
                 GestureDetector(
                   onTap: () => launchUrl(
                     Uri.parse('https://console.groq.com/keys'),

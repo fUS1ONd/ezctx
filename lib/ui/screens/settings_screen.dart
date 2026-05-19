@@ -1,23 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/design_tokens.dart';
-import '../../core/storage/secure_storage_service.dart';
-import '../../features/settings/api_key_repository.dart';
+import '../../core/providers/repository_providers.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_icon_btn.dart';
 import '../widgets/glass_tile.dart';
 import '../widgets/gradient_background.dart';
 
 /// Экран настроек.
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   int _keyCount = 0;
   bool _loading = true;
 
@@ -28,7 +28,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _load() async {
-    final keys = await ApiKeyRepository(SecureStorageServiceImpl()).listKeys();
+    final keys = await ref.read(apiKeyRepoProvider).listKeys();
     if (mounted) {
       setState(() {
         _keyCount = keys.length;
@@ -37,11 +37,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  /// Корректное русское склонение для количества активных ключей.
   String _keyCountLabel(int count) {
     if (count == 0) return 'Нет ключей';
     if (count == 1) return '1 активен';
-    if (count <= 4) return '$count активных';
     return '$count активных';
   }
 
@@ -57,7 +55,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: AppSpacing.md),
-                // Шапка с кнопкой назад
                 Row(
                   children: [
                     GlassIconBtn(
@@ -70,7 +67,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: AppSpacing.xl),
                 const Text('Настройки', style: AppTextStyles.display),
                 const SizedBox(height: AppSpacing.lg),
-                // Статус-карточка подключения к Groq API
                 if (!_loading && _keyCount > 0) ...[
                   _buildGroqStatusCard(),
                   const SizedBox(height: AppSpacing.md),
@@ -80,7 +76,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: Column(
                     children: [
                       ListTile(
-                        leading: Icon(
+                        leading: const Icon(
                           Icons.key_outlined,
                           color: AppColors.inkPrimary,
                         ),
@@ -92,7 +88,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           _loading ? '...' : _keyCountLabel(_keyCount),
                           style: AppTextStyles.label,
                         ),
-                        trailing: Icon(
+                        trailing: const Icon(
                           Icons.chevron_right,
                           color: AppColors.inkTertiary,
                         ),
@@ -115,12 +111,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  /// Статус-карточка «Подключено к Groq» — отображается когда ключ сохранён.
   Widget _buildGroqStatusCard() {
     return GlassTile(
       child: Row(
         children: [
-          // Аватар-иконка ключа на accent-градиенте
           Container(
             width: 48,
             height: 48,
@@ -135,7 +129,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           const SizedBox(width: AppSpacing.md),
-          // Заголовок и статус с зелёной точкой
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -144,7 +137,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: AppSpacing.xs),
                 Row(
                   children: [
-                    // Зелёная точка — индикатор активного ключа
                     Container(
                       width: 8,
                       height: 8,

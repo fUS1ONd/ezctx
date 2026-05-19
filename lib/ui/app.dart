@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../core/constants/app_constants.dart';
 import '../core/constants/design_tokens.dart';
-import '../features/transcription/groq_key_pool.dart';
 import 'screens/api_keys_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/processing_screen.dart';
@@ -10,12 +9,8 @@ import 'screens/result_screen.dart';
 import 'screens/settings_screen.dart';
 
 /// Корневой виджет приложения. Регистрирует именованные маршруты и тему.
-/// Принимает [groqKeyPool] — singleton пул ключей, созданный в main.dart.
 class EzCtxApp extends StatelessWidget {
-  const EzCtxApp({super.key, required this.groqKeyPool});
-
-  /// Singleton пул Groq API-ключей, передаётся в контроллеры транскрибации.
-  final GroqKeyPool groqKeyPool;
+  const EzCtxApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -42,11 +37,9 @@ class EzCtxApp extends StatelessWidget {
           case AppConstants.routeSettings:
             page = const SettingsScreen();
           case AppConstants.routeApiKeys:
-            // Pool передаётся в ApiKeysScreen для реактивного обновления статусов.
-            page = ApiKeysScreen(pool: groqKeyPool);
+            page = const ApiKeysScreen();
           case AppConstants.routeProcessing:
-            // Pool передаётся в ProcessingScreen для инициализации контроллеров.
-            page = ProcessingScreen(groqKeyPool: groqKeyPool);
+            page = const ProcessingScreen();
           case AppConstants.routeResult:
             page = const ResultScreen();
           default:

@@ -1,12 +1,12 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/design_tokens.dart';
 import '../../core/error/app_exception.dart';
-import '../../core/storage/secure_storage_service.dart';
-import '../../features/settings/api_key_repository.dart';
+import '../../core/providers/repository_providers.dart';
 import '../../features/settings/transcription_options_repository.dart';
 import '../../features/transcription/audio_chunking_service.dart';
 import '../../features/transcription/audio_metadata.dart';
@@ -21,17 +21,14 @@ import '../widgets/gradient_background.dart';
 import '../widgets/primary_button.dart';
 
 /// Главный экран: empty state → file preview → кнопка «Транскрибировать».
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  // Единственный экземпляр репозитория на весь lifecycle экрана.
-  final ApiKeyRepository _repository = ApiKeyRepository(SecureStorageServiceImpl());
-
+class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// Текущие настройки транскрибации (модель и язык).
   TranscriptionOptions _options = const TranscriptionOptions.defaults();
 
@@ -47,7 +44,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // Загружаем сохранённые настройки транскрибации при старте экрана.
     _loadOptions();
   }
 
@@ -93,8 +89,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  /// Асинхронно загружает метаданные файла через ffprobe.
-  /// Тихо обрабатывает ошибки — карточка показывается без длительности.
   Future<void> _loadMetadata(SelectedAudioFile file) async {
     if (!mounted) return;
     setState(() => _loadingMetadata = true);
@@ -112,7 +106,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_selectedFile == null) return;
 
     // Pre-flight: есть ли хотя бы один API-ключ?
-    final keys = await _repository.listKeys();
+    final keys = await ref.read(apiKeyRepoProvider).listKeys();
     if (!mounted) return;
 
     if (keys.isEmpty) {
@@ -158,19 +152,15 @@ class _HomeScreenState extends State<HomeScreen> {
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-            // Внешняя колонка: прокручиваемый контент + кнопка, прибитая снизу.
-            // Это исправляет BOTTOM OVERFLOWED после добавления model/language карточки.
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Прокручиваемый контент занимает всё свободное пространство.
                 Expanded(
                   child: SingleChildScrollView(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: AppSpacing.md),
-                        // Шапка: логотип + название + кнопка настроек
                         Row(
                           children: [
                             Container(
@@ -193,16 +183,13 @@ class _HomeScreenState extends State<HomeScreen> {
                           ],
                         ),
                         const SizedBox(height: AppSpacing.xl),
-                        // Display заголовок
                         const Text('Расшифруй\nлюбой звук', style: AppTextStyles.display),
                         const SizedBox(height: AppSpacing.md),
-                        // Subtitle
                         Text(
                           'Загрузите аудиозапись лекции и получите готовый текст',
                           style: AppTextStyles.body.copyWith(color: AppColors.inkSecondary),
                         ),
                         const SizedBox(height: AppSpacing.xxl),
-                        // Upload card / file preview — ConstrainedBox гарантирует minHeight=260
                         SizedBox(
                           width: double.infinity,
                           child: GestureDetector(
@@ -218,7 +205,6 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                         ),
-                        // Сообщение об ошибке
                         if (_errorMessage != null) ...[
                           const SizedBox(height: AppSpacing.sm),
                           Text(
@@ -227,14 +213,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ],
                         const SizedBox(height: AppSpacing.xl),
-                        // Настройки: выбор модели и языка распознавания
                         _buildModelAndLanguageCard(),
                         const SizedBox(height: AppSpacing.xl),
                       ],
                     ),
                   ),
                 ),
-                // Кнопка «Транскрибировать» прибита к нижнему краю экрана.
                 PrimaryButton(
                   label: 'Транскрибировать',
                   onPressed: _selectedFile == null
@@ -256,7 +240,6 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Переключатель модели Whisper
           Row(
             children: [
               Text('Модель', style: AppTextStyles.body),
@@ -282,7 +265,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
-          // Выпадающий список языков распознавания
           Row(
             children: [
               Text('Язык', style: AppTextStyles.body),
@@ -305,8 +287,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Человекочитаемое название языка. Exhaustive switch — компилятор потребует
-  /// обновить метод при добавлении нового значения в [TranscriptionLanguage].
   static String _languageLabel(TranscriptionLanguage lang) => switch (lang) {
     TranscriptionLanguage.auto => 'Авто',
     TranscriptionLanguage.ru   => 'Русский',
@@ -321,7 +301,6 @@ class _HomeScreenState extends State<HomeScreen> {
     TranscriptionLanguage.ar   => 'العربية',
   };
 
-  /// Элементы дропдауна языков, вычисленные из enum (exhaustive).
   static final _languageItems = TranscriptionLanguage.values
       .map((lang) => DropdownMenuItem(
             value: lang,
@@ -336,7 +315,6 @@ class _HomeScreenState extends State<HomeScreen> {
         Stack(
           alignment: Alignment.center,
           children: [
-            // Пунктирная рамка accent-цвета вокруг иконки загрузки
             CustomPaint(
               painter: _DashedBorderPainter(
                 color: AppColors.accent.withValues(alpha: 0.55),
@@ -373,7 +351,6 @@ class _HomeScreenState extends State<HomeScreen> {
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: AppSpacing.sm),
-        // Pill-метка «Из файлов» под подсказкой о форматах
         Container(
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.md,
@@ -416,7 +393,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: AppSpacing.xs),
-              // Подстрока с размером и длительностью / индикатором загрузки.
               if (_loadingMetadata)
                 Row(
                   children: [
@@ -455,7 +431,6 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 /// CustomPainter для пунктирной рамки с заданным радиусом скругления.
-/// Рисует пунктир accent-цвета вокруг прямоугольника с rounded corners.
 class _DashedBorderPainter extends CustomPainter {
   const _DashedBorderPainter({
     required this.color,
@@ -479,7 +454,6 @@ class _DashedBorderPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
 
-    // Путь вокруг скруглённого прямоугольника
     final rrect = RRect.fromRectAndRadius(
       Rect.fromLTWH(0, 0, size.width, size.height),
       Radius.circular(borderRadius),
@@ -487,7 +461,6 @@ class _DashedBorderPainter extends CustomPainter {
 
     final path = Path()..addRRect(rrect);
 
-    // Вычисляем общую длину контура и рисуем пунктир
     final metrics = path.computeMetrics().toList();
     for (final metric in metrics) {
       double distance = 0;
