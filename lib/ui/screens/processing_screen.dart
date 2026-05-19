@@ -141,8 +141,12 @@ class _ProcessingScreenState extends State<ProcessingScreen>
 
     try {
       _normalizedFile = await AudioNormalizationService().normalize(_file!.path);
-      _isChunked =
-          _normalizedFile!.durationSeconds > AppConstants.kChunkThresholdSeconds;
+      // Bug 3: всегда идём через ChunkedTranscriptionController.
+      // Для коротких файлов AudioChunkingService даст 1 чанк, контроллер
+      // ведёт себя как single-shot, но UI стабильно показывает список
+      // статусов частей (для 1 чанка — одну плитку). Раньше порог 82 мин
+      // отрезал почти все реальные файлы и список не появлялся никогда.
+      _isChunked = true;
     } catch (e) {
       if (!mounted) return;
       setState(() {
