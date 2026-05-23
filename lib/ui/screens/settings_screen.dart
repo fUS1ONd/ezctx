@@ -249,6 +249,7 @@ class _Group extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: GlassCard(
+        flat: true,
         borderRadius: 22,
         padding: EdgeInsets.zero,
         child: Column(children: children),
