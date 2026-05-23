@@ -35,6 +35,9 @@ class _ShimmerBarState extends State<ShimmerBar>
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    // Вычисляем ширину один раз — вне AnimatedBuilder, чтобы не дёргать
+    // MediaQuery на каждый кадр анимации (60fps × rebuild).
+    final screenWidth = MediaQuery.sizeOf(context).width;
     return AnimatedBuilder(
       animation: _animation,
       builder: (_, __) {
@@ -55,8 +58,7 @@ class _ShimmerBarState extends State<ShimmerBar>
                   widthFactor: 0.35,
                   child: Transform.translate(
                     offset: Offset(
-                      (_animation.value * 2 - 0.35) *
-                          MediaQuery.sizeOf(context).width,
+                      (_animation.value * 2 - 0.35) * screenWidth,
                       0,
                     ),
                     child: Container(
