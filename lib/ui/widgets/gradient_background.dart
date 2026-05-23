@@ -13,15 +13,21 @@ class GradientBackground extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
 
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        Positioned.fill(
-          child: DecoratedBox(decoration: BoxDecoration(gradient: palette.bgGradient)),
-        ),
-        Positioned.fill(child: CustomPaint(painter: _WallpaperPainter(palette))),
-        child,
-      ],
+    return RepaintBoundary(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned.fill(
+            child: DecoratedBox(decoration: BoxDecoration(gradient: palette.bgGradient)),
+          ),
+          Positioned.fill(
+            child: RepaintBoundary(
+              child: CustomPaint(painter: _WallpaperPainter(palette)),
+            ),
+          ),
+          child,
+        ],
+      ),
     );
   }
 }

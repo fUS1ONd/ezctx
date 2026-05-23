@@ -35,7 +35,7 @@ class LiquidGlassTabBar extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(9999),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
           child: Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(

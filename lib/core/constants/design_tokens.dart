@@ -20,6 +20,8 @@ class AppPalette {
     required this.inkLine,
     required this.glassBg,
     required this.glassBgDeep,
+    required this.glassBgFlat,
+    required this.glassBgFlatDeep,
     required this.glassRim,
     required this.bgGradient,
     required this.blobs,
@@ -42,6 +44,8 @@ class AppPalette {
   // Стекло
   final Color glassBg;
   final Color glassBgDeep;
+  final Color glassBgFlat;      // компенсирующий цвет для flat-режима (без blur)
+  final Color glassBgFlatDeep;  // deep-вариант для flat-режима
   final Color glassRim;
 
   // Обои
@@ -62,8 +66,10 @@ class AppPalette {
     ink2: Color(0x9E1A1421),
     ink3: Color(0x611A1421),
     inkLine: Color(0x141A1421),
-    glassBg: Color(0x7AFFFFFF),       // .48
-    glassBgDeep: Color(0xA8FFFFFF),   // .66
+    glassBg: Color(0x7AFFFFFF),           // .48
+    glassBgDeep: Color(0xA8FFFFFF),       // .66
+    glassBgFlat: Color(0x99FFFFFF),       // .60 — компенсация отсутствия blur
+    glassBgFlatDeep: Color(0xC2FFFFFF),   // .76
     glassRim: Color(0xD9FFFFFF),
     bgGradient: LinearGradient(
       begin: Alignment.topCenter,
@@ -99,9 +105,11 @@ class AppPalette {
     ink2: Color(0xA8F4EEFA),
     ink3: Color(0x66F4EEFA),
     inkLine: Color(0x1AF4EEFA),
-    glassBg: Color(0x0FFFFFFF),       // .06
-    glassBgDeep: Color(0x1AFFFFFF),   // .10
-    glassRim: Color(0x24FFFFFF),      // .14
+    glassBg: Color(0x0FFFFFFF),           // .06
+    glassBgDeep: Color(0x1AFFFFFF),       // .10
+    glassBgFlat: Color(0x1FFFFFFF),       // .12 — компенсация отсутствия blur
+    glassBgFlatDeep: Color(0x33FFFFFF),   // .20
+    glassRim: Color(0x24FFFFFF),          // .14
     bgGradient: LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,

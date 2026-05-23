@@ -23,7 +23,7 @@ class ChunkTile extends StatelessWidget {
         vertical: AppSpacing.sm,
       ),
       decoration: BoxDecoration(
-        color: palette.glassBg,
+        color: palette.glassBgFlat,
         borderRadius: BorderRadius.circular(AppRadius.row),
         border: Border.all(color: palette.inkLine),
       ),

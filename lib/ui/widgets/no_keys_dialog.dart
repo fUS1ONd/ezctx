@@ -48,7 +48,7 @@ class NoKeysDialog extends StatelessWidget {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(32),
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 34, sigmaY: 34),
+            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
             child: Container(
               constraints: const BoxConstraints(maxWidth: 360),
               decoration: BoxDecoration(

@@ -58,11 +58,10 @@ class ChunkedProgressSection extends StatelessWidget {
                 tilePadding: EdgeInsets.zero,
                 childrenPadding: EdgeInsets.zero,
                 children: [
-                  ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: chunks.length,
-                    itemBuilder: (context, i) => ChunkTile(state: chunks[i]),
+                  Column(
+                    children: [
+                      for (final c in chunks) ChunkTile(state: c),
+                    ],
                   ),
                 ],
               ),

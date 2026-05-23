@@ -82,6 +82,7 @@ class _HistoryTile extends StatelessWidget {
     final palette = context.palette;
 
     return GlassCard(
+      flat: true,
       borderRadius: 22,
       padding: const EdgeInsets.all(14),
       child: Row(

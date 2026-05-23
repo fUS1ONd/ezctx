@@ -21,31 +21,32 @@ class GlassIconBtn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDisabled = onPressed == null;
+    // Alpha применяется к цвету иконки — убирает Opacity(saveLayer) на каждый кадр.
+    final iconColor = Theme.of(context)
+        .colorScheme
+        .onSurface
+        .withValues(alpha: isDisabled ? 0.38 : 1.0);
 
     return Semantics(
       label: semanticLabel,
       button: true,
-      child: Opacity(
-        opacity: isDisabled ? 0.38 : 1.0,
-        child: SizedBox(
-          width: 44,
-          height: 44,
-          child: GestureDetector(
-            onTap: onPressed,
-            child: Center(
-              child: GlassCard(
-                borderRadius: 14,
-                padding: EdgeInsets.zero,
-                child: SizedBox(
-                  width: 36,
-                  height: 36,
-                  child: Center(
-                    child: Icon(
-                      icon,
-                      size: iconSize,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
+      child: SizedBox(
+        width: 44,
+        height: 44,
+        child: GestureDetector(
+          onTap: onPressed,
+          child: Center(
+            // Disabled → flat (без blur), чтобы стеклянный фон тоже потускнел.
+            // Active → обычный GlassCard с blur (1 экземпляр на экран, цена приемлема).
+            child: GlassCard(
+              flat: isDisabled,
+              borderRadius: 14,
+              padding: EdgeInsets.zero,
+              child: SizedBox(
+                width: 36,
+                height: 36,
+                child: Center(
+                  child: Icon(icon, size: iconSize, color: iconColor),
                 ),
               ),
             ),

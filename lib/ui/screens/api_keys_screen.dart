@@ -103,7 +103,7 @@ class _ApiKeysScreenState extends ConsumerState<ApiKeysScreen> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(28),
                 child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 34, sigmaY: 34),
+                  filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
                   child: Container(
                     decoration: BoxDecoration(
                       color: palette.glassBgDeep,
@@ -185,32 +185,35 @@ class _ApiKeysScreenState extends ConsumerState<ApiKeysScreen> {
         children: _keys.map((key) {
           return Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-            child: GlassCard(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.sm,
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.vpn_key_outlined, size: 24, color: palette.ink2),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Text(key.masked, style: AppTextStyles.mono.copyWith(color: palette.ink1)),
-                  ),
-                  KeyStatusTile(
-                    status: pool.getStatusForKey(key.raw),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Semantics(
-                    label: 'Удалить ключ',
-                    button: true,
-                    child: IconButton(
-                      icon: const Icon(Icons.delete_outline),
-                      color: palette.bad,
-                      onPressed: () => _confirmDelete(key),
+            child: RepaintBoundary(
+              child: GlassCard(
+                flat: true,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.sm,
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.vpn_key_outlined, size: 24, color: palette.ink2),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(key.masked, style: AppTextStyles.mono.copyWith(color: palette.ink1)),
                     ),
-                  ),
-                ],
+                    KeyStatusTile(
+                      status: pool.getStatusForKey(key.raw),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Semantics(
+                      label: 'Удалить ключ',
+                      button: true,
+                      child: IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        color: palette.bad,
+                        onPressed: () => _confirmDelete(key),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           );
