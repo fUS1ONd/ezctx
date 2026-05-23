@@ -53,6 +53,29 @@ No project skills found. Add skills to any of: `.claude/skills/`, `.agents/skill
 
 Bash разрешён только для: `git add/commit/push/checkout`, `mkdir`, `mv`, `rm`, `cp`.
 
+## Releases
+
+Релиз = push тега `vX.Y.Z` в `main`. Workflow `.github/workflows/release.yml` собирает 3 подписанных APK (по ABI) и публикует GitHub Release.
+
+**Как сделать релиз (с любой машины, чистого чата):**
+
+1. Убедиться, что на `main` и подтянут remote:
+   ```
+   git checkout main && git pull
+   ```
+2. Поднять версию:
+   - в `pubspec.yaml` → строка `version: X.Y.Z+N` (где `N` = `versionCode`, инкрементируется на каждый релиз)
+   - в `android/app/build.gradle` → `versionCode = N`, `versionName = "X.Y.Z"` (должны совпадать с pubspec)
+3. Закоммитить и поставить тег:
+   ```
+   git commit -am "chore(release): vX.Y.Z"
+   git tag vX.Y.Z
+   git push origin main --tags
+   ```
+4. Workflow на тег запустится автоматически — проверить в Actions, что APK опубликованы на странице Releases.
+
+Дебажные APK на каждый push/PR в `main` собирает `build-debug-apk.yml` (артефакт, без релиза).
+
 <!-- GSD:workflow-start source:GSD defaults -->
 ## GSD Workflow Enforcement
 
