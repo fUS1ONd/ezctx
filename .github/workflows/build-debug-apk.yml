@@ -3,6 +3,7 @@ name: Build Debug APK
 on:
   push:
     branches: [main]
+    tags-ignore: ['v*']  # релизные теги собирает release.yml
   pull_request:
     branches: [main]
 
