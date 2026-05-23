@@ -20,7 +20,6 @@ class EzCtxApp extends ConsumerWidget {
     return MaterialApp(
       title: 'ezctx',
       debugShowCheckedModeBanner: false,
-      showPerformanceOverlay: true, // ВРЕМЕННО для замера scroll jank — удалить перед merge
       themeMode: themeMode,
       theme: _buildTheme(Brightness.light),
       darkTheme: _buildTheme(Brightness.dark),

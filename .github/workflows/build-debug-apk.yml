@@ -1,19 +1,14 @@
-name: Build APK
+name: Build Debug APK
 
 on:
   push:
-    branches: [main, 'perf/**']
+    branches: [main]
   pull_request:
     branches: [main]
-  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        renderer: [impeller, skia]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -47,41 +42,15 @@ jobs:
       - name: Analyze
         run: flutter analyze --no-fatal-infos
 
-      - name: Test (skip goldens — хост-агностичные не гарантируем в CI)
-        run: flutter test --exclude-tags=golden
+      - name: Test
+        run: flutter test
 
-      # Для Skia-варианта переключаем meta-data EnableImpeller на false.
-      # Impeller-вариант оставляет AndroidManifest как есть (EnableImpeller=true).
-      - name: Disable Impeller in AndroidManifest (skia variant)
-        if: matrix.renderer == 'skia'
-        run: |
-          python3 <<'PY'
-          import re, pathlib
-          p = pathlib.Path('android/app/src/main/AndroidManifest.xml')
-          s = p.read_text()
-          new = re.sub(
-              r'(android:name="io\.flutter\.embedding\.android\.EnableImpeller"\s+android:value=)"true"',
-              r'\1"false"',
-              s,
-          )
-          assert new != s, 'EnableImpeller meta-data not found / not replaced'
-          p.write_text(new)
-          print('--- Patched AndroidManifest.xml ---')
-          print(new)
-          PY
+      - name: Build Debug APK
+        run: flutter build apk --debug
 
-      - name: Build Profile APK
-        run: flutter build apk --profile
-
-      - name: Rename APK
-        run: |
-          mkdir -p artifacts
-          cp build/app/outputs/flutter-apk/app-profile.apk \
-             artifacts/ezctx-profile-${{ matrix.renderer }}-${{ github.sha }}.apk
-
-      - name: Upload Profile APK
+      - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: ezctx-profile-${{ matrix.renderer }}-${{ github.sha }}
-          path: artifacts/ezctx-profile-${{ matrix.renderer }}-${{ github.sha }}.apk
+          name: debug-apk-${{ github.sha }}
+          path: build/app/outputs/flutter-apk/app-debug.apk
           retention-days: 14
