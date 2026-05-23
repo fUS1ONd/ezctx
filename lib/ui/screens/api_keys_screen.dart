@@ -103,7 +103,7 @@ class _ApiKeysScreenState extends ConsumerState<ApiKeysScreen> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(28),
                 child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 34, sigmaY: 34),
+                  filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
                   child: Container(
                     decoration: BoxDecoration(
                       color: palette.glassBgDeep,
