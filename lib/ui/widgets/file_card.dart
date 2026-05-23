@@ -126,12 +126,14 @@ class FileCard extends StatelessWidget {
           const SizedBox(height: 12),
           SizedBox(
             height: 56,
-            child: CustomPaint(
-              painter: _WaveformPainter(
-                accent: palette.accent,
-                accent2: palette.accent2,
+            child: RepaintBoundary(
+              child: CustomPaint(
+                painter: _WaveformPainter(
+                  accent: palette.accent,
+                  accent2: palette.accent2,
+                ),
+                size: Size.infinite,
               ),
-              size: Size.infinite,
             ),
           ),
           const SizedBox(height: 14),
@@ -160,8 +162,18 @@ class _WaveformPainter extends CustomPainter {
     final barW = w * 0.55;
     final gap = w - barW;
 
+    // Один shader на всю панель — вертикальный градиент сверху-вниз.
+    final panelPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          accent2.withValues(alpha: 0.85),
+          accent.withValues(alpha: 0.55),
+        ],
+      ).createShader(Offset.zero & size);
+
     for (var i = 0; i < bars; i++) {
-      // псевдослучайно, но детерминированно
       final v = (math.sin(i * 1.7) * math.cos(i * 0.6 + 1.1))
           .abs()
           .clamp(0.16, 1.0);
@@ -172,16 +184,7 @@ class _WaveformPainter extends CustomPainter {
         Rect.fromLTWH(x, y, barW, h),
         const Radius.circular(2),
       );
-      final paint = Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            accent2.withValues(alpha: 0.55 + v * 0.40),
-            accent.withValues(alpha: 0.35 + v * 0.40),
-          ],
-        ).createShader(rect.outerRect);
-      canvas.drawRRect(rect, paint);
+      canvas.drawRRect(rect, panelPaint);
     }
   }
 
