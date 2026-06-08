@@ -10,6 +10,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/error/app_exception.dart';
 import 'selected_audio_file.dart';
 import 'transcription_options.dart';
+import 'transcription_provider.dart';
 import 'transcription_result.dart';
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -79,12 +80,13 @@ int _parseDurationString(String s) {
   return total > 0 ? total : 60;
 }
 
-/// HTTP-клиент для Groq Whisper. Phase 1: single-shot (один файл, один запрос).
-/// Чанкование и параллельность — Phase 2.
-class GroqApiService {
+/// HTTP-клиент для Groq Whisper, реализующий провайдеро-независимый
+/// интерфейс [TranscriptionProvider]. Phase 1: single-shot (один файл,
+/// один запрос). Чанкование и параллельность — Phase 2.
+class GroqProvider implements TranscriptionProvider {
   /// [clientFactory] инжектируется для тестирования через MockClient.
   /// В production вызов без аргумента создаёт стандартный http.Client.
-  GroqApiService({http.Client Function()? clientFactory})
+  GroqProvider({http.Client Function()? clientFactory})
       : _clientFactory = clientFactory ?? (() => http.Client());
 
   final http.Client Function() _clientFactory;
@@ -96,6 +98,7 @@ class GroqApiService {
 
   /// Транскрибация одного чанка из байт. Используется в Phase 2 чанкованием.
   /// Бросает [AuthException] / [NetworkException] / [RateLimitException] / [InternalException].
+  @override
   Future<TranscriptionResult> transcribeChunk({
     required List<int> bytes,
     required String filename,
@@ -242,4 +245,15 @@ class GroqApiService {
       client.close();
     }
   }
+
+  /// Политика конкурентности Groq — «поток на ключ»: число параллельных
+  /// чанков ограничено количеством живых ключей, но не менее 1 и не более
+  /// [AppConstants.kMaxConcurrentChunks]. Перенесено из контроллера без
+  /// изменения поведения.
+  @override
+  int concurrencyFor(int aliveKeyCount) =>
+      aliveKeyCount.clamp(1, AppConstants.kMaxConcurrentChunks);
+
+  @override
+  TranscriptionProviderId get id => TranscriptionProviderId.groq;
 }

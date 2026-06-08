@@ -3,15 +3,14 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
-import '../../core/constants/app_constants.dart';
 import '../../core/error/app_exception.dart';
 import 'audio_chunking_service.dart';
 import 'chunk_state.dart';
 import 'groq_key_pool.dart';
 import 'normalized_audio_file.dart';
-import 'transcription_result.dart';
-import 'groq_api_service.dart';
 import 'transcription_options.dart';
+import 'transcription_provider.dart';
+import 'transcription_result.dart';
 
 // ---------------------------------------------------------------------------
 // Вспомогательный семафор: ограничивает количество одновременных операций.
@@ -107,7 +106,7 @@ class ChunkedMissingKey extends ChunkedState {
 class ChunkedTranscriptionController extends ChangeNotifier {
   ChunkedTranscriptionController({
     required GroqKeyPool pool,
-    required GroqApiService apiService,
+    required TranscriptionProvider apiService,
     required AudioChunkingService chunkingService,
     @visibleForTesting Duration Function(int attempt)? retryDelay,
   })  : _pool = pool,
@@ -119,7 +118,7 @@ class ChunkedTranscriptionController extends ChangeNotifier {
       Duration(seconds: 5 * (1 << (attempt - 1).clamp(0, 5)));
 
   final GroqKeyPool _pool;
-  final GroqApiService _api;
+  final TranscriptionProvider _api;
   final AudioChunkingService _chunkingService;
   final Duration Function(int attempt) _retryDelay;
 
@@ -193,10 +192,11 @@ class ChunkedTranscriptionController extends ChangeNotifier {
       totalCount: n,
     ));
 
-    // Семафор: clamp(1, kMaxConcurrentChunks) уже гарантирует верхний предел.
-    // Нижний порог 1 предотвращает деление на ноль и гарантирует обработку хотя бы одного чанка.
-    final concurrency =
-        _pool.aliveKeyCount.clamp(1, AppConstants.kMaxConcurrentChunks);
+    // Конкурентность определяется политикой провайдера (см. TranscriptionProvider.concurrencyFor) —
+    // контроллер провайдеро-независим. Для Groq результат идентичен прежнему
+    // clamp(1, kMaxConcurrentChunks): нижний порог 1 предотвращает деление на ноль
+    // и гарантирует обработку хотя бы одного чанка, верхний — ограничен kMaxConcurrentChunks.
+    final concurrency = _api.concurrencyFor(_pool.aliveKeyCount);
     final semaphore = _Semaphore(concurrency);
 
     try {

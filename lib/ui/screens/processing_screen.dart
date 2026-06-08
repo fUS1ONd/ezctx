@@ -124,7 +124,7 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen>
 
     _chunkedController = ChunkedTranscriptionController(
       pool: ref.read(groqKeyPoolProvider),
-      apiService: ref.read(groqApiServiceProvider),
+      apiService: ref.read(transcriptionProviderProvider),
       chunkingService: ref.read(audioChunkingServiceProvider),
     );
     _chunkedController!.addListener(_onChunkedStateChange);

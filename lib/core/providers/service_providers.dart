@@ -4,14 +4,18 @@ import '../../features/transcription/audio_chunking_service.dart';
 import '../../features/transcription/file_picker_service.dart';
 import '../../features/transcription/groq_api_service.dart';
 import '../../features/transcription/groq_key_pool.dart';
+import '../../features/transcription/transcription_provider.dart';
 
 /// Переопределяется в ProviderScope через groqKeyPoolProvider.overrideWithValue().
 final groqKeyPoolProvider = Provider<GroqKeyPool>((ref) {
   throw UnimplementedError('groqKeyPoolProvider must be overridden in ProviderScope');
 });
 
-final groqApiServiceProvider = Provider<GroqApiService>(
-  (ref) => GroqApiService(),
+/// Провайдеро-независимая точка DI: контроллер и UI зависят от интерфейса
+/// [TranscriptionProvider], не от конкретной реализации. Сейчас единственная
+/// реализация — [GroqProvider] (Phase 10 добавит DeepgramProvider).
+final transcriptionProviderProvider = Provider<TranscriptionProvider>(
+  (ref) => GroqProvider(),
 );
 
 final audioChunkingServiceProvider = Provider<AudioChunkingService>(
