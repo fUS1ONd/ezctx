@@ -8,15 +8,16 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:ezctx/core/constants/app_constants.dart';
 import 'package:ezctx/core/error/app_exception.dart';
 import 'package:ezctx/features/settings/api_key_repository.dart';
 import 'package:ezctx/features/transcription/audio_chunking_service.dart';
 import 'package:ezctx/features/transcription/audio_metadata.dart';
 import 'package:ezctx/features/transcription/chunked_transcription_controller.dart';
-import 'package:ezctx/features/transcription/groq_api_service.dart';
 import 'package:ezctx/features/transcription/groq_key_pool.dart';
 import 'package:ezctx/features/transcription/normalized_audio_file.dart';
 import 'package:ezctx/features/transcription/transcription_options.dart';
+import 'package:ezctx/features/transcription/transcription_provider.dart';
 import 'package:ezctx/features/transcription/transcription_result.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -24,9 +25,12 @@ import 'package:flutter_test/flutter_test.dart';
 // Ручные моки (без mockito codegen, без Flutter binding).
 // ---------------------------------------------------------------------------
 
-/// Мок GroqApiService — обработчик вызовов задаётся через конструктор.
-class _MockGroqApiService extends GroqApiService {
-  _MockGroqApiService(this._handler) : super();
+/// Мок-провайдер транскрибации — обработчик вызовов задаётся через конструктор.
+/// Реализует [TranscriptionProvider] напрямую (без сети) — стратегия
+/// `implements` работает потому, что интерфейс не содержит сетевого
+/// single-shot `transcribe(...)` (см. acceptance Task 1 плана 07-02).
+class _MockTranscriptionProvider implements TranscriptionProvider {
+  _MockTranscriptionProvider(this._handler);
 
   final Future<TranscriptionResult> Function(
     List<int> bytes,
@@ -46,6 +50,13 @@ class _MockGroqApiService extends GroqApiService {
     callCount++;
     return _handler(bytes, filename, apiKey);
   }
+
+  @override
+  int concurrencyFor(int aliveKeyCount) =>
+      aliveKeyCount.clamp(1, AppConstants.kMaxConcurrentChunks);
+
+  @override
+  TranscriptionProviderId get id => TranscriptionProviderId.groq;
 }
 
 /// Файл-заглушка: реализует [File] без обращения к файловой системе.
@@ -298,7 +309,7 @@ void main() {
       );
 
       int callIndex = 0;
-      final apiService = _MockGroqApiService((_, __, ___) async {
+      final apiService = _MockTranscriptionProvider((_, __, ___) async {
         final i = callIndex++;
         if (i == 0) {
           return TranscriptionResult(
@@ -346,7 +357,7 @@ void main() {
       final chunk = _FakeChunkFile('/tmp/chunk_000.mp3');
 
       int calls = 0;
-      final apiService = _MockGroqApiService((_, __, ___) async {
+      final apiService = _MockTranscriptionProvider((_, __, ___) async {
         calls++;
         if (calls == 1) {
           throw const NetworkException('Нет соединения');
@@ -381,7 +392,7 @@ void main() {
       final chunk = _FakeChunkFile('/tmp/chunk_000.mp3');
 
       int calls = 0;
-      final apiService = _MockGroqApiService((_, __, ___) async {
+      final apiService = _MockTranscriptionProvider((_, __, ___) async {
         calls++;
         throw const NetworkException('Сеть недоступна');
       });
@@ -417,7 +428,7 @@ void main() {
       // Но из-за Future.wait параллельного выполнения поведение зависит от порядка.
       // Используем maxConcurrent=1 для последовательного выполнения: chunk0 → chunk1.
       int callIndex = 0;
-      final apiService = _MockGroqApiService((_, __, ___) async {
+      final apiService = _MockTranscriptionProvider((_, __, ___) async {
         final i = callIndex++;
         if (i == 0) {
           return TranscriptionResult(

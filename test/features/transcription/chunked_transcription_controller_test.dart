@@ -2,15 +2,16 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:ezctx/core/constants/app_constants.dart';
 import 'package:ezctx/core/error/app_exception.dart';
 import 'package:ezctx/features/settings/api_key_repository.dart';
 import 'package:ezctx/features/transcription/audio_chunking_service.dart';
 import 'package:ezctx/features/transcription/audio_metadata.dart';
 import 'package:ezctx/features/transcription/chunked_transcription_controller.dart';
-import 'package:ezctx/features/transcription/groq_api_service.dart';
 import 'package:ezctx/features/transcription/groq_key_pool.dart';
 import 'package:ezctx/features/transcription/normalized_audio_file.dart';
 import 'package:ezctx/features/transcription/transcription_options.dart';
+import 'package:ezctx/features/transcription/transcription_provider.dart';
 import 'package:ezctx/features/transcription/transcription_result.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -18,9 +19,12 @@ import 'package:flutter_test/flutter_test.dart';
 // Ручные моки.
 // ---------------------------------------------------------------------------
 
-/// Мок GroqApiService с настраиваемым обработчиком.
-class _MockGroqApiService extends GroqApiService {
-  _MockGroqApiService(this._handler) : super();
+/// Мок-провайдер транскрибации с настраиваемым обработчиком.
+/// Реализует [TranscriptionProvider] напрямую (без сети) — стратегия
+/// `implements` работает потому, что интерфейс не содержит сетевого
+/// single-shot `transcribe(...)` (см. acceptance Task 1 плана 07-02).
+class _MockTranscriptionProvider implements TranscriptionProvider {
+  _MockTranscriptionProvider(this._handler);
 
   final Future<TranscriptionResult> Function(
     List<int> bytes,
@@ -40,6 +44,13 @@ class _MockGroqApiService extends GroqApiService {
     callCount++;
     return _handler(bytes, filename, apiKey);
   }
+
+  @override
+  int concurrencyFor(int aliveKeyCount) =>
+      aliveKeyCount.clamp(1, AppConstants.kMaxConcurrentChunks);
+
+  @override
+  TranscriptionProviderId get id => TranscriptionProviderId.groq;
 }
 
 /// Файл-заглушка: реализует [File] без обращения к файловой системе.
@@ -290,7 +301,7 @@ void main() {
     // -----------------------------------------------------------------------
     test('успех: один чанк → ChunkedSuccess с текстом', () async {
       final chunk = _FakeChunkFile('/tmp/chunk_000.mp3');
-      final apiService = _MockGroqApiService(
+      final apiService = _MockTranscriptionProvider(
         (_, __, ___) async => _makeResult(text: 'Лекция по физике'),
       );
       final chunkingService = _MockAudioChunkingService(chunkFiles: [chunk]);
@@ -314,7 +325,7 @@ void main() {
     test('retry: NetworkException на первом вызове → второй вызов успешен', () async {
       final chunk = _FakeChunkFile('/tmp/chunk_000.mp3');
       int calls = 0;
-      final apiService = _MockGroqApiService((_, __, ___) async {
+      final apiService = _MockTranscriptionProvider((_, __, ___) async {
         calls++;
         if (calls == 1) throw const NetworkException('timeout');
         return _makeResult(text: 'Успех после retry');
@@ -339,7 +350,7 @@ void main() {
     // -----------------------------------------------------------------------
     test('нет retry на AuthException: mock вызван ровно 1 раз', () async {
       final chunk = _FakeChunkFile('/tmp/chunk_000.mp3');
-      final apiService = _MockGroqApiService(
+      final apiService = _MockTranscriptionProvider(
         (_, __, ___) async => throw const AuthException('Неверный ключ'),
       );
       final chunkingService = _MockAudioChunkingService(chunkFiles: [chunk]);
@@ -373,7 +384,7 @@ void main() {
         (i) => _FakeChunkFile('/tmp/chunk_${i.toString().padLeft(3, '0')}.mp3'),
       );
 
-      final apiService = _MockGroqApiService((_, __, ___) async {
+      final apiService = _MockTranscriptionProvider((_, __, ___) async {
         concurrent++;
         if (concurrent > maxObservedConcurrent) {
           maxObservedConcurrent = concurrent;
@@ -428,7 +439,7 @@ void main() {
       );
 
       int callIndex = 0;
-      final apiService = _MockGroqApiService((_, __, ___) async {
+      final apiService = _MockTranscriptionProvider((_, __, ___) async {
         final i = callIndex++;
         if (i == 0) {
           return _makeResult(text: 'Начало лекции', segments: [seg0]);
@@ -470,7 +481,7 @@ void main() {
         (i) => _FakeChunkFile('/tmp/chunk_$i.mp3'),
       );
 
-      final apiService = _MockGroqApiService(
+      final apiService = _MockTranscriptionProvider(
         (_, __, ___) async => _makeResult(),
       );
       final chunkingService = _MockAudioChunkingService(chunkFiles: chunks);
@@ -496,7 +507,7 @@ void main() {
     // Дополнительно: ChunkedMissingKey.
     // -----------------------------------------------------------------------
     test('отсутствие ключа → ChunkedMissingKey', () async {
-      final apiService = _MockGroqApiService(
+      final apiService = _MockTranscriptionProvider(
         (_, __, ___) async => _makeResult(),
       );
       final chunkingService = _MockAudioChunkingService(chunkFiles: []);
