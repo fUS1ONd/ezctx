@@ -127,6 +127,8 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen>
       apiService: ref.read(transcriptionProviderProvider),
       chunkingService: ref.read(audioChunkingServiceProvider),
     );
+    // Слушатель добавляется ДО вызова start(), чтобы не пропустить уведомления,
+    // которые могут быть испущены до первой точки приостановки внутри start().
     _chunkedController!.addListener(_onChunkedStateChange);
     await _chunkedController!.start(_normalizedFile!, options: _transcriptionOptions);
   }
