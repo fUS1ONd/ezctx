@@ -43,10 +43,10 @@ void main() {
   const _fakeBytes = [0x49, 0x44, 0x33]; // mp3 header magic bytes
   const _fakeFilename = 'chunk_000.mp3';
 
-  GroqApiService _serviceWith(http.Client client) =>
-      GroqApiService(clientFactory: () => client);
+  GroqProvider _serviceWith(http.Client client) =>
+      GroqProvider(clientFactory: () => client);
 
-  group('GroqApiService.transcribeChunk — content type', () {
+  group('GroqProvider.transcribeChunk — content type', () {
     test('запрос содержит Content-Type: audio/mpeg для mp3-чанка', () async {
       String? capturedContentType;
 
@@ -93,7 +93,7 @@ void main() {
     });
   });
 
-  group('GroqApiService.transcribeChunk — ответы', () {
+  group('GroqProvider.transcribeChunk — ответы', () {
     test('200 → TranscriptionResult с сегментами', () async {
       final client = MockClient((_) async => _jsonResponse({
             'text': '[00:00:00] Hello world',
