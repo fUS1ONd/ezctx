@@ -160,9 +160,11 @@ class GroqProvider implements TranscriptionProvider {
         );
       }
       // Для всех остальных ошибок включаем тело ответа Groq для диагностики.
-      throw NetworkException(
-        'Groq ${response.statusCode}: ${response.body}',
-      );
+      // Обрезаем до 200 символов, чтобы API-ключ не просочился в логи через тело ответа.
+      final safeBody = response.body.length > 200
+          ? '${response.body.substring(0, 200)}…'
+          : response.body;
+      throw NetworkException('Groq ${response.statusCode}: $safeBody');
     } on SocketException {
       throw const NetworkException(_networkErrorMessage);
     } on TimeoutException {
