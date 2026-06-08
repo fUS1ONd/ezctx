@@ -158,6 +158,13 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen>
     _ticker?.cancel();
     _chunkedController?.removeListener(_onChunkedStateChange);
     _chunkedController?.dispose();
+    // Удаляем старый нормализованный файл до сброса ссылки,
+    // иначе tmp-файл осиротеет и не будет удалён в dispose().
+    if (_normalizedFile != null) {
+      try {
+        File(_normalizedFile!.path).deleteSync();
+      } catch (_) {}
+    }
     setState(() {
       _elapsed = Duration.zero;
       _startedAt = DateTime.now();
