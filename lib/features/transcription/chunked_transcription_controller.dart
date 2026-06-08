@@ -157,6 +157,9 @@ class ChunkedTranscriptionController extends ChangeNotifier {
     NormalizedAudioFile file, {
     TranscriptionOptions options = const TranscriptionOptions.defaults(),
   }) async {
+    // Явный сброс при каждом вызове start() — обеспечивает корректный счётчик
+    // при повторном использовании того же экземпляра контроллера (кнопка «Повторить»).
+    _completedCount = 0;
     _set(const ChunkedSplitting());
 
     // Проверяем наличие ключей в пуле.
