@@ -45,9 +45,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await ref.read(transcriptionOptionsRepoProvider).save(updated);
   }
 
-  String _modelLabel(WhisperModel m) => switch (m) {
-        WhisperModel.largeV3 => 'Whisper Large v3',
-        WhisperModel.turbo => 'Whisper Turbo',
+  String _modelLabel(TranscriptionModel m) => switch (m) {
+        TranscriptionModel.whisperLargeV3 => 'Whisper Large v3',
+        TranscriptionModel.whisperTurbo => 'Whisper Turbo',
+        TranscriptionModel.nova3 => 'Nova-3',
       };
 
   String _languageLabel(TranscriptionLanguage l) => switch (l) {
@@ -130,9 +131,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   iconGradient: const [Color(0xFF9AA6FF), Color(0xFF6A4ADF)],
                   title: 'Модель',
                   detail: _modelLabel(_options.model),
-                  onTap: () => _pickOne<WhisperModel>(
+                  onTap: () => _pickOne<TranscriptionModel>(
                     title: 'Модель',
-                    options: WhisperModel.values,
+                    options: TranscriptionModel.values,
                     value: _options.model,
                     label: _modelLabel,
                     onChanged: (m) =>
