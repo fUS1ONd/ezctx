@@ -180,8 +180,19 @@ class ChunkedTranscriptionController extends ChangeNotifier {
       return;
     }
 
+    // Защита от пустого списка чанков: теоретически возможно при нулевой длительности файла.
+    // Без этой проверки chunkFiles.length == 0 приведёт к делению на ноль (double.infinity),
+    // что даст таймкоды вида [Infinity:NaN:NaN] в итоговом тексте.
+    if (chunkFiles.isEmpty) {
+      _set(ChunkedError(
+        message: 'Не удалось разбить файл на чанки (пустой результат)',
+        retryable: true,
+      ));
+      return;
+    }
+
     // Используем реальное количество чанков от ffmpeg для точных таймкодов.
-    // chunkFiles.length >= 1 гарантировано: split() либо возвращает файлы, либо бросает.
+    // chunkFiles.length >= 1 гарантировано проверкой выше.
     final chunkDuration = file.durationSeconds / chunkFiles.length;
 
     final n = chunkFiles.length;
