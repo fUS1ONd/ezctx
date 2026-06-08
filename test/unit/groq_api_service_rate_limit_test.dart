@@ -16,7 +16,9 @@ void main() {
           );
         }),
       );
-      expect(
+      // await + expectLater обязательны для async-функций: без await тест проходит
+      // даже если transcribeChunk не бросает исключение (Future просто игнорируется).
+      await expectLater(
         () => service.transcribeChunk(
           bytes: [0, 1, 2],
           filename: 'test.mp3',
