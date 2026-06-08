@@ -265,10 +265,14 @@ class ChunkedTranscriptionController extends ChangeNotifier {
     final bytes = await file.readAsBytes();
     final filename = 'chunk_${index.toString().padLeft(3, '0')}.mp3';
 
-    int attempt = 0;
+    // Отдельные счётчики для разных типов ошибок: смешивать нельзя,
+    // иначе при 5 rate-limit попытках (смена ключей) следующая сетевая ошибка
+    // немедленно завершает чанк без реальных ретраев по сети.
+    int networkAttempt = 0;
+    int rateLimitAttempt = 0;
     const maxAttempts = 10;
 
-    while (attempt < maxAttempts) {
+    while (networkAttempt < maxAttempts && rateLimitAttempt < maxAttempts) {
       // Показываем статус ожидания ключа если все заблокированы.
       if (_pool.aliveKeyCount == 0) {
         _updateChunkState(index, ChunkWaitingForKey(index));
@@ -301,25 +305,25 @@ class ChunkedTranscriptionController extends ChangeNotifier {
         // чтобы Future.wait→catch вывел понятное сообщение, а не «Неизвестная ошибка».
         rethrow;
       } on RateLimitException catch (e) {
-        attempt++;
+        rateLimitAttempt++;
         // Сообщаем пулу о блокировке ключа на указанное время.
         _pool.reportRateLimited(key, e.retryAfterSeconds);
-        if (attempt >= maxAttempts) {
+        if (rateLimitAttempt >= maxAttempts) {
           // Исчерпаны все попытки из-за rate-limit — сообщаем корректную причину.
           throw const NetworkException('Превышено число попыток (rate limit)');
         }
-        _updateChunkState(index, ChunkRetrying(index, attempt: attempt));
+        _updateChunkState(index, ChunkRetrying(index, attempt: rateLimitAttempt));
         // Не ждём явно: следующая итерация вызовет acquireKey() и дождётся живого ключа.
       } on AuthException {
         // Неверный ключ — пробрасываем немедленно без ретрая.
         rethrow;
       } on NetworkException {
-        attempt++;
-        if (attempt >= maxAttempts) {
+        networkAttempt++;
+        if (networkAttempt >= maxAttempts) {
           throw const NetworkException('Превышено максимальное число попыток');
         }
-        _updateChunkState(index, ChunkRetrying(index, attempt: attempt));
-        await Future.delayed(_retryDelay(attempt));
+        _updateChunkState(index, ChunkRetrying(index, attempt: networkAttempt));
+        await Future.delayed(_retryDelay(networkAttempt));
       }
     }
 
