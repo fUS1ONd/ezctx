@@ -133,7 +133,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   detail: _modelLabel(_options.model),
                   onTap: () => _pickOne<TranscriptionModel>(
                     title: 'Модель',
-                    options: TranscriptionModel.values,
+                    // nova3 скрыта до Phase 10: DeepgramProvider ещё не реализован.
+                    // Показывать её в UI нельзя — запрос уйдёт на Groq с model=nova-3,
+                    // что вернёт ошибку 400.
+                    options: TranscriptionModel.values
+                        .where((m) => m != TranscriptionModel.nova3)
+                        .toList(),
                     value: _options.model,
                     label: _modelLabel,
                     onChanged: (m) =>
