@@ -71,7 +71,15 @@ int _parseDurationString(String s) {
     total += int.parse(minutesMatch.group(1)!) * 60;
   }
 
-  // Секунды (включая дробные): "59.56s"
+  // Миллисекунды: "500ms" — обрабатываем ДО секунд, чтобы не спутать суффикс "s".
+  // Округляем вверх: 500ms → 1 с (лучше подождать лишнюю секунду, чем не подождать).
+  final msMatch = RegExp(r'(\d+)ms').firstMatch(s);
+  if (msMatch != null) {
+    total += (int.parse(msMatch.group(1)!) / 1000).ceil();
+  }
+
+  // Секунды (включая дробные): "59.56s" — ищем только если нет "ms" суффикса перед "s".
+  // RegExp r'([\d.]+)s' не совпадёт с "500ms", так как перед "s" стоит "m", а не цифра/точка.
   final secondsMatch = RegExp(r'([\d.]+)s').firstMatch(s);
   if (secondsMatch != null) {
     total += double.parse(secondsMatch.group(1)!).ceil();
