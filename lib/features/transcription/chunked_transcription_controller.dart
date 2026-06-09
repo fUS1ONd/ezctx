@@ -203,9 +203,12 @@ class ChunkedTranscriptionController extends ChangeNotifier {
       return;
     }
 
-    // Используем реальное количество чанков от ffmpeg для точных таймкодов.
+    // Средняя длительность чанка — используется только как fallback в
+    // _assembleResult, если конкретный чанк не сообщил реальную длительность
+    // (r.duration == 0). Реальные таймкоды считаются по фактическим
+    // r.duration каждого чанка (см. WR-06), а не по этому среднему.
     // chunkFiles.length >= 1 гарантировано проверкой выше.
-    final chunkDuration = file.durationSeconds / chunkFiles.length;
+    final fallbackChunkDuration = file.durationSeconds / chunkFiles.length;
 
     final n = chunkFiles.length;
     _chunkStates = List<ChunkState>.generate(n, (i) => ChunkWaiting(i));
@@ -264,7 +267,7 @@ class ChunkedTranscriptionController extends ChangeNotifier {
       _results
           .map((r) => r ?? TranscriptionResult.empty())
           .toList(),
-      chunkDuration,
+      fallbackChunkDuration,
     );
     _set(ChunkedSuccess(result: assembled));
   }
@@ -366,13 +369,19 @@ class ChunkedTranscriptionController extends ChangeNotifier {
 
   /// Собирает финальный [TranscriptionResult] из результатов чанков.
   ///
-  /// Для каждого сегмента вычисляет абсолютное время:
-  /// `absoluteStart = chunkIndex * chunkDuration + segment.start`.
+  /// Абсолютное время сегмента считается по фактическому кумулятивному
+  /// смещению чанка (`cumulativeStart + segment.start`), а не по усреднённой
+  /// длительности `i * chunkDuration` (WR-06). Кумулятивное смещение
+  /// накапливается из реальных `r.duration` каждого чанка, поэтому укороченный
+  /// последний чанк (типичное поведение ffmpeg-сегментации) не сдвигает
+  /// таймкоды последующих чанков. [fallbackChunkDuration] используется лишь
+  /// когда чанк не сообщил длительность (`r.duration <= 0`), чтобы смещение
+  /// не схлопнулось в ноль.
   /// [text] форматирует в `[HH:MM:SS] segment.text` (timestamped).
   /// [plainText] содержит тот же текст без временных меток (Bug-2).
   TranscriptionResult _assembleResult(
     List<TranscriptionResult> results,
-    double chunkDuration,
+    double fallbackChunkDuration,
   ) {
     // timestamped-буфер: `[HH:MM:SS] текст`
     final buffer = StringBuffer();
@@ -382,31 +391,39 @@ class ChunkedTranscriptionController extends ChangeNotifier {
     double totalDuration = 0.0;
     String language = '';
 
+    // Кумулятивное смещение начала текущего чанка от старта файла.
+    double cumulativeStart = 0.0;
+
     for (var i = 0; i < results.length; i++) {
       final r = results[i];
-      totalDuration += r.duration;
       if (language.isEmpty) language = r.language;
+
+      // Реальная длительность чанка; если провайдер её не вернул — берём
+      // усреднённый fallback, чтобы кумулятивное смещение не остановилось.
+      final chunkSpan = r.duration > 0 ? r.duration : fallbackChunkDuration;
 
       if (r.segments.isNotEmpty) {
         // Есть сегменты — собираем с таймкодами.
         for (final seg in r.segments) {
-          final absoluteStart = i * chunkDuration + seg.start;
+          final absoluteStart = cumulativeStart + seg.start;
           final ts = _formatTimecode(absoluteStart);
           buffer.write('[$ts] ${seg.text.trim()}\n');
           plainBuffer.write('${seg.text.trim()}\n');
           allSegments.add(TranscriptionSegment(
             start: absoluteStart,
-            end: i * chunkDuration + seg.end,
+            end: cumulativeStart + seg.end,
             text: seg.text,
           ));
         }
       } else {
         // Нет сегментов — используем весь текст чанка с таймкодом начала.
-        final offsetStart = i * chunkDuration;
-        final ts = _formatTimecode(offsetStart);
+        final ts = _formatTimecode(cumulativeStart);
         buffer.write('[$ts] ${r.text.trim()}\n');
         plainBuffer.write('${r.text.trim()}\n');
       }
+
+      totalDuration += r.duration;
+      cumulativeStart += chunkSpan;
     }
 
     return TranscriptionResult(

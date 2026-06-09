@@ -65,7 +65,9 @@ void main() {
           return TranscriptionResult(
             text: 'Привет мир',
             language: 'ru',
-            duration: 60.0,
+            // Реальная длительность чанка 0 = 4500s → кумулятивное смещение
+            // чанка 1 = 4500s (WR-06: считаем по r.duration, не по total/N).
+            duration: 4500.0,
             words: const [],
             segments: [seg0],
           );

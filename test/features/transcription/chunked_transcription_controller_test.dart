@@ -189,7 +189,14 @@ void main() {
       final apiService = MockTranscriptionProvider((_, __, ___) async {
         final i = callIndex++;
         if (i == 0) {
-          return _makeResult(text: 'Начало лекции', segments: [seg0]);
+          // Реальная длительность чанка 0 = 4500s → чанк 1 начинается с 01:15:00.
+          // Кумулятивное смещение считается из r.duration (WR-06), а не из
+          // усреднённого total/N, поэтому duration здесь задан явно.
+          return _makeResult(
+            text: 'Начало лекции',
+            segments: [seg0],
+            duration: 4500.0,
+          );
         }
         return _makeResult(text: 'Продолжение', segments: [seg1, seg1b]);
       });
@@ -217,6 +224,55 @@ void main() {
       expect(text, contains('[00:00:00]'));
       expect(text, contains('[01:15:00]'));
       expect(text, contains('[01:15:05]'));
+    });
+
+    // -----------------------------------------------------------------------
+    // 5b. WR-06: таймкоды считаются по реальным r.duration, без дрейфа на
+    //     укороченном последнем чанке. Усреднённое total/N дало бы неверное
+    //     смещение для чанков 1 и 2.
+    // -----------------------------------------------------------------------
+    test('таймкоды WR-06: неравные чанки не дают дрейфа смещений', () async {
+      final chunks = [
+        FakeChunkFile('/tmp/chunk_000.ogg'),
+        FakeChunkFile('/tmp/chunk_001.ogg'),
+        FakeChunkFile('/tmp/chunk_002.ogg'),
+      ];
+
+      // Реальные длительности чанков: 3000 + 3000 + 1000 = 7000s.
+      // Усреднение дало бы 7000/3 ≈ 2333.3s на чанк → неверные смещения.
+      // Истинные смещения: чанк0=0, чанк1=3000 (00:50:00), чанк2=6000 (01:40:00).
+      final durations = [3000.0, 3000.0, 1000.0];
+      int callIndex = 0;
+      final apiService = MockTranscriptionProvider((_, __, ___) async {
+        final i = callIndex++;
+        return _makeResult(
+          text: 'Чанк $i',
+          // Один сегмент в начале чанка (start 0) → таймкод = смещение чанка.
+          segments: [TranscriptionSegment(start: 0.0, end: 5.0, text: 'Чанк $i')],
+          duration: durations[i],
+        );
+      });
+
+      final chunkingService = MockAudioChunkingService(chunkFiles: chunks);
+
+      final ctrl = ChunkedTranscriptionController(
+        // durationSeconds=9000 у _dummyFile → fallback total/N=3000; но он НЕ
+        // используется, т.к. r.duration > 0. Проверяем истинные смещения.
+        pool: KeyPool(initialKeys: [_testKey.raw]),
+        apiService: apiService,
+        chunkingService: chunkingService,
+      );
+
+      await ctrl.start(_dummyFile);
+
+      expect(ctrl.state, isA<ChunkedSuccess>());
+      final text = (ctrl.state as ChunkedSuccess).result.text;
+
+      expect(text, contains('[00:00:00]')); // чанк 0
+      expect(text, contains('[00:50:00]')); // чанк 1: смещение 3000s
+      expect(text, contains('[01:40:00]')); // чанк 2: смещение 6000s
+      // Усреднённое смещение чанка 2 было бы 2*2333=4666s=[01:17:46] — не должно встречаться.
+      expect(text, isNot(contains('[01:17:46]')));
     });
 
     // -----------------------------------------------------------------------
