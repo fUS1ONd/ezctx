@@ -25,7 +25,7 @@ void main() {
       final tmpInput = File('${tmpDir.path}/input.mp3')..createSync();
       addTearDown(() { try { tmpInput.deleteSync(); } catch (_) {} });
 
-      final tmpOutput = File('${tmpDir.path}/ezctx_norm_out.mp3')..createSync();
+      final tmpOutput = File('${tmpDir.path}/ezctx_norm_out.ogg')..createSync();
       addTearDown(() { try { tmpOutput.deleteSync(); } catch (_) {} });
 
       String? capturedCommand;
@@ -40,12 +40,14 @@ void main() {
       final result = await svc.normalize(tmpInput.path);
 
       expect(capturedCommand, isNotNull);
-      expect(capturedCommand, contains('-b:a 32k'));
+      expect(capturedCommand, contains('-vn'));
+      expect(capturedCommand, contains('-c:a libopus'));
+      expect(capturedCommand, contains('-b:a 48k'));
       expect(capturedCommand, contains('-ac 1'));
       expect(capturedCommand, contains('-ar 16000'));
-      expect(capturedCommand, contains('-codec:a libmp3lame'));
       expect(capturedCommand, contains('-y'));
-      expect(result.path, endsWith('.mp3'));
+      expect(capturedCommand, isNot(contains('libmp3lame')));
+      expect(result.path, endsWith('.ogg'));
       expect(result.durationSeconds, equals(300.0));
     });
 
@@ -54,7 +56,7 @@ void main() {
       addTearDown(() => tmpDir.deleteSync(recursive: true));
 
       final tmpInput = File('${tmpDir.path}/input.mp3')..createSync();
-      final tmpOutput = File('${tmpDir.path}/ezctx_norm_out.mp3')..createSync();
+      final tmpOutput = File('${tmpDir.path}/ezctx_norm_out.ogg')..createSync();
 
       String? capturedCommand;
       final svc = AudioNormalizationService(
@@ -71,12 +73,12 @@ void main() {
       expect(capturedCommand, contains('"${tmpInput.path}"'));
     });
 
-    test('выходной путь содержит ezctx_norm_ и оканчивается на .mp3', () async {
+    test('выходной путь содержит ezctx_norm_ и оканчивается на .ogg', () async {
       final tmpDir = Directory.systemTemp.createTempSync('ezctx_norm_test3_');
       addTearDown(() => tmpDir.deleteSync(recursive: true));
 
       final tmpInput = File('${tmpDir.path}/input.mp3')..createSync();
-      final tmpOutput = File('${tmpDir.path}/ezctx_norm_12345.mp3')..createSync();
+      final tmpOutput = File('${tmpDir.path}/ezctx_norm_12345.ogg')..createSync();
 
       final svc = AudioNormalizationService(
         ffmpegOverride: (_) async {},
@@ -89,7 +91,7 @@ void main() {
       final result = await svc.normalize(tmpInput.path);
 
       expect(result.path, contains('ezctx_norm_'));
-      expect(result.path, endsWith('.mp3'));
+      expect(result.path, endsWith('.ogg'));
     });
 
     test('ошибка ffmpeg → InternalException', () async {
@@ -97,7 +99,7 @@ void main() {
       addTearDown(() => tmpDir.deleteSync(recursive: true));
 
       final tmpInput = File('${tmpDir.path}/input.mp3')..createSync();
-      final tmpOutput = File('${tmpDir.path}/ezctx_norm_out.mp3')..createSync();
+      final tmpOutput = File('${tmpDir.path}/ezctx_norm_out.ogg')..createSync();
 
       final svc = AudioNormalizationService(
         ffmpegOverride: (_) async {
