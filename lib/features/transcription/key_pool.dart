@@ -26,21 +26,31 @@ final class BlockedKeyStatus extends KeyStatus {
   const BlockedKeyStatus({required super.key, required this.blockedUntil});
 }
 
+/// Ключ навсегда выведен из ротации — кредиты провайдера исчерпаны.
+/// Deepgram: HTTP 402. Устанавливается через [KeyPool.reportExhausted].
+/// Не снимается таймером — только через [KeyPool.removeKey].
+final class ExhaustedKeyStatus extends KeyStatus {
+  const ExhaustedKeyStatus({required super.key});
+}
+
 // ────────────────────────────────────────────────────────────────────────────
-// GroqKeyPool
+// KeyPool
 // ────────────────────────────────────────────────────────────────────────────
 
-/// Пул Groq API-ключей с round-robin ротацией и поддержкой rate-limit блокировок.
+/// Пул API-ключей с round-robin ротацией и поддержкой rate-limit блокировок.
+///
+/// Провайдеро-независим: одинаково используется Groq и Deepgram клиентами.
 ///
 /// Ключевые операции:
 /// - [acquireKey] — возвращает следующий живой ключ (асинхронно ждёт если все заблокированы)
 /// - [reportRateLimited] — помечает ключ заблокированным на N секунд
+/// - [reportExhausted] — навсегда выводит ключ из ротации (исчерпанные кредиты)
 /// - [getStatuses] — возвращает текущий статус всех ключей для UI
 ///
 /// Расширяет [ChangeNotifier]: UI слушает через ListenableBuilder без поллинга.
-class GroqKeyPool extends ChangeNotifier {
+class KeyPool extends ChangeNotifier {
   /// [initialKeys] — список сырых строк ключей для инициализации.
-  GroqKeyPool({List<String> initialKeys = const []})
+  KeyPool({List<String> initialKeys = const []})
       : _keys = List.of(initialKeys);
 
   // Хранилище ключей
@@ -48,6 +58,9 @@ class GroqKeyPool extends ChangeNotifier {
 
   // Карта: ключ → время разблокировки (если ключ заблокирован)
   final Map<String, DateTime> _blockedUntil = {};
+
+  // Множество ключей с исчерпанными кредитами — навсегда выведены из ротации
+  final Set<String> _exhausted = {};
 
   // Текущий индекс round-robin
   int _cyclicIndex = 0;
@@ -57,8 +70,8 @@ class GroqKeyPool extends ChangeNotifier {
 
   // ── Геттеры ─────────────────────────────────────────────────────────────
 
-  /// Количество незаблокированных ключей.
-  int get aliveKeyCount => _keys.where((k) => !_isBlocked(k)).length;
+  /// Количество живых ключей (не заблокированных и не исчерпанных).
+  int get aliveKeyCount => _keys.where(_isAlive).length;
 
   /// Все ключи пула (включая заблокированные).
   List<String> get allKeys => List.unmodifiable(_keys);
@@ -76,14 +89,18 @@ class GroqKeyPool extends ChangeNotifier {
     return true;
   }
 
-  /// Возвращает следующий живой ключ по round-robin или null если все заблокированы.
+  /// Проверяет, является ли ключ «живым» — не заблокированным и не исчерпанным.
+  /// Используется вместо !_isBlocked во всех местах выбора ключа.
+  bool _isAlive(String key) => !_exhausted.contains(key) && !_isBlocked(key);
+
+  /// Возвращает следующий живой ключ по round-robin или null если все заблокированы/исчерпаны.
   String? _nextAlive() {
     if (_keys.isEmpty) return null;
     // Защита от выхода за границы при удалении ключей
     _cyclicIndex = _cyclicIndex % _keys.length;
     for (var i = 0; i < _keys.length; i++) {
       final idx = (_cyclicIndex + i) % _keys.length;
-      if (!_isBlocked(_keys[idx])) {
+      if (_isAlive(_keys[idx])) {
         // Advance: следующий acquireKey начнёт с idx+1
         _cyclicIndex = (idx + 1) % _keys.length;
         return _keys[idx];
@@ -129,13 +146,24 @@ class GroqKeyPool extends ChangeNotifier {
   // ── Публичный API ────────────────────────────────────────────────────────
 
   /// Возвращает следующий живой ключ (round-robin).
-  /// Если все ключи заблокированы — ждёт разблокировки.
+  /// Если все ключи заблокированы rate-limit'ом — ждёт разблокировки.
+  /// Если все ключи exhausted (и нет rate-limit блокировок) — бросает
+  /// [AllKeysBlockedException] НЕМЕДЛЕННО, без 10-минутного ожидания.
   /// Таймаут ожидания: 10 минут; при превышении бросает [AllKeysBlockedException].
   Future<String> acquireKey() async {
     final alive = _nextAlive();
     if (alive != null) return alive;
 
-    // Все ключи заблокированы — ждём
+    // Быстрый путь R-04: все ключи exhausted и нет временных блокировок —
+    // ждать нечего, бросаем немедленно без создания waiter/_scheduleWakeup.
+    // Анти-паттерн: НЕ добавлять exhausted в _blockedUntil — сломает _scheduleWakeup.
+    if (_blockedUntil.isEmpty) {
+      throw const AllKeysBlockedException(
+        'Кредиты всех API-ключей исчерпаны. Добавьте ключ с активным балансом.',
+      );
+    }
+
+    // Все ключи заблокированы rate-limit'ом — ждём
     final completer = Completer<String>();
     _waiters.add(completer);
     _scheduleWakeup();
@@ -163,6 +191,19 @@ class GroqKeyPool extends ChangeNotifier {
     _scheduleWakeup();
   }
 
+  /// Навсегда выводит ключ из ротации — кредиты исчерпаны (Deepgram HTTP 402).
+  ///
+  /// В отличие от [reportRateLimited], НЕ использует таймер и НЕ вызывает
+  /// _scheduleWakeup — ключ остаётся exhausted до [removeKey].
+  /// Безопасность T-09-02-I: маскируем ключ в логах (последние ≤4 символа).
+  void reportExhausted(String key) {
+    debugPrint(
+      'reportExhausted: ...${key.length > 4 ? key.substring(key.length - 4) : key}',
+    );
+    _exhausted.add(key);
+    notifyListeners();
+  }
+
   /// Освобождает ключ после использования.
   /// В текущей реализации ключи не требуют явного release (ротация через round-robin).
   void releaseKey(String key) {
@@ -172,6 +213,8 @@ class GroqKeyPool extends ChangeNotifier {
   /// Возвращает список статусов всех ключей для отображения в UI.
   List<KeyStatus> getStatuses() {
     return _keys.map((k) {
+      // Сначала проверяем exhausted — приоритет выше rate-limit
+      if (_exhausted.contains(k)) return ExhaustedKeyStatus(key: k);
       if (_isBlocked(k)) {
         return BlockedKeyStatus(key: k, blockedUntil: _blockedUntil[k]!);
       }
@@ -181,6 +224,8 @@ class GroqKeyPool extends ChangeNotifier {
 
   /// Возвращает статус конкретного ключа (для ApiKeysScreen).
   KeyStatus getStatusForKey(String rawKey) {
+    // Сначала проверяем exhausted — приоритет выше rate-limit
+    if (_exhausted.contains(rawKey)) return ExhaustedKeyStatus(key: rawKey);
     if (_isBlocked(rawKey)) {
       return BlockedKeyStatus(
         key: rawKey,
@@ -199,9 +244,11 @@ class GroqKeyPool extends ChangeNotifier {
   }
 
   /// Удаляет ключ из пула.
+  /// Очищает все состояния ключа: _blockedUntil и _exhausted.
   void removeKey(String raw) {
     _keys.remove(raw);
     _blockedUntil.remove(raw);
+    _exhausted.remove(raw);
     // Защита от выхода за границы после удаления
     if (_keys.isNotEmpty) {
       _cyclicIndex = _cyclicIndex % _keys.length;
