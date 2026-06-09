@@ -32,8 +32,10 @@ class AppConstants {
     'webm',
   };
 
-  /// Порог для isChunked и нарезки чанков: 82 мин ≈ 18.7 MB при 32 kbps (per D-PHASE09).
-  static const int kChunkThresholdSeconds = 4920;
+  /// Порог для isChunked и нарезки чанков: ~54 мин ≈ 18.5 MB при opus 48 kbps.
+  /// Расчёт: 48 kbps CBR = 6 000 B/s; 3240 × 6000 = 19 440 000 байт ≈ 18.54 MB.
+  /// Реальный речевой VBR (~30-40 kbps) даёт ~12-16 MB — двойной запас до лимита Groq 18.5 MB.
+  static const int kChunkThresholdSeconds = 3240;
 
   /// Максимальное число параллельных чанков.
   /// Реальное значение = min(pool.aliveKeyCount, этой константы).
