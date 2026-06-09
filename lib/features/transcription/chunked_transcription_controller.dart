@@ -140,8 +140,20 @@ class ChunkedTranscriptionController extends ChangeNotifier {
   }
 
   /// Обновить состояние одного чанка и уведомить слушателей.
+  ///
+  /// completedCount пересчитывается из _chunkStates (число ChunkDone), а не
+  /// из отдельного счётчика — иначе при близком завершении двух параллельных
+  /// чанков снимок мог отражать число, не совпадающее с видимыми ChunkDone-тайлами.
   void _updateChunkState(int index, ChunkState chunkState) {
     _chunkStates[index] = chunkState;
+    _emitProcessing();
+  }
+
+  /// Собирает и публикует снимок ChunkedProcessing из текущих _chunkStates.
+  /// Единая точка правды для completedCount — считаем ChunkDone в массиве,
+  /// чтобы счётчик не дрейфовал относительно фактических состояний чанков.
+  void _emitProcessing() {
+    _completedCount = _chunkStates.whereType<ChunkDone>().length;
     _set(ChunkedProcessing(
       chunks: List.unmodifiable(_chunkStates),
       completedCount: _completedCount,
@@ -302,13 +314,10 @@ class ChunkedTranscriptionController extends ChangeNotifier {
         );
 
         _results[index] = result;
+        // Мутация слота + снимок идут через единый helper: completedCount
+        // пересчитывается из _chunkStates, не из отдельного счётчика (WR-03).
         _chunkStates[index] = ChunkDone(index, text: result.text);
-        _completedCount++;
-        _set(ChunkedProcessing(
-          chunks: List.unmodifiable(_chunkStates),
-          completedCount: _completedCount,
-          totalCount: _chunkStates.length,
-        ));
+        _emitProcessing();
         return result;
       } on AllKeysBlockedException {
         // Все ключи заблокированы и таймаут (10 мин) истёк — пробрасываем напрямую,
