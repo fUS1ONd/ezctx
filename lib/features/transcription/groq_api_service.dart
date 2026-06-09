@@ -129,8 +129,9 @@ class GroqProvider implements TranscriptionProvider {
             'file',
             bytes,
             filename: filename,
-            // Явно указываем audio/mpeg — fromBytes не выводит тип из расширения.
-            contentType: MediaType('audio', 'mpeg'),
+            // Явно указываем audio/ogg — fromBytes не выводит тип из расширения;
+            // формат нормализации — opus/.ogg (фаза 08).
+            contentType: MediaType('audio', 'ogg'),
           ),
         );
       // Передаём язык только если явно задан (auto — не передаём).
