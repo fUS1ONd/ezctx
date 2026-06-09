@@ -27,20 +27,23 @@ final class BlockedKeyStatus extends KeyStatus {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// GroqKeyPool
+// KeyPool
 // ────────────────────────────────────────────────────────────────────────────
 
-/// Пул Groq API-ключей с round-robin ротацией и поддержкой rate-limit блокировок.
+/// Пул API-ключей с round-robin ротацией и поддержкой rate-limit блокировок.
+///
+/// Провайдеро-независим: одинаково используется Groq и Deepgram клиентами.
 ///
 /// Ключевые операции:
 /// - [acquireKey] — возвращает следующий живой ключ (асинхронно ждёт если все заблокированы)
 /// - [reportRateLimited] — помечает ключ заблокированным на N секунд
+/// - [reportExhausted] — навсегда выводит ключ из ротации (исчерпанные кредиты)
 /// - [getStatuses] — возвращает текущий статус всех ключей для UI
 ///
 /// Расширяет [ChangeNotifier]: UI слушает через ListenableBuilder без поллинга.
-class GroqKeyPool extends ChangeNotifier {
+class KeyPool extends ChangeNotifier {
   /// [initialKeys] — список сырых строк ключей для инициализации.
-  GroqKeyPool({List<String> initialKeys = const []})
+  KeyPool({List<String> initialKeys = const []})
       : _keys = List.of(initialKeys);
 
   // Хранилище ключей

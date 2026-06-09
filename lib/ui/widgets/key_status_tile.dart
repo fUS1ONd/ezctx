@@ -4,7 +4,7 @@ import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/constants/design_tokens.dart';
-import '../../features/transcription/groq_key_pool.dart';
+import '../../features/transcription/key_pool.dart';
 
 /// Отображает статус одного API-ключа: зелёный «Активен» или красный «До HH:MM:SS».
 ///

@@ -1,20 +1,20 @@
 import 'package:ezctx/core/error/app_exception.dart';
-import 'package:ezctx/features/transcription/groq_key_pool.dart';
+import 'package:ezctx/features/transcription/key_pool.dart';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  group('GroqKeyPool', () {
+  group('KeyPool', () {
     test('round_robin выдаёт ключи по очереди', () async {
       // Два ключа: k1, k2 — ожидаем чередование
-      final pool = GroqKeyPool(initialKeys: ['k1', 'k2']);
+      final pool = KeyPool(initialKeys: ['k1', 'k2']);
       expect(await pool.acquireKey(), 'k1');
       expect(await pool.acquireKey(), 'k2');
       expect(await pool.acquireKey(), 'k1');
     });
 
     test('заблокированный ключ пропускается при acquireKey', () async {
-      final pool = GroqKeyPool(initialKeys: ['k1', 'k2']);
+      final pool = KeyPool(initialKeys: ['k1', 'k2']);
       // Блокируем k1 на 30 секунд
       pool.reportRateLimited('k1', 30);
       // Следующие два вызова должны вернуть k2
@@ -24,7 +24,7 @@ void main() {
 
     test('все ключи заблокированы → ждём разблокировки', () {
       fakeAsync((async) {
-        final pool = GroqKeyPool(initialKeys: ['k1']);
+        final pool = KeyPool(initialKeys: ['k1']);
         // Блокируем единственный ключ на 5 секунд
         pool.reportRateLimited('k1', 5);
 
@@ -43,7 +43,7 @@ void main() {
 
     test('таймаут 10 мин → AllKeysBlockedException', () {
       fakeAsync((async) {
-        final pool = GroqKeyPool(initialKeys: ['k1']);
+        final pool = KeyPool(initialKeys: ['k1']);
         // Блокируем на 20 минут (больше таймаута acquireKey = 10 мин)
         pool.reportRateLimited('k1', 1200);
 
@@ -64,14 +64,14 @@ void main() {
     });
 
     test('aliveKeyCount корректен', () {
-      final pool = GroqKeyPool(initialKeys: ['k1', 'k2', 'k3']);
+      final pool = KeyPool(initialKeys: ['k1', 'k2', 'k3']);
       expect(pool.aliveKeyCount, 3);
       pool.reportRateLimited('k1', 60);
       expect(pool.aliveKeyCount, 2);
     });
 
     test('getStatuses возвращает правильные типы', () {
-      final pool = GroqKeyPool(initialKeys: ['k1', 'k2']);
+      final pool = KeyPool(initialKeys: ['k1', 'k2']);
       pool.reportRateLimited('k1', 60);
       final statuses = pool.getStatuses();
       expect(statuses[0], isA<BlockedKeyStatus>());
@@ -79,7 +79,7 @@ void main() {
     });
 
     test('addKey / removeKey работают корректно', () {
-      final pool = GroqKeyPool(initialKeys: ['k1']);
+      final pool = KeyPool(initialKeys: ['k1']);
       pool.addKey('k2');
       expect(pool.allKeys, ['k1', 'k2']);
       pool.removeKey('k1');

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:ezctx/features/transcription/groq_key_pool.dart';
+import 'package:ezctx/features/transcription/key_pool.dart';
 import 'package:ezctx/ui/widgets/key_status_tile.dart';
 
 void main() {
