@@ -73,7 +73,7 @@ class AudioChunkingService {
   ///
   /// Алгоритм: N = ceil(totalDurationSeconds / kChunkThresholdSeconds),
   /// optimalDuration = totalDurationSeconds / N.
-  /// Возвращает отсортированный список файлов `chunk_NNN.mp3` во временной директории.
+  /// Возвращает отсортированный список файлов `chunk_NNN.ogg` во временной директории.
   /// Бросает [InternalException] при ошибке ffmpeg или если [totalDurationSeconds] ≤ 0.
   Future<List<File>> split(
     String filePath,
@@ -92,9 +92,9 @@ class AudioChunkingService {
       throw InternalException('Путь к файлу содержит недопустимые символы: $filePath');
     }
 
-    // Shortcircuit для n=1: 32 kbps CBR × 4920с ≈ 19.68 MB ≤ 25 MB лимита Groq.
-    // Возвращаем исходный файл без ffmpeg-сегментации, чтобы -c:a copy не создавал
-    // хвостовой чанк по границе аудио-кадров.
+    // Shortcircuit для n=1: opus 48 kbps × 3240с ≈ 18.54 MB ≤ лимита Groq 18.5 MB (CBR-потолок).
+    // Реальный VBR (~30-40 kbps) даёт ~12-16 MB. Возвращаем исходный файл без ffmpeg-сегментации,
+    // чтобы -c:a copy не создавал хвостовой чанк по границе аудио-кадров.
     if (totalDurationSeconds <= AppConstants.kChunkThresholdSeconds) {
       return [File(filePath)];
     }
@@ -110,11 +110,11 @@ class AudioChunkingService {
             '/ezctx_chunks_${DateTime.now().millisecondsSinceEpoch}';
     await Directory(tmpBase).create(recursive: true);
 
-    // Команда ffmpeg: сегментация по времени, -c:a copy (файл уже нормализован)
+    // Команда ffmpeg: сегментация по времени, -c:a copy (opus-пакеты независимы — реэнкод не нужен)
     final command =
         '-i "$filePath" -f segment -segment_time $optimalDuration'
         ' -c:a copy'
-        ' "$tmpBase/chunk_%03d.mp3"';
+        ' "$tmpBase/chunk_%03d.ogg"';
 
     if (_ffmpegOverride != null) {
       // В тестах override выполняет команду напрямую и бросает ошибку при неудаче
