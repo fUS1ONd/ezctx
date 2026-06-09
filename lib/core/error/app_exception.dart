@@ -8,12 +8,12 @@ sealed class AppException implements Exception {
   String toString() => '$runtimeType: $message';
 }
 
-/// Сетевая ошибка (нет соединения, таймаут, 5xx от Groq).
+/// Сетевая ошибка (нет соединения, таймаут, 5xx от провайдера).
 class NetworkException extends AppException {
   const NetworkException(super.message);
 }
 
-/// Ошибка аутентификации (401 от Groq — неверный API-ключ).
+/// Ошибка аутентификации (401 от провайдера — неверный API-ключ).
 class AuthException extends AppException {
   const AuthException(super.message);
 }
@@ -28,7 +28,7 @@ class InternalException extends AppException {
   const InternalException(super.message);
 }
 
-/// HTTP 429 от Groq — превышен rate limit; ретраится с задержкой.
+/// HTTP 429 от провайдера — превышен rate limit; ретраится с задержкой.
 /// [retryAfterSeconds] — количество секунд до следующего разрешённого запроса.
 /// Парсится из заголовков retry-after / x-ratelimit-reset-*; дефолт 60 с.
 class RateLimitException extends AppException {
@@ -57,7 +57,7 @@ class KeyExhaustedException extends AppException {
 extension AppExceptionUserMessage on AppException {
   String get userMessage => switch (this) {
     RateLimitException(:final retryAfterSeconds) =>
-        'Превышен лимит Groq. Попробуйте через $retryAfterSeconds с.',
+        'Превышен лимит запросов. Попробуйте через $retryAfterSeconds с.',
     AllKeysBlockedException() =>
         'Все API-ключи заблокированы лимитом. Подождите или добавьте ещё ключи.',
     KeyExhaustedException() =>

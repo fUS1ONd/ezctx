@@ -323,7 +323,9 @@ class ChunkedTranscriptionController extends ChangeNotifier {
         _pool.reportRateLimited(key, e.retryAfterSeconds);
         if (rateLimitAttempt >= maxAttempts) {
           // Исчерпаны все попытки из-за rate-limit — сообщаем корректную причину.
-          throw const NetworkException('Превышено число попыток (rate limit)');
+          // Бросаем RateLimitException (а не NetworkException), чтобы ассемблер
+          // и UI не маскировали лимит запросов под сетевую ошибку.
+          throw const RateLimitException('Превышено число попыток (rate limit)');
         }
         _updateChunkState(index, ChunkRetrying(index, attempt: rateLimitAttempt));
         // Не ждём явно: следующая итерация вызовет acquireKey() и дождётся живого ключа.
