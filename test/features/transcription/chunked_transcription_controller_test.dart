@@ -270,4 +270,107 @@ void main() {
       expect(ctrl.state, isA<ChunkedMissingKey>());
     });
   });
+
+  // -------------------------------------------------------------------------
+  // R-06: политика конкурентности Groq — дефолтный mock без concurrencyPolicy.
+  // -------------------------------------------------------------------------
+  group('R-06: concurrencyFor — Groq-политика (дефолт)', () {
+    test('concurrencyFor(1)==1 при дефолтной политике', () {
+      final provider = MockTranscriptionProvider((_, __, ___) async => _makeResult());
+      // 1 живой ключ → дефолт Groq: clamp(1, kMaxConcurrentChunks) = 1
+      expect(provider.concurrencyFor(1), equals(1));
+    });
+
+    test('concurrencyFor(3)==3 при дефолтной политике', () {
+      final provider = MockTranscriptionProvider((_, __, ___) async => _makeResult());
+      // 3 живых ключа → дефолт Groq: clamp(3, kMaxConcurrentChunks) = 3
+      expect(provider.concurrencyFor(3), equals(3));
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // R-07: политика конкурентности Deepgram — настраиваемая concurrencyPolicy.
+  // -------------------------------------------------------------------------
+  group('R-07: concurrencyFor — Deepgram-политика (настраиваемая)', () {
+    test('concurrencyFor(1)==5 при Deepgram-политике (n > 0 ? 5 : 0)', () {
+      final provider = MockTranscriptionProvider(
+        (_, __, ___) async => _makeResult(),
+        concurrencyPolicy: (n) => n > 0 ? 5 : 0,
+      );
+      // 1 живой ключ → Deepgram-политика: 5
+      expect(provider.concurrencyFor(1), equals(5));
+    });
+
+    test('concurrencyFor(0)==0 при Deepgram-политике (n > 0 ? 5 : 0)', () {
+      final provider = MockTranscriptionProvider(
+        (_, __, ___) async => _makeResult(),
+        concurrencyPolicy: (n) => n > 0 ? 5 : 0,
+      );
+      // 0 живых ключей → Deepgram-политика: 0
+      expect(provider.concurrencyFor(0), equals(0));
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // R-08: KeyExhaustedException → reportExhausted без инкремента счётчиков.
+  // -------------------------------------------------------------------------
+  group('R-08: KeyExhaustedException → reportExhausted', () {
+    test(
+      'первый ключ исчерпан → reportExhausted, второй ключ успешен, state==ChunkedSuccess',
+      () async {
+        final chunk = FakeChunkFile('/tmp/chunk_000.ogg');
+        int callCount = 0;
+        // Первый вызов: бросает KeyExhaustedException (ключ k1).
+        // Второй вызов: успех (ключ k2).
+        final apiService = MockTranscriptionProvider((_, __, String apiKey) async {
+          callCount++;
+          if (callCount == 1) {
+            throw const KeyExhaustedException();
+          }
+          return _makeResult(text: 'Успех со вторым ключом');
+        });
+        final chunkingService = MockAudioChunkingService(chunkFiles: [chunk]);
+
+        // Пул из 2 ключей — первый будет exhausted, второй используется.
+        final pool = KeyPool(initialKeys: ['key1-test', 'key2-test']);
+
+        final ctrl = ChunkedTranscriptionController(
+          pool: pool,
+          apiService: apiService,
+          chunkingService: chunkingService,
+        );
+
+        await ctrl.start(_dummyFile);
+
+        // Итог — успешная транскрибация со вторым ключом.
+        expect(
+          ctrl.state,
+          isA<ChunkedSuccess>(),
+          reason: 'После exhausted-ключа контроллер должен использовать второй ключ',
+        );
+
+        // Первый ключ должен быть exhausted — aliveKeyCount уменьшился.
+        expect(
+          pool.aliveKeyCount,
+          equals(1),
+          reason: 'После reportExhausted(key1) должен остаться 1 живой ключ',
+        );
+
+        // Также проверяем через статусы: первый ключ — ExhaustedKeyStatus.
+        final statuses = pool.getStatuses();
+        expect(
+          statuses.any((s) => s is ExhaustedKeyStatus),
+          isTrue,
+          reason: 'Один из ключей должен иметь статус ExhaustedKeyStatus',
+        );
+
+        // mock вызван дважды: первый раз KeyExhaustedException, второй — успех.
+        expect(
+          callCount,
+          equals(2),
+          reason: 'transcribeChunk должен быть вызван 2 раза (1 exhausted + 1 успех)',
+        );
+      },
+    );
+  });
 }
