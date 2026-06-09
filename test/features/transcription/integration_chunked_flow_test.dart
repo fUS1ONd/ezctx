@@ -4,266 +4,15 @@
 /// Использует ручные моки без Flutter binding (чистый dart:test) для скорости.
 library;
 
-import 'dart:convert';
-import 'dart:io';
-import 'dart:typed_data';
-
-import 'package:ezctx/core/constants/app_constants.dart';
 import 'package:ezctx/core/error/app_exception.dart';
 import 'package:ezctx/features/settings/api_key_repository.dart';
-import 'package:ezctx/features/transcription/audio_chunking_service.dart';
-import 'package:ezctx/features/transcription/audio_metadata.dart';
 import 'package:ezctx/features/transcription/chunked_transcription_controller.dart';
-import 'package:ezctx/features/transcription/groq_key_pool.dart';
+import 'package:ezctx/features/transcription/key_pool.dart';
 import 'package:ezctx/features/transcription/normalized_audio_file.dart';
-import 'package:ezctx/features/transcription/transcription_options.dart';
-import 'package:ezctx/features/transcription/transcription_provider.dart';
 import 'package:ezctx/features/transcription/transcription_result.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-// ---------------------------------------------------------------------------
-// Ручные моки (без mockito codegen, без Flutter binding).
-// ---------------------------------------------------------------------------
-
-/// Мок-провайдер транскрибации — обработчик вызовов задаётся через конструктор.
-/// Реализует [TranscriptionProvider] напрямую (без сети) — стратегия
-/// `implements` работает потому, что интерфейс не содержит сетевого
-/// single-shot `transcribe(...)` (см. acceptance Task 1 плана 07-02).
-class _MockTranscriptionProvider implements TranscriptionProvider {
-  _MockTranscriptionProvider(this._handler);
-
-  final Future<TranscriptionResult> Function(
-    List<int> bytes,
-    String filename,
-    String apiKey,
-  ) _handler;
-
-  int callCount = 0;
-
-  @override
-  Future<TranscriptionResult> transcribeChunk({
-    required List<int> bytes,
-    required String filename,
-    required String apiKey,
-    TranscriptionOptions options = const TranscriptionOptions.defaults(),
-  }) async {
-    callCount++;
-    return _handler(bytes, filename, apiKey);
-  }
-
-  @override
-  int concurrencyFor(int aliveKeyCount) =>
-      aliveKeyCount.clamp(1, AppConstants.kMaxConcurrentChunks);
-
-  @override
-  TranscriptionProviderId get id => TranscriptionProviderId.groq;
-}
-
-/// Файл-заглушка: реализует [File] без обращения к файловой системе.
-/// Позволяет отслеживать вызов delete().
-class _FakeChunkFile implements File {
-  _FakeChunkFile(this._filePath);
-
-  final String _filePath;
-  bool deleted = false;
-
-  @override
-  String get path => _filePath;
-
-  @override
-  Uri get uri => Uri.file(_filePath);
-
-  @override
-  bool get isAbsolute => true;
-
-  @override
-  File get absolute => this;
-
-  @override
-  Directory get parent => throw UnimplementedError();
-
-  @override
-  Future<Uint8List> readAsBytes() async => Uint8List.fromList([1, 2, 3]);
-
-  @override
-  Uint8List readAsBytesSync() => Uint8List.fromList([1, 2, 3]);
-
-  @override
-  Future<File> delete({bool recursive = false}) async {
-    deleted = true;
-    return this;
-  }
-
-  @override
-  void deleteSync({bool recursive = false}) => deleted = true;
-
-  @override
-  Future<bool> exists() async => !deleted;
-
-  @override
-  bool existsSync() => !deleted;
-
-  @override
-  Future<int> length() async => 3;
-
-  @override
-  int lengthSync() => 3;
-
-  @override
-  Future<File> create({bool recursive = false, bool exclusive = false}) =>
-      throw UnimplementedError();
-
-  @override
-  void createSync({bool recursive = false, bool exclusive = false}) =>
-      throw UnimplementedError();
-
-  @override
-  Future<File> copy(String newPath) => throw UnimplementedError();
-
-  @override
-  File copySync(String newPath) => throw UnimplementedError();
-
-  @override
-  Future<DateTime> lastAccessed() => throw UnimplementedError();
-
-  @override
-  DateTime lastAccessedSync() => throw UnimplementedError();
-
-  @override
-  Future<DateTime> lastModified() => throw UnimplementedError();
-
-  @override
-  DateTime lastModifiedSync() => throw UnimplementedError();
-
-  @override
-  Future<RandomAccessFile> open({FileMode mode = FileMode.read}) =>
-      throw UnimplementedError();
-
-  @override
-  Stream<List<int>> openRead([int? start, int? end]) =>
-      throw UnimplementedError();
-
-  @override
-  RandomAccessFile openSync({FileMode mode = FileMode.read}) =>
-      throw UnimplementedError();
-
-  @override
-  IOSink openWrite({
-    FileMode mode = FileMode.write,
-    Encoding encoding = utf8,
-  }) =>
-      throw UnimplementedError();
-
-  @override
-  Future<List<String>> readAsLines({Encoding encoding = utf8}) =>
-      throw UnimplementedError();
-
-  @override
-  List<String> readAsLinesSync({Encoding encoding = utf8}) =>
-      throw UnimplementedError();
-
-  @override
-  Future<String> readAsString({Encoding encoding = utf8}) =>
-      throw UnimplementedError();
-
-  @override
-  String readAsStringSync({Encoding encoding = utf8}) =>
-      throw UnimplementedError();
-
-  @override
-  Future<File> rename(String newPath) => throw UnimplementedError();
-
-  @override
-  File renameSync(String newPath) => throw UnimplementedError();
-
-  @override
-  Future<String> resolveSymbolicLinks() => throw UnimplementedError();
-
-  @override
-  String resolveSymbolicLinksSync() => throw UnimplementedError();
-
-  @override
-  Future setLastAccessed(DateTime time) => throw UnimplementedError();
-
-  @override
-  void setLastAccessedSync(DateTime time) => throw UnimplementedError();
-
-  @override
-  Future setLastModified(DateTime time) => throw UnimplementedError();
-
-  @override
-  void setLastModifiedSync(DateTime time) => throw UnimplementedError();
-
-  @override
-  Future<FileStat> stat() => throw UnimplementedError();
-
-  @override
-  FileStat statSync() => throw UnimplementedError();
-
-  @override
-  Stream<FileSystemEvent> watch({
-    int events = FileSystemEvent.all,
-    bool recursive = false,
-  }) =>
-      throw UnimplementedError();
-
-  @override
-  Future<File> writeAsBytes(
-    List<int> bytes, {
-    FileMode mode = FileMode.write,
-    bool flush = false,
-  }) =>
-      throw UnimplementedError();
-
-  @override
-  void writeAsBytesSync(
-    List<int> bytes, {
-    FileMode mode = FileMode.write,
-    bool flush = false,
-  }) =>
-      throw UnimplementedError();
-
-  @override
-  Future<File> writeAsString(
-    String contents, {
-    FileMode mode = FileMode.write,
-    Encoding encoding = utf8,
-    bool flush = false,
-  }) =>
-      throw UnimplementedError();
-
-  @override
-  void writeAsStringSync(
-    String contents, {
-    FileMode mode = FileMode.write,
-    Encoding encoding = utf8,
-    bool flush = false,
-  }) =>
-      throw UnimplementedError();
-}
-
-/// Мок AudioChunkingService — возвращает заданные файлы без ffmpeg.
-class _MockAudioChunkingService extends AudioChunkingService {
-  _MockAudioChunkingService({required this.chunkFiles});
-
-  final List<_FakeChunkFile> chunkFiles;
-
-  @override
-  Future<AudioMetadata> getMetadata(String filePath) async => const AudioMetadata(
-        name: 'test.ogg',
-        durationSeconds: 2400.0,
-        sizeBytes: 1024,
-      );
-
-  @override
-  Future<List<File>> split(
-    String filePath,
-    double totalDurationSeconds, {
-    String? outputDir,
-  }) async {
-    return chunkFiles;
-  }
-}
+import '../../helpers/transcription_mocks.dart';
 
 // ---------------------------------------------------------------------------
 // Константы.
@@ -292,8 +41,8 @@ void main() {
     // -----------------------------------------------------------------------
     test('сценарий 1 — happy path 2 чанка: ChunkedSuccess, текст с таймкодами', () async {
       final chunks = [
-        _FakeChunkFile('/tmp/chunk_000.ogg'),
-        _FakeChunkFile('/tmp/chunk_001.ogg'),
+        FakeChunkFile('/tmp/chunk_000.ogg'),
+        FakeChunkFile('/tmp/chunk_001.ogg'),
       ];
 
       // Сегмент в чанке 0 (offset=0s): [00:00:00] Привет мир
@@ -310,7 +59,7 @@ void main() {
       );
 
       int callIndex = 0;
-      final apiService = _MockTranscriptionProvider((_, __, ___) async {
+      final apiService = MockTranscriptionProvider((_, __, ___) async {
         final i = callIndex++;
         if (i == 0) {
           return TranscriptionResult(
@@ -332,9 +81,9 @@ void main() {
 
       // 1 ключ → aliveKeyCount=1 → semaphore=1 → последовательное выполнение
       final ctrl = ChunkedTranscriptionController(
-        pool: GroqKeyPool(initialKeys: [_testKey.raw]),
+        pool: KeyPool(initialKeys: [_testKey.raw]),
         apiService: apiService,
-        chunkingService: _MockAudioChunkingService(chunkFiles: chunks),
+        chunkingService: MockAudioChunkingService(chunkFiles: chunks),
       );
 
       await ctrl.start(_dummyFile);
@@ -355,10 +104,10 @@ void main() {
     // Сценарий 2: Retry — первый вызов NetworkException, второй успешен.
     // -----------------------------------------------------------------------
     test('сценарий 2 — retry и успех: mock вызван 2 раза, итог ChunkedSuccess', () async {
-      final chunk = _FakeChunkFile('/tmp/chunk_000.ogg');
+      final chunk = FakeChunkFile('/tmp/chunk_000.ogg');
 
       int calls = 0;
-      final apiService = _MockTranscriptionProvider((_, __, ___) async {
+      final apiService = MockTranscriptionProvider((_, __, ___) async {
         calls++;
         if (calls == 1) {
           throw const NetworkException('Нет соединения');
@@ -373,9 +122,9 @@ void main() {
       });
 
       final ctrl = ChunkedTranscriptionController(
-        pool: GroqKeyPool(initialKeys: [_testKey.raw]),
+        pool: KeyPool(initialKeys: [_testKey.raw]),
         apiService: apiService,
-        chunkingService: _MockAudioChunkingService(chunkFiles: [chunk]),
+        chunkingService: MockAudioChunkingService(chunkFiles: [chunk]),
       );
 
       await ctrl.start(_dummyFile);
@@ -390,19 +139,19 @@ void main() {
     // Сценарий 3: Исчерпаны retries (3 попытки) → ChunkedError.
     // -----------------------------------------------------------------------
     test('сценарий 3 — исчерпаны retries: после 3 попыток ChunkedError', () async {
-      final chunk = _FakeChunkFile('/tmp/chunk_000.ogg');
+      final chunk = FakeChunkFile('/tmp/chunk_000.ogg');
 
       int calls = 0;
-      final apiService = _MockTranscriptionProvider((_, __, ___) async {
+      final apiService = MockTranscriptionProvider((_, __, ___) async {
         calls++;
         throw const NetworkException('Сеть недоступна');
       });
 
       // retryDelay: нулевой → тест не ждёт реальных задержек
       final ctrl = ChunkedTranscriptionController(
-        pool: GroqKeyPool(initialKeys: [_testKey.raw]),
+        pool: KeyPool(initialKeys: [_testKey.raw]),
         apiService: apiService,
-        chunkingService: _MockAudioChunkingService(chunkFiles: [chunk]),
+        chunkingService: MockAudioChunkingService(chunkFiles: [chunk]),
         retryDelay: (_) => Duration.zero,
       );
 
@@ -422,14 +171,14 @@ void main() {
     // Сценарий 4: Cleanup — оба файла удалены, даже при AuthException.
     // -----------------------------------------------------------------------
     test('сценарий 4 — cleanup: оба tmp-файла удалены при AuthException', () async {
-      final chunk0 = _FakeChunkFile('/tmp/chunk_000.ogg');
-      final chunk1 = _FakeChunkFile('/tmp/chunk_001.ogg');
+      final chunk0 = FakeChunkFile('/tmp/chunk_000.ogg');
+      final chunk1 = FakeChunkFile('/tmp/chunk_001.ogg');
 
       // Первый чанк успешен, второй бросает AuthException.
       // Но из-за Future.wait параллельного выполнения поведение зависит от порядка.
       // Используем maxConcurrent=1 для последовательного выполнения: chunk0 → chunk1.
       int callIndex = 0;
-      final apiService = _MockTranscriptionProvider((_, __, ___) async {
+      final apiService = MockTranscriptionProvider((_, __, ___) async {
         final i = callIndex++;
         if (i == 0) {
           return TranscriptionResult(
@@ -446,9 +195,9 @@ void main() {
 
       // 1 ключ → semaphore=1 → последовательно: chunk0 → chunk1
       final ctrl = ChunkedTranscriptionController(
-        pool: GroqKeyPool(initialKeys: [_testKey.raw]),
+        pool: KeyPool(initialKeys: [_testKey.raw]),
         apiService: apiService,
-        chunkingService: _MockAudioChunkingService(chunkFiles: [chunk0, chunk1]),
+        chunkingService: MockAudioChunkingService(chunkFiles: [chunk0, chunk1]),
       );
 
       await ctrl.start(_dummyFile);
