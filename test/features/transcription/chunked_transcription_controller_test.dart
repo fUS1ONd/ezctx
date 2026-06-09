@@ -309,6 +309,76 @@ void main() {
       // 0 живых ключей → Deepgram-политика: 0
       expect(provider.concurrencyFor(0), equals(0));
     });
+
+    // CR-01: concurrencyFor(0)==0, прогнанный ЧЕРЕЗ контроллер, не должен
+    // приводить к вечному зависанию _Semaphore(0). Контроллер обязан
+    // обнулить порог до 1 и завершиться (acquireKey сам бросит исключение,
+    // если живых ключей нет). Оборачиваем в timeout — при регрессии
+    // (deadlock) тест упадёт по таймауту, а не зависнет навсегда.
+    test(
+      'concurrencyFor(0)==0 через контроллер → завершается, не зависает',
+      () async {
+        final chunk = FakeChunkFile('/tmp/chunk_000.ogg');
+        final apiService = MockTranscriptionProvider(
+          (_, __, ___) async => _makeResult(text: 'OK'),
+          // Политика, которая при любом числе ключей возвращает 0 —
+          // воспроизводит Deepgram-без-живых-ключей напрямую.
+          concurrencyPolicy: (_) => 0,
+        );
+        final chunkingService = MockAudioChunkingService(chunkFiles: [chunk]);
+
+        final ctrl = ChunkedTranscriptionController(
+          pool: KeyPool(initialKeys: [_testKey.raw]),
+          apiService: apiService,
+          chunkingService: chunkingService,
+        );
+
+        // start() не должен зависнуть: при флоре до 1 чанк обрабатывается.
+        await ctrl.start(_dummyFile).timeout(
+              const Duration(seconds: 5),
+              onTimeout: () => fail(
+                'start() завис при concurrencyFor(0)==0 — _Semaphore(0) deadlock',
+              ),
+            );
+
+        // Живой ключ есть → чанк успешно обработан, без зависания.
+        expect(ctrl.state, isA<ChunkedSuccess>());
+      },
+    );
+
+    // CR-01 (продолжение): concurrency 0 И нет живых ключей → контроллер
+    // должен завершиться ошибкой (ChunkedError), а не зависнуть.
+    test(
+      'concurrencyFor(0)==0 без живых ключей → ChunkedError, не зависает',
+      () async {
+        final chunk = FakeChunkFile('/tmp/chunk_000.ogg');
+        final apiService = MockTranscriptionProvider(
+          (_, __, ___) async => _makeResult(),
+          concurrencyPolicy: (_) => 0,
+        );
+        final chunkingService = MockAudioChunkingService(chunkFiles: [chunk]);
+
+        // Пул с ключом, который сразу исчерпан → aliveKeyCount==0,
+        // _blockedUntil пуст → acquireKey бросит AllKeysBlockedException.
+        final pool = KeyPool(initialKeys: ['only-key-test']);
+        pool.reportExhausted('only-key-test');
+
+        final ctrl = ChunkedTranscriptionController(
+          pool: pool,
+          apiService: apiService,
+          chunkingService: chunkingService,
+        );
+
+        await ctrl.start(_dummyFile).timeout(
+              const Duration(seconds: 5),
+              onTimeout: () => fail(
+                'start() завис вместо немедленной ошибки при отсутствии ключей',
+              ),
+            );
+
+        expect(ctrl.state, isA<ChunkedError>());
+      },
+    );
   });
 
   // -------------------------------------------------------------------------

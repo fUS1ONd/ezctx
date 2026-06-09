@@ -211,7 +211,12 @@ class ChunkedTranscriptionController extends ChangeNotifier {
     // clamp(1, kMaxConcurrentChunks): нижний порог 1 предотвращает деление на ноль
     // и гарантирует обработку хотя бы одного чанка, верхний — ограничен kMaxConcurrentChunks.
     final concurrency = _api.concurrencyFor(_pool.aliveKeyCount);
-    final semaphore = _Semaphore(concurrency);
+    // Семафор не может иметь вместимость 0 — иначе run() ждёт вечно
+    // (0 >= 0 → каждый чанк паркуется в очередь и никогда не запускается,
+    // Future.wait зависает, finally-cleanup tmp-чанков не выполняется).
+    // Нулевую конкурентность (Deepgram без живых ключей) трактуем как 1:
+    // acquireKey() сам бросит AllKeysBlockedException, если живых ключей нет.
+    final semaphore = _Semaphore(concurrency < 1 ? 1 : concurrency);
 
     try {
       await Future.wait(
