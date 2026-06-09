@@ -7,7 +7,7 @@ library;
 import 'package:ezctx/core/error/app_exception.dart';
 import 'package:ezctx/features/settings/api_key_repository.dart';
 import 'package:ezctx/features/transcription/chunked_transcription_controller.dart';
-import 'package:ezctx/features/transcription/groq_key_pool.dart';
+import 'package:ezctx/features/transcription/key_pool.dart';
 import 'package:ezctx/features/transcription/normalized_audio_file.dart';
 import 'package:ezctx/features/transcription/transcription_result.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -81,7 +81,7 @@ void main() {
 
       // 1 ключ → aliveKeyCount=1 → semaphore=1 → последовательное выполнение
       final ctrl = ChunkedTranscriptionController(
-        pool: GroqKeyPool(initialKeys: [_testKey.raw]),
+        pool: KeyPool(initialKeys: [_testKey.raw]),
         apiService: apiService,
         chunkingService: MockAudioChunkingService(chunkFiles: chunks),
       );
@@ -122,7 +122,7 @@ void main() {
       });
 
       final ctrl = ChunkedTranscriptionController(
-        pool: GroqKeyPool(initialKeys: [_testKey.raw]),
+        pool: KeyPool(initialKeys: [_testKey.raw]),
         apiService: apiService,
         chunkingService: MockAudioChunkingService(chunkFiles: [chunk]),
       );
@@ -149,7 +149,7 @@ void main() {
 
       // retryDelay: нулевой → тест не ждёт реальных задержек
       final ctrl = ChunkedTranscriptionController(
-        pool: GroqKeyPool(initialKeys: [_testKey.raw]),
+        pool: KeyPool(initialKeys: [_testKey.raw]),
         apiService: apiService,
         chunkingService: MockAudioChunkingService(chunkFiles: [chunk]),
         retryDelay: (_) => Duration.zero,
@@ -195,7 +195,7 @@ void main() {
 
       // 1 ключ → semaphore=1 → последовательно: chunk0 → chunk1
       final ctrl = ChunkedTranscriptionController(
-        pool: GroqKeyPool(initialKeys: [_testKey.raw]),
+        pool: KeyPool(initialKeys: [_testKey.raw]),
         apiService: apiService,
         chunkingService: MockAudioChunkingService(chunkFiles: [chunk0, chunk1]),
       );

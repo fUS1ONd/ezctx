@@ -1,7 +1,8 @@
 import 'package:ezctx/core/error/app_exception.dart';
 import 'package:ezctx/features/settings/api_key_repository.dart';
+import 'package:ezctx/features/transcription/audio_metadata.dart';
 import 'package:ezctx/features/transcription/chunked_transcription_controller.dart';
-import 'package:ezctx/features/transcription/groq_key_pool.dart';
+import 'package:ezctx/features/transcription/key_pool.dart';
 import 'package:ezctx/features/transcription/normalized_audio_file.dart';
 import 'package:ezctx/features/transcription/transcription_result.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -53,7 +54,7 @@ void main() {
       final chunkingService = MockAudioChunkingService(chunkFiles: [chunk]);
 
       final ctrl = ChunkedTranscriptionController(
-        pool: GroqKeyPool(initialKeys: [_testKey.raw]),
+        pool: KeyPool(initialKeys: [_testKey.raw]),
         apiService: apiService,
         chunkingService: chunkingService,
       );
@@ -79,7 +80,7 @@ void main() {
       final chunkingService = MockAudioChunkingService(chunkFiles: [chunk]);
 
       final ctrl = ChunkedTranscriptionController(
-        pool: GroqKeyPool(initialKeys: [_testKey.raw]),
+        pool: KeyPool(initialKeys: [_testKey.raw]),
         apiService: apiService,
         chunkingService: chunkingService,
         retryDelay: (_) => Duration.zero,
@@ -102,7 +103,7 @@ void main() {
       final chunkingService = MockAudioChunkingService(chunkFiles: [chunk]);
 
       final ctrl = ChunkedTranscriptionController(
-        pool: GroqKeyPool(initialKeys: [_testKey.raw]),
+        pool: KeyPool(initialKeys: [_testKey.raw]),
         apiService: apiService,
         chunkingService: chunkingService,
       );
@@ -143,7 +144,7 @@ void main() {
 
       // 2 ключа → aliveKeyCount=2 → semaphore=min(2, kMaxConcurrentChunks)=2
       final ctrl = ChunkedTranscriptionController(
-        pool: GroqKeyPool(initialKeys: [_testKey.raw, 'second-key-${_testKey.raw}']),
+        pool: KeyPool(initialKeys: [_testKey.raw, 'second-key-${_testKey.raw}']),
         apiService: apiService,
         chunkingService: chunkingService,
       );
@@ -203,7 +204,7 @@ void main() {
       );
 
       final ctrl = ChunkedTranscriptionController(
-        pool: GroqKeyPool(initialKeys: [_testKey.raw]),
+        pool: KeyPool(initialKeys: [_testKey.raw]),
         apiService: apiService,
         chunkingService: chunkingService,
       );
@@ -233,7 +234,7 @@ void main() {
       final chunkingService = MockAudioChunkingService(chunkFiles: chunks);
 
       final ctrl = ChunkedTranscriptionController(
-        pool: GroqKeyPool(initialKeys: [_testKey.raw]),
+        pool: KeyPool(initialKeys: [_testKey.raw]),
         apiService: apiService,
         chunkingService: chunkingService,
       );
@@ -259,7 +260,7 @@ void main() {
       final chunkingService = MockAudioChunkingService(chunkFiles: []);
 
       final ctrl = ChunkedTranscriptionController(
-        pool: GroqKeyPool(),
+        pool: KeyPool(),
         apiService: apiService,
         chunkingService: chunkingService,
       );

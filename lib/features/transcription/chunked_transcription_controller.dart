@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../../core/error/app_exception.dart';
 import 'audio_chunking_service.dart';
 import 'chunk_state.dart';
-import 'groq_key_pool.dart';
+import 'key_pool.dart';
 import 'normalized_audio_file.dart';
 import 'transcription_options.dart';
 import 'transcription_provider.dart';
@@ -101,11 +101,11 @@ class ChunkedMissingKey extends ChunkedState {
 
 /// ChangeNotifier, управляющий пайплайном транскрибации большого файла:
 /// разбивка через [AudioChunkingService] → параллельная отправка (≤ maxConcurrent) →
-/// retry на транзиентных ошибках через [GroqKeyPool] → сборка текста с таймкодами →
+/// retry на транзиентных ошибках через [KeyPool] → сборка текста с таймкодами →
 /// удаление tmp-чанков.
 class ChunkedTranscriptionController extends ChangeNotifier {
   ChunkedTranscriptionController({
-    required GroqKeyPool pool,
+    required KeyPool pool,
     required TranscriptionProvider apiService,
     required AudioChunkingService chunkingService,
     @visibleForTesting Duration Function(int attempt)? retryDelay,
@@ -117,7 +117,7 @@ class ChunkedTranscriptionController extends ChangeNotifier {
   static Duration _defaultRetryDelay(int attempt) =>
       Duration(seconds: 5 * (1 << (attempt - 1).clamp(0, 5)));
 
-  final GroqKeyPool _pool;
+  final KeyPool _pool;
   final TranscriptionProvider _api;
   final AudioChunkingService _chunkingService;
   final Duration Function(int attempt) _retryDelay;
@@ -263,7 +263,7 @@ class ChunkedTranscriptionController extends ChangeNotifier {
     TranscriptionOptions options,
   ) async {
     final bytes = await file.readAsBytes();
-    final filename = 'chunk_${index.toString().padLeft(3, '0')}.mp3';
+    final filename = 'chunk_${index.toString().padLeft(3, '0')}.ogg';
 
     // Отдельные счётчики для разных типов ошибок: смешивать нельзя,
     // иначе при 5 rate-limit попытках (смена ключей) следующая сетевая ошибка
@@ -304,6 +304,14 @@ class ChunkedTranscriptionController extends ChangeNotifier {
         // Все ключи заблокированы и таймаут (10 мин) истёк — пробрасываем напрямую,
         // чтобы Future.wait→catch вывел понятное сообщение, а не «Неизвестная ошибка».
         rethrow;
+      } on KeyExhaustedException {
+        // Кредиты ключа исчерпаны (Deepgram HTTP 402) — ключ выводится из ротации
+        // навсегда. Счётчики networkAttempt/rateLimitAttempt НЕ инкрементируются:
+        // это не транзиентная ошибка, а постоянная. Следующий acquireKey() вернёт
+        // другой живой ключ или бросит AllKeysBlockedException.
+        _pool.reportExhausted(key);
+        _updateChunkState(index, ChunkRetrying(index, attempt: 0));
+        // Продолжаем цикл — без rethrow.
       } on RateLimitException catch (e) {
         rateLimitAttempt++;
         // Сообщаем пулу о блокировке ключа на указанное время.
