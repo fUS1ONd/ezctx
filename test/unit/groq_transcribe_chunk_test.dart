@@ -41,13 +41,13 @@ class _MultipartCapturingClient extends http.BaseClient {
 void main() {
   const _fakeKey = 'gsk_testkey';
   const _fakeBytes = [0x49, 0x44, 0x33]; // mp3 header magic bytes
-  const _fakeFilename = 'chunk_000.mp3';
+  const _fakeFilename = 'chunk_000.ogg';
 
   GroqProvider _serviceWith(http.Client client) =>
       GroqProvider(clientFactory: () => client);
 
   group('GroqProvider.transcribeChunk — content type', () {
-    test('запрос содержит Content-Type: audio/mpeg для mp3-чанка', () async {
+    test('запрос содержит Content-Type: audio/ogg для ogg-чанка', () async {
       String? capturedContentType;
 
       final client = _MultipartCapturingClient((request) async {
@@ -67,7 +67,7 @@ void main() {
         apiKey: _fakeKey,
       );
 
-      expect(capturedContentType, equals('audio/mpeg'));
+      expect(capturedContentType, equals('audio/ogg'));
     });
 
     test('запрос содержит поле timestamp_granularities[]=segment', () async {
