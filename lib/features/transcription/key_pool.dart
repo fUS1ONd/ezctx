@@ -68,6 +68,11 @@ class KeyPool extends ChangeNotifier {
   // Очередь ожидающих acquireKey()
   final List<Completer<String>> _waiters = [];
 
+  // Единственный таймер пробуждения. Храним хэндл, чтобы отменять предыдущий
+  // перед перепланированием — иначе N reportRateLimited создавали бы N
+  // независимых таймеров (WR-05).
+  Timer? _wakeupTimer;
+
   // ── Геттеры ─────────────────────────────────────────────────────────────
 
   /// Количество живых ключей (не заблокированных и не исчерпанных).
@@ -110,7 +115,15 @@ class KeyPool extends ChangeNotifier {
   }
 
   /// Планирует пробуждение при разблокировке ближайшего ключа.
+  ///
+  /// Хранит единственный таймер (_wakeupTimer) и отменяет предыдущий перед
+  /// перепланированием — без этого каждый reportRateLimited плодил бы новый
+  /// независимый Timer (timer-churn, лишние notifyListeners). Если waiter'ов
+  /// нет — планировать нечего (no-op).
   void _scheduleWakeup() {
+    // Некого будить — таймер не нужен.
+    if (_waiters.isEmpty) return;
+
     final now = clock.now();
     DateTime? nearest;
     for (final t in _blockedUntil.values) {
@@ -120,7 +133,9 @@ class KeyPool extends ChangeNotifier {
     }
     if (nearest == null) return;
     final delay = nearest.difference(now) + const Duration(milliseconds: 50);
-    Timer(delay, _onWakeup);
+    // Отменяем предыдущий таймер — держим строго один активный.
+    _wakeupTimer?.cancel();
+    _wakeupTimer = Timer(delay, _onWakeup);
   }
 
   /// Вызывается при пробуждении — выдаёт ровно один ключ одному ожидающему.
@@ -159,6 +174,9 @@ class KeyPool extends ChangeNotifier {
         }
       }
       _waiters.clear();
+      // Будить больше некого — снимаем таймер пробуждения (WR-05).
+      _wakeupTimer?.cancel();
+      _wakeupTimer = null;
     }
   }
 
@@ -281,5 +299,14 @@ class KeyPool extends ChangeNotifier {
     // припаркованные waiter'ы не дождутся пробуждения, проваливаем их сразу (WR-04).
     _failWaitersIfPoolDead();
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    // Отменяем таймер пробуждения, чтобы не оставлять висящий Timer после
+    // уничтожения пула (WR-05).
+    _wakeupTimer?.cancel();
+    _wakeupTimer = null;
+    super.dispose();
   }
 }
