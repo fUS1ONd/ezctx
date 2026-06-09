@@ -37,10 +37,19 @@ class RateLimitException extends AppException {
 }
 
 /// Все API-ключи заблокированы rate-limit'ом и таймаут ожидания истёк.
-/// Бросается из GroqKeyPool.acquireKey() после 10 минут ожидания живого ключа.
+/// Бросается из KeyPool.acquireKey() после 10 минут ожидания живого ключа.
 class AllKeysBlockedException extends AppException {
   const AllKeysBlockedException([
     super.message = 'Все ключи заблокированы. Ожидание…',
+  ]);
+}
+
+/// Кредиты API-ключа провайдера исчерпаны — ключ выводится из ротации навсегда.
+/// Deepgram: HTTP 402. Groq: никогда не бросает это исключение.
+/// Не содержит значение ключа — сообщение статично (T-09-01-I).
+class KeyExhaustedException extends AppException {
+  const KeyExhaustedException([
+    super.message = 'Кредиты API-ключа исчерпаны.',
   ]);
 }
 
@@ -51,6 +60,8 @@ extension AppExceptionUserMessage on AppException {
         'Превышен лимит Groq. Попробуйте через $retryAfterSeconds с.',
     AllKeysBlockedException() =>
         'Все API-ключи заблокированы лимитом. Подождите или добавьте ещё ключи.',
+    KeyExhaustedException() =>
+        'Кредиты API-ключа исчерпаны. Добавьте ключ с активным балансом.',
     AuthException() =>
         'Неверный API-ключ. Проверьте настройки.',
     NetworkException() =>
