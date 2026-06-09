@@ -275,9 +275,14 @@ class ChunkedTranscriptionController extends ChangeNotifier {
     // немедленно завершает чанк без реальных ретраев по сети.
     int networkAttempt = 0;
     int rateLimitAttempt = 0;
+    // Отдельный счётчик исчерпанных ключей: провайдер, возвращающий 402 на
+    // каждый ключ, не должен крутить цикл по всему пулу без ограничения.
+    int exhaustedAttempt = 0;
     const maxAttempts = 10;
 
-    while (networkAttempt < maxAttempts && rateLimitAttempt < maxAttempts) {
+    while (networkAttempt < maxAttempts &&
+        rateLimitAttempt < maxAttempts &&
+        exhaustedAttempt < maxAttempts) {
       // Показываем статус ожидания ключа если все заблокированы.
       if (_pool.aliveKeyCount == 0) {
         _updateChunkState(index, ChunkWaitingForKey(index));
@@ -311,10 +316,15 @@ class ChunkedTranscriptionController extends ChangeNotifier {
         rethrow;
       } on KeyExhaustedException {
         // Кредиты ключа исчерпаны (Deepgram HTTP 402) — ключ выводится из ротации
-        // навсегда. Счётчики networkAttempt/rateLimitAttempt НЕ инкрементируются:
-        // это не транзиентная ошибка, а постоянная. Следующий acquireKey() вернёт
-        // другой живой ключ или бросит AllKeysBlockedException.
+        // навсегда. networkAttempt/rateLimitAttempt НЕ инкрементируются (это не
+        // транзиентная ошибка), но exhaustedAttempt — да: иначе misbehaving-провайдер,
+        // отдающий 402 на все ключи, крутил бы цикл по всему пулу без потолка.
+        exhaustedAttempt++;
         _pool.reportExhausted(key);
+        if (exhaustedAttempt >= maxAttempts) {
+          // Исчерпан лимит попыток на исчерпанных ключах — пробрасываем понятную причину.
+          throw const KeyExhaustedException();
+        }
         _updateChunkState(index, ChunkRetrying(index, attempt: 0));
         // Продолжаем цикл — без rethrow.
       } on RateLimitException catch (e) {
