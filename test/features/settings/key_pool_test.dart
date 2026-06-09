@@ -140,5 +140,82 @@ void main() {
         expect(thrown, isA<AllKeysBlockedException>());
       });
     });
+
+    // ── WR-04: припаркованный waiter будится при исчерпании последнего ключа ──
+    test(
+      'WR-04: reportExhausted последнего живого ключа будит waiter немедленно',
+      () {
+        fakeAsync((async) {
+          // k1 заблокирован rate-limit'ом, k2 пока живой.
+          final pool = KeyPool(initialKeys: ['k1', 'k2']);
+          pool.reportRateLimited('k1', 600); // 10 мин блокировки
+
+          // Исчерпываем k2 — но waiter появится только при отсутствии живых.
+          // Сначала блокируем k2, чтобы acquireKey припарковал waiter.
+          pool.reportRateLimited('k2', 600);
+
+          Object? thrown;
+          String? result;
+          pool.acquireKey().then((k) => result = k).catchError((e) {
+            thrown = e;
+            return '';
+          });
+
+          async.flushMicrotasks();
+          // Пока оба ключа в rate-limit — waiter висит, исключения нет.
+          expect(thrown, isNull);
+          expect(result, isNull);
+
+          // Исчерпываем оба ключа (402). Теперь живых нет, но _blockedUntil
+          // ещё не пуст — снимем блокировки удалением.
+          pool.reportExhausted('k1');
+          pool.reportExhausted('k2');
+          // _blockedUntil всё ещё содержит k1/k2 → _failWaitersIfPoolDead
+          // не сработает. Удаляем ключи — это чистит и _blockedUntil.
+          pool.removeKey('k1');
+          pool.removeKey('k2');
+
+          async.flushMicrotasks();
+          // Waiter должен быть провален НЕМЕДЛЕННО, без 10-мин таймаута.
+          expect(
+            thrown,
+            isA<AllKeysBlockedException>(),
+            reason: 'удаление последнего ключа должно сразу провалить waiter',
+          );
+        });
+      },
+    );
+
+    test(
+      'WR-04: removeKey единственного живого ключа будит waiter немедленно',
+      () {
+        fakeAsync((async) {
+          final pool = KeyPool(initialKeys: ['k1', 'k2']);
+          // Оба в rate-limit → acquireKey припаркует waiter.
+          pool.reportRateLimited('k1', 600);
+          pool.reportRateLimited('k2', 600);
+
+          Object? thrown;
+          pool.acquireKey().catchError((e) {
+            thrown = e;
+            return '';
+          });
+
+          async.flushMicrotasks();
+          expect(thrown, isNull);
+
+          // Удаляем оба ключа — _blockedUntil очищается, живых не остаётся.
+          pool.removeKey('k1');
+          pool.removeKey('k2');
+
+          async.flushMicrotasks();
+          expect(
+            thrown,
+            isA<AllKeysBlockedException>(),
+            reason: 'waiter должен быть провален сразу при опустошении пула',
+          );
+        });
+      },
+    );
   });
 }

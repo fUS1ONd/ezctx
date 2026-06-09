@@ -143,6 +143,25 @@ class KeyPool extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Немедленно проваливает всех припаркованных waiter'ов, если живых ключей
+  /// не осталось и нет временных rate-limit блокировок (ждать больше нечего).
+  ///
+  /// Зеркалит быстрый путь R-04 из [acquireKey]: при опустошении пула
+  /// (removeKey/reportExhausted последнего ключа) waiter не должен висеть
+  /// 10 минут до таймаута — корректнее сразу бросить [AllKeysBlockedException].
+  void _failWaitersIfPoolDead() {
+    if (aliveKeyCount == 0 && _blockedUntil.isEmpty && _waiters.isNotEmpty) {
+      for (final w in _waiters) {
+        if (!w.isCompleted) {
+          w.completeError(const AllKeysBlockedException(
+            'Кредиты всех API-ключей исчерпаны. Добавьте ключ с активным балансом.',
+          ));
+        }
+      }
+      _waiters.clear();
+    }
+  }
+
   // ── Публичный API ────────────────────────────────────────────────────────
 
   /// Возвращает следующий живой ключ (round-robin).
@@ -201,6 +220,9 @@ class KeyPool extends ChangeNotifier {
       'reportExhausted: ...${key.length > 4 ? key.substring(key.length - 4) : key}',
     );
     _exhausted.add(key);
+    // Если это был последний живой ключ и нет rate-limit блокировок —
+    // будить нечем, поэтому сразу проваливаем припаркованных waiter'ов (WR-04).
+    _failWaitersIfPoolDead();
     notifyListeners();
   }
 
@@ -255,6 +277,9 @@ class KeyPool extends ChangeNotifier {
     } else {
       _cyclicIndex = 0;
     }
+    // Удалили последний живой ключ при отсутствии rate-limit блокировок —
+    // припаркованные waiter'ы не дождутся пробуждения, проваливаем их сразу (WR-04).
+    _failWaitersIfPoolDead();
     notifyListeners();
   }
 }
