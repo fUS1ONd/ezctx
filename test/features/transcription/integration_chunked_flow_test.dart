@@ -250,7 +250,7 @@ class _MockAudioChunkingService extends AudioChunkingService {
 
   @override
   Future<AudioMetadata> getMetadata(String filePath) async => const AudioMetadata(
-        name: 'test.mp3',
+        name: 'test.ogg',
         durationSeconds: 2400.0,
         sizeBytes: 1024,
       );
@@ -275,8 +275,9 @@ const _testKey = ApiKeyView(
 );
 
 final _dummyFile = NormalizedAudioFile(
-  path: '/tmp/test_lecture.mp3',
-  // 9000s = 2.5 ч → N=ceil(9000/4920)=2, chunkDuration=4500s → offset чанка 1 = [01:15:00]
+  path: '/tmp/test_lecture.ogg',
+  // 9000s = 2.5 ч → 2 чанка инжектируются напрямую; chunkDuration = 9000/2 = 4500s
+  // (контроллер делит на число чанков, не на порог) → offset чанка 1 = [01:15:00]
   durationSeconds: 9000.0,
 );
 
@@ -291,8 +292,8 @@ void main() {
     // -----------------------------------------------------------------------
     test('сценарий 1 — happy path 2 чанка: ChunkedSuccess, текст с таймкодами', () async {
       final chunks = [
-        _FakeChunkFile('/tmp/chunk_000.mp3'),
-        _FakeChunkFile('/tmp/chunk_001.mp3'),
+        _FakeChunkFile('/tmp/chunk_000.ogg'),
+        _FakeChunkFile('/tmp/chunk_001.ogg'),
       ];
 
       // Сегмент в чанке 0 (offset=0s): [00:00:00] Привет мир
@@ -354,7 +355,7 @@ void main() {
     // Сценарий 2: Retry — первый вызов NetworkException, второй успешен.
     // -----------------------------------------------------------------------
     test('сценарий 2 — retry и успех: mock вызван 2 раза, итог ChunkedSuccess', () async {
-      final chunk = _FakeChunkFile('/tmp/chunk_000.mp3');
+      final chunk = _FakeChunkFile('/tmp/chunk_000.ogg');
 
       int calls = 0;
       final apiService = _MockTranscriptionProvider((_, __, ___) async {
@@ -389,7 +390,7 @@ void main() {
     // Сценарий 3: Исчерпаны retries (3 попытки) → ChunkedError.
     // -----------------------------------------------------------------------
     test('сценарий 3 — исчерпаны retries: после 3 попыток ChunkedError', () async {
-      final chunk = _FakeChunkFile('/tmp/chunk_000.mp3');
+      final chunk = _FakeChunkFile('/tmp/chunk_000.ogg');
 
       int calls = 0;
       final apiService = _MockTranscriptionProvider((_, __, ___) async {
@@ -421,8 +422,8 @@ void main() {
     // Сценарий 4: Cleanup — оба файла удалены, даже при AuthException.
     // -----------------------------------------------------------------------
     test('сценарий 4 — cleanup: оба tmp-файла удалены при AuthException', () async {
-      final chunk0 = _FakeChunkFile('/tmp/chunk_000.mp3');
-      final chunk1 = _FakeChunkFile('/tmp/chunk_001.mp3');
+      final chunk0 = _FakeChunkFile('/tmp/chunk_000.ogg');
+      final chunk1 = _FakeChunkFile('/tmp/chunk_001.ogg');
 
       // Первый чанк успешен, второй бросает AuthException.
       // Но из-за Future.wait параллельного выполнения поведение зависит от порядка.
@@ -460,9 +461,9 @@ void main() {
 
       // Cleanup: оба файла должны быть удалены в блоке finally.
       expect(chunk0.deleted, isTrue,
-          reason: 'chunk_000.mp3 должен быть удалён в блоке finally');
+          reason: 'chunk_000.ogg должен быть удалён в блоке finally');
       expect(chunk1.deleted, isTrue,
-          reason: 'chunk_001.mp3 должен быть удалён в блоке finally');
+          reason: 'chunk_001.ogg должен быть удалён в блоке finally');
     });
   });
 }

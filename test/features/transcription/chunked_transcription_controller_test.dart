@@ -240,7 +240,7 @@ class _MockAudioChunkingService extends AudioChunkingService {
   _MockAudioChunkingService({
     required this.chunkFiles,
     this.metadata = const AudioMetadata(
-      name: 'test.mp3',
+      name: 'test.ogg',
       durationSeconds: 2400.0,
       sizeBytes: 1024,
     ),
@@ -272,7 +272,7 @@ const _testKey = ApiKeyView(
 );
 
 final _dummyFile = NormalizedAudioFile(
-  path: '/tmp/test_lecture.mp3',
+  path: '/tmp/test_lecture.ogg',
   // 9000s = 2.5 ч → chunkDuration = 9000/2 = 4500s → offset чанка 1 = [01:15:00]
   durationSeconds: 9000.0,
 );
@@ -300,7 +300,7 @@ void main() {
     // 1. Успешная транскрибация одного чанка.
     // -----------------------------------------------------------------------
     test('успех: один чанк → ChunkedSuccess с текстом', () async {
-      final chunk = _FakeChunkFile('/tmp/chunk_000.mp3');
+      final chunk = _FakeChunkFile('/tmp/chunk_000.ogg');
       final apiService = _MockTranscriptionProvider(
         (_, __, ___) async => _makeResult(text: 'Лекция по физике'),
       );
@@ -323,7 +323,7 @@ void main() {
     // 2. Retry на NetworkException → итог ChunkedSuccess.
     // -----------------------------------------------------------------------
     test('retry: NetworkException на первом вызове → второй вызов успешен', () async {
-      final chunk = _FakeChunkFile('/tmp/chunk_000.mp3');
+      final chunk = _FakeChunkFile('/tmp/chunk_000.ogg');
       int calls = 0;
       final apiService = _MockTranscriptionProvider((_, __, ___) async {
         calls++;
@@ -349,7 +349,7 @@ void main() {
     // 3. AuthException — не ретраится.
     // -----------------------------------------------------------------------
     test('нет retry на AuthException: mock вызван ровно 1 раз', () async {
-      final chunk = _FakeChunkFile('/tmp/chunk_000.mp3');
+      final chunk = _FakeChunkFile('/tmp/chunk_000.ogg');
       final apiService = _MockTranscriptionProvider(
         (_, __, ___) async => throw const AuthException('Неверный ключ'),
       );
@@ -381,7 +381,7 @@ void main() {
 
       final chunks = List.generate(
         totalChunks,
-        (i) => _FakeChunkFile('/tmp/chunk_${i.toString().padLeft(3, '0')}.mp3'),
+        (i) => _FakeChunkFile('/tmp/chunk_${i.toString().padLeft(3, '0')}.ogg'),
       );
 
       final apiService = _MockTranscriptionProvider((_, __, ___) async {
@@ -418,8 +418,8 @@ void main() {
     // -----------------------------------------------------------------------
     test('таймкоды: chunk 0 → [00:00:00], chunk 1 offset 4500s → [01:15:00]', () async {
       final chunks = [
-        _FakeChunkFile('/tmp/chunk_000.mp3'),
-        _FakeChunkFile('/tmp/chunk_001.mp3'),
+        _FakeChunkFile('/tmp/chunk_000.ogg'),
+        _FakeChunkFile('/tmp/chunk_001.ogg'),
       ];
 
       final seg0 = TranscriptionSegment(
@@ -450,7 +450,7 @@ void main() {
       final chunkingService = _MockAudioChunkingService(
         chunkFiles: chunks,
         metadata: const AudioMetadata(
-          name: 'test.mp3',
+          name: 'test.ogg',
           durationSeconds: 2400.0,
           sizeBytes: 1024,
         ),
@@ -478,7 +478,7 @@ void main() {
     test('cleanup: все tmp-чанки удалены после старта (success)', () async {
       final chunks = List.generate(
         3,
-        (i) => _FakeChunkFile('/tmp/chunk_$i.mp3'),
+        (i) => _FakeChunkFile('/tmp/chunk_$i.ogg'),
       );
 
       final apiService = _MockTranscriptionProvider(
