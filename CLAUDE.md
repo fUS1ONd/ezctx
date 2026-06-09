@@ -17,7 +17,7 @@
 - **Бюджет на распространение**: $0 на v1 (APK + бета через Firebase App Distribution), Google Play ($25 разово) — по необходимости.
 - **Хранение секретов**: API-ключи только в `flutter_secure_storage`, никогда не в репозитории и не в сборке.
 - **ffmpeg на Android**: через `ffmpeg_kit_flutter_new` (содержит ffmpeg + ffprobe).
-- **Размер чанка**: ≤ 19 MB под лимит Groq; нормализация в `mp3 32k/16kHz/mono`, порог нарезки ~82 мин (`kChunkThresholdSeconds = 4920`).
+- **Размер чанка**: ≤ 19 MB под лимит Groq; нормализация в `opus 48k/16kHz/mono` (контейнер `.ogg`, MIME `audio/ogg`), порог нарезки ~54 мин (`kChunkThresholdSeconds = 3240`). libopus доступен в Full-GPL сборке `ffmpeg_kit_flutter_new` — fallback на mp3 не требуется.
 <!-- GSD:project-end -->
 
 <!-- GSD:stack-start source:STACK.md -->
