@@ -8,7 +8,7 @@ class ApiKeyView {
   const ApiKeyView({required this.raw, required this.masked});
 }
 
-/// Repository для управления Groq API-ключами.
+/// Repository для управления API-ключами провайдера (namespace задаётся SecureStorageService).
 /// Единственный потребитель SecureStorageService в feature-слое.
 class ApiKeyRepository {
   ApiKeyRepository(this._storage);

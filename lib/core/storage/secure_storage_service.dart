@@ -28,19 +28,23 @@ abstract interface class SecureStorageService {
 }
 
 /// Реализация SecureStorageService через flutter_secure_storage.
-/// Все API-ключи хранятся под единым ключом как JSON-массив строк.
+/// Все API-ключи хранятся под заданным namespace-ключом как JSON-массив строк.
+/// [storageKey] задаёт namespace: default = Groq, для Deepgram передаётся явно.
 class SecureStorageServiceImpl implements SecureStorageService {
-  SecureStorageServiceImpl({FlutterSecureStorage? storage})
-    : _storage =
-          storage ??
-          const FlutterSecureStorage(
-            aOptions: AndroidOptions(),
-          );
+  SecureStorageServiceImpl({
+    FlutterSecureStorage? storage,
+    String storageKey = AppConstants.storageKeyApiKeys,
+  }) : _storage =
+           storage ??
+           const FlutterSecureStorage(
+             aOptions: AndroidOptions(),
+           ),
+       _storageKey = storageKey;
 
   final FlutterSecureStorage _storage;
 
-  // Используем константу, не магическую строку (T-01-01: нет логирования ключей)
-  static const _storageKey = AppConstants.storageKeyApiKeys;
+  // Namespace ключа хранилища: определяет изоляцию Groq и Deepgram ключей (T-10-03)
+  final String _storageKey;
 
   @override
   Future<void> writeRawKey(String value) async {
