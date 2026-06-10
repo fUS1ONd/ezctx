@@ -111,7 +111,10 @@ class DeepgramProvider implements TranscriptionProvider {
       throw const NetworkException(_networkErrorMessage);
     } on AppException {
       rethrow;
-    } catch (_) {
+    } catch (e) {
+      if (e is TypeError) {
+        throw InternalException('Неожиданная схема ответа Deepgram: $e');
+      }
       throw const NetworkException(_networkErrorMessage);
     } finally {
       client.close();
@@ -158,9 +161,9 @@ class DeepgramProvider implements TranscriptionProvider {
           final sm = s as Map<String, dynamic>;
           segments.add(TranscriptionSegment(
             // start/end — 0-based от начала чанка, НЕ прибавлять offset (Pitfall 5).
-            start: (sm['start'] as num).toDouble(),
-            end: (sm['end'] as num).toDouble(),
-            text: sm['text'] as String? ?? '',
+            start: ((sm['start'] as num?)?.toDouble()) ?? 0.0,
+            end: ((sm['end'] as num?)?.toDouble()) ?? 0.0,
+            text: (sm['text'] as String?) ?? '',
           ));
         }
       }
@@ -183,9 +186,9 @@ class DeepgramProvider implements TranscriptionProvider {
       final segments = wordsList.map((w) {
         final wm = w as Map<String, dynamic>;
         return TranscriptionSegment(
-          start: (wm['start'] as num).toDouble(),
-          end: (wm['end'] as num).toDouble(),
-          text: wm['word'] as String? ?? '',
+          start: ((wm['start'] as num?)?.toDouble()) ?? 0.0,
+          end: ((wm['end'] as num?)?.toDouble()) ?? 0.0,
+          text: (wm['word'] as String?) ?? '',
         );
       }).toList();
       final lastWord = wordsList.last as Map<String, dynamic>;
