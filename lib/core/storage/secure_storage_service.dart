@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:synchronized/synchronized.dart';
 
 import '../constants/app_constants.dart';
 
@@ -42,6 +43,7 @@ class SecureStorageServiceImpl implements SecureStorageService {
        _storageKey = storageKey;
 
   final FlutterSecureStorage _storage;
+  final _lock = Lock();
 
   // Namespace ключа хранилища: определяет изоляцию Groq и Deepgram ключей (T-10-03)
   final String _storageKey;
@@ -78,17 +80,21 @@ class SecureStorageServiceImpl implements SecureStorageService {
 
   @override
   Future<void> addApiKey(String key) async {
-    final keys = await listApiKeys();
-    if (!keys.contains(key)) {
-      keys.add(key);
-      await _storage.write(key: _storageKey, value: jsonEncode(keys));
-    }
+    await _lock.synchronized(() async {
+      final keys = await listApiKeys();
+      if (!keys.contains(key)) {
+        keys.add(key);
+        await _storage.write(key: _storageKey, value: jsonEncode(keys));
+      }
+    });
   }
 
   @override
   Future<void> removeApiKey(String key) async {
-    final keys = await listApiKeys();
-    keys.remove(key);
-    await _storage.write(key: _storageKey, value: jsonEncode(keys));
+    await _lock.synchronized(() async {
+      final keys = await listApiKeys();
+      keys.remove(key);
+      await _storage.write(key: _storageKey, value: jsonEncode(keys));
+    });
   }
 }
