@@ -10,8 +10,6 @@ import '../../core/error/app_exception.dart';
 import '../../core/providers/service_providers.dart';
 import '../../features/transcription/audio_normalization_service.dart';
 import '../../features/transcription/chunked_transcription_controller.dart';
-import '../../features/transcription/deepgram_provider.dart';
-import '../../features/transcription/groq_api_service.dart';
 import '../../features/transcription/normalized_audio_file.dart';
 import '../../features/transcription/processing_args.dart';
 import '../../features/transcription/result_args.dart';
@@ -136,7 +134,9 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen>
       pool: _isDeepgram
           ? ref.read(deepgramKeyPoolProvider)
           : ref.read(groqKeyPoolProvider),
-      apiService: _isDeepgram ? DeepgramProvider() : GroqProvider(),
+      apiService: _isDeepgram
+          ? ref.read(deepgramTranscriptionProviderProvider)
+          : ref.read(groqTranscriptionProviderProvider),
       chunkingService: ref.read(audioChunkingServiceProvider),
     );
     // Слушатель добавляется ДО вызова start(), чтобы не пропустить уведомления,
