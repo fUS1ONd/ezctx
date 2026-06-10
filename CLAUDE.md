@@ -13,7 +13,7 @@
 
 - **Tech stack**: Flutter (Dart) — единый кодбейз под Android/Windows/iOS, зрелый `ffmpeg_kit_flutter_new`, простой перенос React-дизайна.
 - **Платформа v1**: только Android — собирается с Windows+WSL без Mac.
-- **API**: только Groq Whisper (free tier), без серверной части.
+- **API**: Groq Whisper и Deepgram nova-3 (оба free tier), без серверной части.
 - **Бюджет на распространение**: $0 на v1 (APK + бета через Firebase App Distribution), Google Play ($25 разово) — по необходимости.
 - **Хранение секретов**: API-ключи только в `flutter_secure_storage`, никогда не в репозитории и не в сборке.
 - **ffmpeg на Android**: через `ffmpeg_kit_flutter_new` (содержит ffmpeg + ffprobe).

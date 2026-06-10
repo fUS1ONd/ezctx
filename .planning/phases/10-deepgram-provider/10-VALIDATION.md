@@ -1,9 +1,10 @@
 ---
 phase: 10
 slug: deepgram-provider
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: complete
+nyquist_compliant: true
+wave_0_complete: true
+completed: 2026-06-10
 created: 2026-06-10
 ---
 
