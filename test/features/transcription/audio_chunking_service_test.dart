@@ -151,6 +151,27 @@ void main() {
       expect(capturedCommand, contains('chunk_%03d.ogg'));
     });
 
+    // Регрессия: `-f segment -c:a copy` на Opus сохраняет исходные абсолютные
+    // таймстемпы (granule-позиции). Без -reset_timestamps второй чанк начинался
+    // с отметки ~2332с и сообщал длительность всей записи (~4664с) → Groq Whisper
+    // принимал его за 77-минутный поток и отдавал HTTP 502 service_unavailable.
+    // Первый чанк (0→2332с) проходил, последующие ломались. Флаг обнуляет
+    // таймстемпы каждого сегмента к нулю — проверено сквозным запросом в Groq.
+    test('команда содержит -reset_timestamps 1 (иначе Groq 502 на чанках > первого)', () async {
+      final outDir = await _tmpDir();
+      addTearDown(() => outDir.deleteSync(recursive: true));
+
+      String? capturedCommand;
+      final service = AudioChunkingService(
+        ffmpegOverride: (cmd) async { capturedCommand = cmd; },
+      );
+
+      await service.split('/input/audio.ogg', 6480.0, outputDir: outDir.path);
+
+      expect(capturedCommand, isNotNull);
+      expect(capturedCommand, contains('-reset_timestamps 1'));
+    });
+
     test('150 мин (9000s): N=3, optimalDuration=3000 → содержит -segment_time 3000.0', () async {
       final outDir = await _tmpDir();
       addTearDown(() => outDir.deleteSync(recursive: true));

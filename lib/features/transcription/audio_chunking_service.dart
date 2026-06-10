@@ -110,9 +110,16 @@ class AudioChunkingService {
             '/ezctx_chunks_${DateTime.now().millisecondsSinceEpoch}';
     await Directory(tmpBase).create(recursive: true);
 
-    // Команда ffmpeg: сегментация по времени, -c:a copy (opus-пакеты независимы — реэнкод не нужен)
+    // Команда ffmpeg: сегментация по времени, -c:a copy (opus-пакеты независимы — реэнкод не нужен).
+    // -reset_timestamps 1 ОБЯЗАТЕЛЕН: без него segment-муксер сохраняет исходные
+    // абсолютные таймстемпы Opus (granule-позиции), поэтому chunk_001 начинается
+    // с отметки ~optimalDuration и сообщает длительность всей записи. Groq Whisper
+    // принимает такой чанк за поток полной длины, захлёбывается и отдаёт HTTP 502
+    // service_unavailable — первый чанк (0→optimalDuration) проходит, все
+    // последующие ломаются. Флаг обнуляет таймстемпы каждого сегмента к нулю.
     final command =
         '-i "$filePath" -f segment -segment_time $optimalDuration'
+        ' -reset_timestamps 1'
         ' -c:a copy'
         ' "$tmpBase/chunk_%03d.ogg"';
 
