@@ -186,6 +186,50 @@ void main() {
       },
     );
 
+    // ── WR-07: одновременная разблокировка будит ВСЕХ waiter'ов ──────────────
+    // Регрессия: _onWakeup выдавал ключ ровно одному waiter'у и не пере-арминг
+    // таймер для остальных. При двух ключах, разблокирующихся одновременно, и
+    // двух припаркованных waiter'ах второй зависал до 10-мин таймаута, хотя
+    // живой ключ для него уже был доступен.
+    test(
+      'WR-07: два ключа разблокируются одновременно → оба waiter\'а получают ключ',
+      () {
+        fakeAsync((async) {
+          final pool = KeyPool(initialKeys: ['k1', 'k2']);
+          // Оба ключа в rate-limit на одинаковые 30с → разблокируются вместе.
+          pool.reportRateLimited('k1', 30);
+          pool.reportRateLimited('k2', 30);
+
+          final results = <String>[];
+          Object? thrown;
+          pool.acquireKey().then((k) => results.add(k)).catchError((e) {
+            thrown = e;
+            return '';
+          });
+          pool.acquireKey().then((k) => results.add(k)).catchError((e) {
+            thrown = e;
+            return '';
+          });
+
+          async.flushMicrotasks();
+          // Пока оба ключа заблокированы — оба waiter'а висят.
+          expect(results, isEmpty);
+          expect(thrown, isNull);
+
+          // Прошло 31с — оба ключа разблокированы.
+          async.elapse(const Duration(seconds: 31));
+          async.flushMicrotasks();
+
+          expect(thrown, isNull,
+              reason: 'ни один waiter не должен упасть с таймаутом');
+          expect(results.length, 2,
+              reason: 'оба waiter\'а должны получить ключ после разблокировки, '
+                  'а не один (второй не должен зависать до 10-мин таймаута)');
+          expect(results.toSet(), {'k1', 'k2'});
+        });
+      },
+    );
+
     test(
       'WR-04: removeKey единственного живого ключа будит waiter немедленно',
       () {
