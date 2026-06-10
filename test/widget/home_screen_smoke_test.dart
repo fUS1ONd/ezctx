@@ -1,5 +1,7 @@
 // test/widget/home_screen_smoke_test.dart
+import 'package:ezctx/core/providers/service_providers.dart';
 import 'package:ezctx/core/providers/theme_provider.dart';
+import 'package:ezctx/features/transcription/key_pool.dart';
 import 'package:ezctx/ui/screens/home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,6 +17,10 @@ Widget _wrap(Widget child) {
   return ProviderScope(
     overrides: [
       themeModeProvider.overrideWith(_FakeThemeModeNotifier.new),
+      // R-DG-08: оба пула ключей переопределяются, приложение стартует
+      // без UnimplementedError от groqKeyPoolProvider/deepgramKeyPoolProvider.
+      groqKeyPoolProvider.overrideWithValue(KeyPool(initialKeys: const [])),
+      deepgramKeyPoolProvider.overrideWithValue(KeyPool(initialKeys: const [])),
     ],
     child: MaterialApp(home: child),
   );
