@@ -1,0 +1,19 @@
+{
+  "results": {
+    "channels": [
+      {
+        "detected_language": "ru",
+        "alternatives": [
+          {
+            "transcript": "",
+            "words": [],
+            "paragraphs": {
+              "transcript": "",
+              "paragraphs": []
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
