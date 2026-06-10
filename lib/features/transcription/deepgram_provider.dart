@@ -22,6 +22,9 @@ class DeepgramProvider implements TranscriptionProvider {
 
   final http.Client Function() _clientFactory;
 
+  /// Число параллельных запросов к Deepgram.
+  static const int _deepgramConcurrency = 5;
+
   /// Сообщение об ошибке аутентификации (401).
   static const _authErrorMessage =
       'Ключ не подошёл. Проверьте его в console.deepgram.com → API Keys.';
@@ -214,9 +217,10 @@ class DeepgramProvider implements TranscriptionProvider {
     );
   }
 
-  /// Число параллельных запросов: 5 при наличии ключей, 0 при отсутствии.
+  /// Число параллельных запросов: _deepgramConcurrency при наличии ключей, 0 при отсутствии.
   @override
-  int concurrencyFor(int aliveKeyCount) => aliveKeyCount > 0 ? 5 : 0;
+  int concurrencyFor(int aliveKeyCount) =>
+      aliveKeyCount > 0 ? _deepgramConcurrency : 0;
 
   /// Идентификатор провайдера — Deepgram.
   @override
