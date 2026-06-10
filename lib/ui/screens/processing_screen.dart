@@ -10,6 +10,8 @@ import '../../core/error/app_exception.dart';
 import '../../core/providers/service_providers.dart';
 import '../../features/transcription/audio_normalization_service.dart';
 import '../../features/transcription/chunked_transcription_controller.dart';
+import '../../features/transcription/deepgram_provider.dart';
+import '../../features/transcription/groq_api_service.dart';
 import '../../features/transcription/normalized_audio_file.dart';
 import '../../features/transcription/processing_args.dart';
 import '../../features/transcription/result_args.dart';
@@ -35,6 +37,10 @@ class ProcessingScreen extends ConsumerStatefulWidget {
 class _ProcessingScreenState extends ConsumerState<ProcessingScreen>
     with SingleTickerProviderStateMixin {
   ChunkedTranscriptionController? _chunkedController;
+
+  /// true, если текущая сессия обрабатывается Deepgram-провайдером.
+  /// Используется для выбора пула ключей и динамического сообщения ChunkedMissingKey.
+  bool _isDeepgram = false;
 
   bool _normalizing = false;
   NormalizedAudioFile? _normalizedFile;
@@ -122,9 +128,15 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen>
     if (!mounted) return;
     setState(() => _normalizing = false);
 
+    // Определяем провайдер по выбранной модели и выбираем соответствующий пул.
+    _isDeepgram =
+        _transcriptionOptions.model.provider == TranscriptionProviderId.deepgram;
+
     _chunkedController = ChunkedTranscriptionController(
-      pool: ref.read(groqKeyPoolProvider),
-      apiService: ref.read(transcriptionProviderProvider),
+      pool: _isDeepgram
+          ? ref.read(deepgramKeyPoolProvider)
+          : ref.read(groqKeyPoolProvider),
+      apiService: _isDeepgram ? DeepgramProvider() : GroqProvider(),
       chunkingService: ref.read(audioChunkingServiceProvider),
     );
     // Слушатель добавляется ДО вызова start(), чтобы не пропустить уведомления,
@@ -411,7 +423,10 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen>
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Добавьте API-ключ Groq для начала транскрибации',
+              // Сообщение динамично: имя провайдера зависит от выбранной модели.
+              _isDeepgram
+                  ? 'Добавьте API-ключ Deepgram для начала транскрибации'
+                  : 'Добавьте API-ключ Groq для начала транскрибации',
               style: AppTextStyles.label.copyWith(color: palette.bad),
             ),
             const SizedBox(height: AppSpacing.sm),
