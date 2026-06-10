@@ -35,7 +35,6 @@ class SecureStorageServiceImpl implements SecureStorageService {
   SecureStorageServiceImpl({
     FlutterSecureStorage? storage,
     String storageKey = AppConstants.storageKeyApiKeys,
-<<<<<<< HEAD
   }) : _storage =
            storage ??
            const FlutterSecureStorage(

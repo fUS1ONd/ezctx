@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/providers/repository_providers.dart';
 import 'core/providers/service_providers.dart';
+import 'features/settings/api_key_repository.dart';
 import 'features/transcription/key_pool.dart';
 import 'ui/app.dart';
 
@@ -19,8 +20,8 @@ void main() async {
   // Читаем ключи обоих провайдеров до dispose контейнера.
   // try/catch: если хранилище недоступно (повреждённый keystore, factory reset),
   // запускаемся с пустыми пулами — пользователь добавит ключи вручную.
-  var groqRawKeys = <dynamic>[];
-  var deepgramRawKeys = <dynamic>[];
+  var groqRawKeys = <ApiKeyView>[];
+  var deepgramRawKeys = <ApiKeyView>[];
   try {
     groqRawKeys = await bootstrap.read(apiKeyRepoProvider).listKeys();
     deepgramRawKeys =
