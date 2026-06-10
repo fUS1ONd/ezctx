@@ -204,11 +204,9 @@ void main() {
           Object? thrown;
           pool.acquireKey().then((k) => results.add(k)).catchError((e) {
             thrown = e;
-            return '';
           });
           pool.acquireKey().then((k) => results.add(k)).catchError((e) {
             thrown = e;
-            return '';
           });
 
           async.flushMicrotasks();
