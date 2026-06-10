@@ -4,6 +4,7 @@ import 'package:ezctx/features/transcription/audio_metadata.dart';
 import 'package:ezctx/features/transcription/chunked_transcription_controller.dart';
 import 'package:ezctx/features/transcription/key_pool.dart';
 import 'package:ezctx/features/transcription/normalized_audio_file.dart';
+import 'package:ezctx/features/transcription/transcription_options.dart';
 import 'package:ezctx/features/transcription/transcription_result.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -307,7 +308,7 @@ void main() {
     });
 
     // -----------------------------------------------------------------------
-    // Дополнительно: ChunkedMissingKey.
+    // Дополнительно: ChunkedMissingKey (Groq-default).
     // -----------------------------------------------------------------------
     test('отсутствие ключа → ChunkedMissingKey', () async {
       final apiService = MockTranscriptionProvider(
@@ -323,6 +324,37 @@ void main() {
 
       await ctrl.start(_dummyFile);
 
+      expect(ctrl.state, isA<ChunkedMissingKey>());
+    });
+
+    // -----------------------------------------------------------------------
+    // R-DG-06: Deepgram-пул без ключей → ChunkedMissingKey.
+    // Проверяет корректный выбор Deepgram-пула при nova-3 опциях.
+    // -----------------------------------------------------------------------
+    test('R-DG-06: пустой Deepgram-пул + nova-3 → ChunkedMissingKey', () async {
+      // Deepgram-провайдер с пустым пулом ключей.
+      final apiService = MockTranscriptionProvider(
+        (_, __, ___) async => _makeResult(),
+        providerId: TranscriptionProviderId.deepgram,
+      );
+      final chunkingService = MockAudioChunkingService(chunkFiles: []);
+
+      final ctrl = ChunkedTranscriptionController(
+        // Пустой Deepgram-пул — ключей нет.
+        pool: KeyPool(initialKeys: const []),
+        apiService: apiService,
+        chunkingService: chunkingService,
+      );
+
+      // Опции с моделью nova-3 (Deepgram).
+      const options = TranscriptionOptions(
+        model: TranscriptionModel.nova3,
+        language: TranscriptionLanguage.auto,
+      );
+
+      await ctrl.start(_dummyFile, options: options);
+
+      // Без ключей контроллер должен вернуть ChunkedMissingKey.
       expect(ctrl.state, isA<ChunkedMissingKey>());
     });
   });
