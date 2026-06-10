@@ -17,9 +17,15 @@ void main() async {
   final bootstrap = ProviderContainer();
 
   // Читаем ключи обоих провайдеров до dispose контейнера.
-  final groqRawKeys = await bootstrap.read(apiKeyRepoProvider).listKeys();
-  final deepgramRawKeys =
-      await bootstrap.read(deepgramApiKeyRepoProvider).listKeys();
+  // try/catch: если хранилище недоступно (повреждённый keystore, factory reset),
+  // запускаемся с пустыми пулами — пользователь добавит ключи вручную.
+  var groqRawKeys = <dynamic>[];
+  var deepgramRawKeys = <dynamic>[];
+  try {
+    groqRawKeys = await bootstrap.read(apiKeyRepoProvider).listKeys();
+    deepgramRawKeys =
+        await bootstrap.read(deepgramApiKeyRepoProvider).listKeys();
+  } catch (_) {}
 
   bootstrap.dispose();
 
