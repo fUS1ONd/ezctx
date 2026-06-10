@@ -27,7 +27,7 @@ DeepgramProvider _providerWith(http.Client client) =>
 
 void main() {
   /// Тестовые константы.
-  const fakeKey = 'dg_testkey_abc123';
+  const fakeKey = 'dg_test_key_abcdef1234';
   const fakeBytes = [0x4F, 0x67, 0x67, 0x53]; // OGG magic bytes
   const fakeFilename = 'chunk_000.ogg';
 

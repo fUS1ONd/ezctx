@@ -22,6 +22,9 @@ class DeepgramProvider implements TranscriptionProvider {
 
   final http.Client Function() _clientFactory;
 
+  /// Число параллельных запросов к Deepgram.
+  static const int _deepgramConcurrency = 5;
+
   /// Сообщение об ошибке аутентификации (401).
   static const _authErrorMessage =
       'Ключ не подошёл. Проверьте его в console.deepgram.com → API Keys.';
@@ -97,20 +100,24 @@ class DeepgramProvider implements TranscriptionProvider {
         );
       }
 
-      // 504 / 5xx — сетевые/серверные ошибки.
-      // Тело обрезается до 200 символов, чтобы потенциальный API-ключ/секрет
-      // не утёк в текст исключения или UI-лог (T-10-02).
-      final safeBody = response.body.length > 200
-          ? '${response.body.substring(0, 200)}…'
-          : response.body;
-      throw NetworkException('Deepgram ${response.statusCode}: $safeBody');
+      // 400/403 — клиентские ошибки (неверный запрос / нет доступа).
+      if (response.statusCode == 400 || response.statusCode == 403) {
+        throw NetworkException('Deepgram error ${response.statusCode}');
+      }
+
+      // 504 / 5xx — сетевые/серверные ошибки; тело не включаем,
+      // чтобы потенциальный API-ключ/секрет не утёк в текст исключения (T-10-02).
+      throw NetworkException('Deepgram error ${response.statusCode}');
     } on SocketException {
       throw const NetworkException(_networkErrorMessage);
     } on TimeoutException {
       throw const NetworkException(_networkErrorMessage);
     } on AppException {
       rethrow;
-    } catch (_) {
+    } catch (e) {
+      if (e is TypeError) {
+        throw InternalException('Неожиданная схема ответа Deepgram: $e');
+      }
       throw const NetworkException(_networkErrorMessage);
     } finally {
       client.close();
@@ -140,8 +147,14 @@ class DeepgramProvider implements TranscriptionProvider {
 
     // detected_language находится на уровне channel, не alternative (Pitfall 3).
     // Fallback на явный язык из настроек если Deepgram не определил (Open Question A1).
+    // При auto-режиме isoCode может быть '' — в таком случае используем 'unknown'.
+    final rawDetectedLanguage = channel['detected_language'] as String?;
     final detectedLanguage =
-        channel['detected_language'] as String? ?? options.language.isoCode;
+        (rawDetectedLanguage != null && rawDetectedLanguage.isNotEmpty)
+            ? rawDetectedLanguage
+            : (options.language.isoCode.isNotEmpty
+                ? options.language.isoCode
+                : 'unknown');
 
     // Попытка 1: paragraphs → sentences (предпочтительный режим).
     // Pitfall 2: alt['paragraphs'] — это Map, внутри ['paragraphs'] — List.
@@ -157,9 +170,9 @@ class DeepgramProvider implements TranscriptionProvider {
           final sm = s as Map<String, dynamic>;
           segments.add(TranscriptionSegment(
             // start/end — 0-based от начала чанка, НЕ прибавлять offset (Pitfall 5).
-            start: (sm['start'] as num).toDouble(),
-            end: (sm['end'] as num).toDouble(),
-            text: sm['text'] as String? ?? '',
+            start: ((sm['start'] as num?)?.toDouble()) ?? 0.0,
+            end: ((sm['end'] as num?)?.toDouble()) ?? 0.0,
+            text: (sm['text'] as String?) ?? '',
           ));
         }
       }
@@ -182,9 +195,9 @@ class DeepgramProvider implements TranscriptionProvider {
       final segments = wordsList.map((w) {
         final wm = w as Map<String, dynamic>;
         return TranscriptionSegment(
-          start: (wm['start'] as num).toDouble(),
-          end: (wm['end'] as num).toDouble(),
-          text: wm['word'] as String? ?? '',
+          start: ((wm['start'] as num?)?.toDouble()) ?? 0.0,
+          end: ((wm['end'] as num?)?.toDouble()) ?? 0.0,
+          text: (wm['word'] as String?) ?? '',
         );
       }).toList();
       final lastWord = wordsList.last as Map<String, dynamic>;
@@ -210,9 +223,10 @@ class DeepgramProvider implements TranscriptionProvider {
     );
   }
 
-  /// Число параллельных запросов: 5 при наличии ключей, 0 при отсутствии.
+  /// Число параллельных запросов: _deepgramConcurrency при наличии ключей, 0 при отсутствии.
   @override
-  int concurrencyFor(int aliveKeyCount) => aliveKeyCount > 0 ? 5 : 0;
+  int concurrencyFor(int aliveKeyCount) =>
+      aliveKeyCount > 0 ? _deepgramConcurrency : 0;
 
   /// Идентификатор провайдера — Deepgram.
   @override
