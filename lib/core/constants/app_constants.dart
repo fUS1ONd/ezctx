@@ -14,6 +14,9 @@ class AppConstants {
   // Chunked-путь хардкодит 'segment' в groq_api_service.dart (там не нужны word-таймкоды).
   static const String groqTimestampGranularity = 'segment';
 
+  // Deepgram API
+  static const String deepgramApiUrl = 'https://api.deepgram.com/v1/listen';
+
   // Лимиты файлов
   // 19 MB — консервативная граница; реальный лимит Groq Free Tier = 25 MB.
   // В Phase 1 файлы > 19 MB отклоняются с ошибкой; чанкование появится в Phase 2.
@@ -43,6 +46,7 @@ class AppConstants {
 
   // Secure storage keys
   static const String storageKeyApiKeys = 'groq_api_keys_v1';
+  // Отдельный ключ хранилища для Deepgram API-ключей — namespace изолирован от Groq.
   static const String storageKeyDeepgramApiKeys = 'deepgram_api_keys_v1';
   static const String storageKeyTranscriptionOptions = 'transcription_options_v1';
   static const String storageKeyThemeMode = 'app_theme_mode';

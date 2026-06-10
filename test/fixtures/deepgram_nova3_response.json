@@ -1,0 +1,50 @@
+{
+  "results": {
+    "channels": [
+      {
+        "detected_language": "ru",
+        "alternatives": [
+          {
+            "transcript": "Это тест транскрибации через Deepgram nova-3.",
+            "words": [
+              {
+                "word": "Это",
+                "start": 0.33,
+                "end": 0.65,
+                "confidence": 0.98
+              },
+              {
+                "word": "тест",
+                "start": 0.70,
+                "end": 1.10,
+                "confidence": 0.97
+              }
+            ],
+            "paragraphs": {
+              "transcript": "Это тест транскрибации через Deepgram nova-3.",
+              "paragraphs": [
+                {
+                  "sentences": [
+                    {
+                      "text": "Это тест транскрибации.",
+                      "start": 0.33,
+                      "end": 3.77
+                    },
+                    {
+                      "text": "Через Deepgram nova-3.",
+                      "start": 4.10,
+                      "end": 7.50
+                    }
+                  ],
+                  "num_words": 6,
+                  "start": 0.33,
+                  "end": 7.50
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
