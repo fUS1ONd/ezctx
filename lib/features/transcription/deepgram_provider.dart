@@ -97,13 +97,14 @@ class DeepgramProvider implements TranscriptionProvider {
         );
       }
 
-      // 504 / 5xx — сетевые/серверные ошибки.
-      // Тело обрезается до 200 символов, чтобы потенциальный API-ключ/секрет
-      // не утёк в текст исключения или UI-лог (T-10-02).
-      final safeBody = response.body.length > 200
-          ? '${response.body.substring(0, 200)}…'
-          : response.body;
-      throw NetworkException('Deepgram ${response.statusCode}: $safeBody');
+      // 400/403 — клиентские ошибки (неверный запрос / нет доступа).
+      if (response.statusCode == 400 || response.statusCode == 403) {
+        throw NetworkException('Deepgram error ${response.statusCode}');
+      }
+
+      // 504 / 5xx — сетевые/серверные ошибки; тело не включаем,
+      // чтобы потенциальный API-ключ/секрет не утёк в текст исключения (T-10-02).
+      throw NetworkException('Deepgram error ${response.statusCode}');
     } on SocketException {
       throw const NetworkException(_networkErrorMessage);
     } on TimeoutException {
