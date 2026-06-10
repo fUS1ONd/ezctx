@@ -147,8 +147,14 @@ class DeepgramProvider implements TranscriptionProvider {
 
     // detected_language находится на уровне channel, не alternative (Pitfall 3).
     // Fallback на явный язык из настроек если Deepgram не определил (Open Question A1).
+    // При auto-режиме isoCode может быть '' — в таком случае используем 'unknown'.
+    final rawDetectedLanguage = channel['detected_language'] as String?;
     final detectedLanguage =
-        channel['detected_language'] as String? ?? options.language.isoCode;
+        (rawDetectedLanguage != null && rawDetectedLanguage.isNotEmpty)
+            ? rawDetectedLanguage
+            : (options.language.isoCode.isNotEmpty
+                ? options.language.isoCode
+                : 'unknown');
 
     // Попытка 1: paragraphs → sentences (предпочтительный режим).
     // Pitfall 2: alt['paragraphs'] — это Map, внутри ['paragraphs'] — List.
