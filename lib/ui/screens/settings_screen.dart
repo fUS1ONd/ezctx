@@ -170,25 +170,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     label: _modelLabel,
                     onChanged: (m) async {
                       await _saveOptions(_options.copyWith(model: m));
-                      // D-05, D-06: при выборе nova3 без ключей Deepgram → диалог
-                      if (m == TranscriptionModel.nova3 && mounted) {
-                        final pool = ref.read(deepgramKeyPoolProvider);
-                        if (pool.aliveKeyCount == 0) {
-                          await NoKeysDialog.show(
-                            // ignore: use_build_context_synchronously
-                            context,
-                            title: 'Нужен ключ Deepgram',
-                            bodyText:
-                                'Nova-3 работает через Deepgram. Добавьте '
-                                'API-ключ Deepgram — free-tier хватает на часы аудио.',
-                            onOpenSettings: () => Navigator.pushNamed(
-                              context,
-                              AppConstants.routeApiKeys,
-                              arguments: 'deepgram',
-                            ),
-                          );
-                        }
-                      }
+                      // D-05, D-06: при выборе модели без ключей её провайдера → диалог
+                      await _promptIfNoKeys(m);
                     },
                   ),
                 ),
@@ -241,6 +224,35 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// Показывает диалог «Нужен ключ», если у провайдера выбранной модели
+  /// нет ни одного живого ключа. Провайдер выводится из самой модели,
+  /// поэтому проверка симметрична для Groq и Deepgram (а не только nova3).
+  Future<void> _promptIfNoKeys(TranscriptionModel m) async {
+    final isDeepgram = m.provider == TranscriptionProviderId.deepgram;
+    final pool = ref.read(
+      isDeepgram ? deepgramKeyPoolProvider : groqKeyPoolProvider,
+    );
+    // Ключ есть или экран уже размонтирован (await между сменой и диалогом) —
+    // ничего не показываем.
+    if (pool.aliveKeyCount > 0 || !mounted) return;
+
+    await NoKeysDialog.show(
+      context,
+      // Groq — дефолтные title/bodyText виджета, Deepgram — свой текст.
+      title: isDeepgram ? 'Нужен ключ Deepgram' : 'Нужен ключ Groq',
+      bodyText: isDeepgram
+          ? 'Nova-3 работает через Deepgram. Добавьте '
+              'API-ключ Deepgram — free-tier хватает на часы аудио.'
+          : 'Чтобы запустить распознавание, добавьте API-ключ. '
+              'На free-tier Groq хватает на обычную лекцию.',
+      onOpenSettings: () => Navigator.pushNamed(
+        context,
+        AppConstants.routeApiKeys,
+        arguments: isDeepgram ? 'deepgram' : 'groq',
       ),
     );
   }
