@@ -12,6 +12,7 @@ import '../../features/transcription/audio_metadata.dart';
 import '../../features/transcription/file_picker_service.dart';
 import '../../features/transcription/processing_args.dart';
 import '../../features/transcription/selected_audio_file.dart';
+import '../../features/transcription/transcription_options.dart';
 import '../widgets/file_card.dart';
 import '../widgets/gradient_background.dart';
 import '../widgets/no_keys_dialog.dart';
@@ -87,20 +88,41 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Future<void> _onTranscribeTap() async {
     if (_selectedFile == null) return;
 
-    final keys = await ref.read(apiKeyRepoProvider).listKeys();
+    // Опции грузим ПЕРВЫМИ: провайдер ключей определяется выбранной моделью.
+    // Groq и Deepgram хранят ключи в разных namespace — нельзя проверять
+    // только Groq, иначе при выбранной nova3 (Deepgram) приложение требует
+    // несуществующий Groq-ключ.
+    final options = await ref.read(transcriptionOptionsRepoProvider).load();
+    if (!mounted) return;
+
+    final isDeepgram =
+        options.model.provider == TranscriptionProviderId.deepgram;
+    final keyRepo = isDeepgram
+        ? ref.read(deepgramApiKeyRepoProvider)
+        : ref.read(apiKeyRepoProvider);
+    final keys = await keyRepo.listKeys();
     if (!mounted) return;
 
     if (keys.isEmpty) {
-      final goToSettings = await NoKeysDialog.show(context);
+      // Для Deepgram показываем провайдер-специфичный текст; для Groq —
+      // дефолтные title/bodyText диалога.
+      final bool? goToSettings;
+      if (isDeepgram) {
+        goToSettings = await NoKeysDialog.show(
+          context,
+          title: 'Нужен ключ Deepgram',
+          bodyText: 'Nova-3 работает через Deepgram. Добавьте '
+              'API-ключ Deepgram — free-tier хватает на часы аудио.',
+        );
+      } else {
+        goToSettings = await NoKeysDialog.show(context);
+      }
       if (!mounted) return;
       if (goToSettings == true) {
         ScaffoldWithNavBar.of(context)?.switchTab(2);
       }
       return;
     }
-
-    final options = await ref.read(transcriptionOptionsRepoProvider).load();
-    if (!mounted) return;
 
     Navigator.pushNamed(
       context,
