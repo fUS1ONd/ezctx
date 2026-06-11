@@ -65,8 +65,9 @@ class LiquidGlassTabBar extends StatelessWidget {
 
 class TabItem {
   final String label;
-  final TabIconKind icon;
-  const TabItem({required this.label, required this.icon});
+  // nullable — text-only вкладки не требуют иконки (D-08)
+  final TabIconKind? icon;
+  const TabItem({required this.label, this.icon});
 }
 
 enum TabIconKind { home, doc, gear }
@@ -114,14 +115,17 @@ class _TabPill extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CustomPaint(
-              size: const Size(22, 22),
-              painter: _TabIconPainter(
-                kind: item.icon,
-                color: active ? Colors.white : inactiveColor,
+            // Иконка рендерится только если передана (D-08: поддержка text-only вкладок)
+            if (item.icon != null) ...[
+              CustomPaint(
+                size: const Size(22, 22),
+                painter: _TabIconPainter(
+                  kind: item.icon!,
+                  color: active ? Colors.white : inactiveColor,
+                ),
               ),
-            ),
-            const SizedBox(width: 6),
+              const SizedBox(width: 6),
+            ],
             Text(
               item.label,
               style: TextStyle(
