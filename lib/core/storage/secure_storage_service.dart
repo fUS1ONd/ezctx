@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:synchronized/synchronized.dart';
 
 import '../constants/app_constants.dart';
 
@@ -28,19 +29,24 @@ abstract interface class SecureStorageService {
 }
 
 /// Реализация SecureStorageService через flutter_secure_storage.
-/// Все API-ключи хранятся под единым ключом как JSON-массив строк.
+/// Все API-ключи хранятся под заданным namespace-ключом как JSON-массив строк.
+/// [storageKey] задаёт namespace: default = Groq, для Deepgram передаётся явно.
 class SecureStorageServiceImpl implements SecureStorageService {
-  SecureStorageServiceImpl({FlutterSecureStorage? storage})
-    : _storage =
-          storage ??
-          const FlutterSecureStorage(
-            aOptions: AndroidOptions(),
-          );
+  SecureStorageServiceImpl({
+    FlutterSecureStorage? storage,
+    String storageKey = AppConstants.storageKeyApiKeys,
+  }) : _storage =
+           storage ??
+           const FlutterSecureStorage(
+             aOptions: AndroidOptions(),
+           ),
+       _storageKey = storageKey;
 
   final FlutterSecureStorage _storage;
+  final _lock = Lock();
 
-  // Используем константу, не магическую строку (T-01-01: нет логирования ключей)
-  static const _storageKey = AppConstants.storageKeyApiKeys;
+  // Namespace ключа хранилища: определяет изоляцию Groq и Deepgram ключей (T-10-03)
+  final String _storageKey;
 
   @override
   Future<void> writeRawKey(String value) async {
@@ -74,17 +80,21 @@ class SecureStorageServiceImpl implements SecureStorageService {
 
   @override
   Future<void> addApiKey(String key) async {
-    final keys = await listApiKeys();
-    if (!keys.contains(key)) {
-      keys.add(key);
-      await _storage.write(key: _storageKey, value: jsonEncode(keys));
-    }
+    await _lock.synchronized(() async {
+      final keys = await listApiKeys();
+      if (!keys.contains(key)) {
+        keys.add(key);
+        await _storage.write(key: _storageKey, value: jsonEncode(keys));
+      }
+    });
   }
 
   @override
   Future<void> removeApiKey(String key) async {
-    final keys = await listApiKeys();
-    keys.remove(key);
-    await _storage.write(key: _storageKey, value: jsonEncode(keys));
+    await _lock.synchronized(() async {
+      final keys = await listApiKeys();
+      keys.remove(key);
+      await _storage.write(key: _storageKey, value: jsonEncode(keys));
+    });
   }
 }

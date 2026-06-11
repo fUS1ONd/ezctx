@@ -1,7 +1,7 @@
 name: ezctx
-description: "Расшифровка аудио в текст на Android через Groq Whisper API"
+description: "Расшифровка аудио в текст на Android через Groq Whisper и Deepgram nova-3"
 publish_to: 'none'
-version: 0.1.1+2
+version: 0.2.0+3
 
 environment:
   sdk: ^3.5.0
@@ -20,6 +20,7 @@ dependencies:
   super_clipboard: ^0.9.1
   share_plus: ^10.0.0
   flutter_riverpod: ^2.6.1
+  synchronized: ^3.1.0
 
 dev_dependencies:
   flutter_test:

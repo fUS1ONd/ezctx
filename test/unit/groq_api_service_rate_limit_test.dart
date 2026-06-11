@@ -5,9 +5,9 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 void main() {
-  group('GroqApiService 503', () {
+  group('GroqProvider 503', () {
     test('503 бросает RateLimitException с retryAfterSeconds из заголовков', () async {
-      final service = GroqApiService(
+      final service = GroqProvider(
         clientFactory: () => MockClient((request) async {
           return http.Response(
             '{"error": "Service Unavailable"}',
@@ -16,7 +16,9 @@ void main() {
           );
         }),
       );
-      expect(
+      // await + expectLater обязательны для async-функций: без await тест проходит
+      // даже если transcribeChunk не бросает исключение (Future просто игнорируется).
+      await expectLater(
         () => service.transcribeChunk(
           bytes: [0, 1, 2],
           filename: 'test.mp3',

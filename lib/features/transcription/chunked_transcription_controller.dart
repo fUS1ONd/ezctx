@@ -3,15 +3,14 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
-import '../../core/constants/app_constants.dart';
 import '../../core/error/app_exception.dart';
 import 'audio_chunking_service.dart';
 import 'chunk_state.dart';
-import 'groq_key_pool.dart';
+import 'key_pool.dart';
 import 'normalized_audio_file.dart';
-import 'transcription_result.dart';
-import 'groq_api_service.dart';
 import 'transcription_options.dart';
+import 'transcription_provider.dart';
+import 'transcription_result.dart';
 
 // ---------------------------------------------------------------------------
 // Вспомогательный семафор: ограничивает количество одновременных операций.
@@ -102,12 +101,12 @@ class ChunkedMissingKey extends ChunkedState {
 
 /// ChangeNotifier, управляющий пайплайном транскрибации большого файла:
 /// разбивка через [AudioChunkingService] → параллельная отправка (≤ maxConcurrent) →
-/// retry на транзиентных ошибках через [GroqKeyPool] → сборка текста с таймкодами →
+/// retry на транзиентных ошибках через [KeyPool] → сборка текста с таймкодами →
 /// удаление tmp-чанков.
 class ChunkedTranscriptionController extends ChangeNotifier {
   ChunkedTranscriptionController({
-    required GroqKeyPool pool,
-    required GroqApiService apiService,
+    required KeyPool pool,
+    required TranscriptionProvider apiService,
     required AudioChunkingService chunkingService,
     @visibleForTesting Duration Function(int attempt)? retryDelay,
   })  : _pool = pool,
@@ -118,8 +117,8 @@ class ChunkedTranscriptionController extends ChangeNotifier {
   static Duration _defaultRetryDelay(int attempt) =>
       Duration(seconds: 5 * (1 << (attempt - 1).clamp(0, 5)));
 
-  final GroqKeyPool _pool;
-  final GroqApiService _api;
+  final KeyPool _pool;
+  final TranscriptionProvider _api;
   final AudioChunkingService _chunkingService;
   final Duration Function(int attempt) _retryDelay;
 
@@ -141,8 +140,20 @@ class ChunkedTranscriptionController extends ChangeNotifier {
   }
 
   /// Обновить состояние одного чанка и уведомить слушателей.
+  ///
+  /// completedCount пересчитывается из _chunkStates (число ChunkDone), а не
+  /// из отдельного счётчика — иначе при близком завершении двух параллельных
+  /// чанков снимок мог отражать число, не совпадающее с видимыми ChunkDone-тайлами.
   void _updateChunkState(int index, ChunkState chunkState) {
     _chunkStates[index] = chunkState;
+    _emitProcessing();
+  }
+
+  /// Собирает и публикует снимок ChunkedProcessing из текущих _chunkStates.
+  /// Единая точка правды для completedCount — считаем ChunkDone в массиве,
+  /// чтобы счётчик не дрейфовал относительно фактических состояний чанков.
+  void _emitProcessing() {
+    _completedCount = _chunkStates.whereType<ChunkDone>().length;
     _set(ChunkedProcessing(
       chunks: List.unmodifiable(_chunkStates),
       completedCount: _completedCount,
@@ -158,6 +169,9 @@ class ChunkedTranscriptionController extends ChangeNotifier {
     NormalizedAudioFile file, {
     TranscriptionOptions options = const TranscriptionOptions.defaults(),
   }) async {
+    // Явный сброс при каждом вызове start() — обеспечивает корректный счётчик
+    // при повторном использовании того же экземпляра контроллера (кнопка «Повторить»).
+    _completedCount = 0;
     _set(const ChunkedSplitting());
 
     // Проверяем наличие ключей в пуле.
@@ -178,9 +192,23 @@ class ChunkedTranscriptionController extends ChangeNotifier {
       return;
     }
 
-    // Используем реальное количество чанков от ffmpeg для точных таймкодов.
-    // chunkFiles.length >= 1 гарантировано: split() либо возвращает файлы, либо бросает.
-    final chunkDuration = file.durationSeconds / chunkFiles.length;
+    // Защита от пустого списка чанков: теоретически возможно при нулевой длительности файла.
+    // Без этой проверки chunkFiles.length == 0 приведёт к делению на ноль (double.infinity),
+    // что даст таймкоды вида [Infinity:NaN:NaN] в итоговом тексте.
+    if (chunkFiles.isEmpty) {
+      _set(ChunkedError(
+        message: 'Не удалось разбить файл на чанки (пустой результат)',
+        retryable: true,
+      ));
+      return;
+    }
+
+    // Средняя длительность чанка — используется только как fallback в
+    // _assembleResult, если конкретный чанк не сообщил реальную длительность
+    // (r.duration == 0). Реальные таймкоды считаются по фактическим
+    // r.duration каждого чанка (см. WR-06), а не по этому среднему.
+    // chunkFiles.length >= 1 гарантировано проверкой выше.
+    final fallbackChunkDuration = file.durationSeconds / chunkFiles.length;
 
     final n = chunkFiles.length;
     _chunkStates = List<ChunkState>.generate(n, (i) => ChunkWaiting(i));
@@ -193,11 +221,17 @@ class ChunkedTranscriptionController extends ChangeNotifier {
       totalCount: n,
     ));
 
-    // Семафор: clamp(1, kMaxConcurrentChunks) уже гарантирует верхний предел.
-    // Нижний порог 1 предотвращает деление на ноль и гарантирует обработку хотя бы одного чанка.
-    final concurrency =
-        _pool.aliveKeyCount.clamp(1, AppConstants.kMaxConcurrentChunks);
-    final semaphore = _Semaphore(concurrency);
+    // Конкурентность определяется политикой провайдера (см. TranscriptionProvider.concurrencyFor) —
+    // контроллер провайдеро-независим. Для Groq результат идентичен прежнему
+    // clamp(1, kMaxConcurrentChunks): нижний порог 1 предотвращает деление на ноль
+    // и гарантирует обработку хотя бы одного чанка, верхний — ограничен kMaxConcurrentChunks.
+    final concurrency = _api.concurrencyFor(_pool.aliveKeyCount);
+    // Семафор не может иметь вместимость 0 — иначе run() ждёт вечно
+    // (0 >= 0 → каждый чанк паркуется в очередь и никогда не запускается,
+    // Future.wait зависает, finally-cleanup tmp-чанков не выполняется).
+    // Нулевую конкурентность (Deepgram без живых ключей) трактуем как 1:
+    // acquireKey() сам бросит AllKeysBlockedException, если живых ключей нет.
+    final semaphore = _Semaphore(concurrency < 1 ? 1 : concurrency);
 
     try {
       await Future.wait(
@@ -233,7 +267,7 @@ class ChunkedTranscriptionController extends ChangeNotifier {
       _results
           .map((r) => r ?? TranscriptionResult.empty())
           .toList(),
-      chunkDuration,
+      fallbackChunkDuration,
     );
     _set(ChunkedSuccess(result: assembled));
   }
@@ -249,12 +283,21 @@ class ChunkedTranscriptionController extends ChangeNotifier {
     TranscriptionOptions options,
   ) async {
     final bytes = await file.readAsBytes();
-    final filename = 'chunk_${index.toString().padLeft(3, '0')}.mp3';
+    final filename = 'chunk_${index.toString().padLeft(3, '0')}.ogg';
 
-    int attempt = 0;
+    // Отдельные счётчики для разных типов ошибок: смешивать нельзя,
+    // иначе при 5 rate-limit попытках (смена ключей) следующая сетевая ошибка
+    // немедленно завершает чанк без реальных ретраев по сети.
+    int networkAttempt = 0;
+    int rateLimitAttempt = 0;
+    // Отдельный счётчик исчерпанных ключей: провайдер, возвращающий 402 на
+    // каждый ключ, не должен крутить цикл по всему пулу без ограничения.
+    int exhaustedAttempt = 0;
     const maxAttempts = 10;
 
-    while (attempt < maxAttempts) {
+    while (networkAttempt < maxAttempts &&
+        rateLimitAttempt < maxAttempts &&
+        exhaustedAttempt < maxAttempts) {
       // Показываем статус ожидания ключа если все заблокированы.
       if (_pool.aliveKeyCount == 0) {
         _updateChunkState(index, ChunkWaitingForKey(index));
@@ -274,38 +317,50 @@ class ChunkedTranscriptionController extends ChangeNotifier {
         );
 
         _results[index] = result;
+        // Мутация слота + снимок идут через единый helper: completedCount
+        // пересчитывается из _chunkStates, не из отдельного счётчика (WR-03).
         _chunkStates[index] = ChunkDone(index, text: result.text);
-        _completedCount++;
-        _set(ChunkedProcessing(
-          chunks: List.unmodifiable(_chunkStates),
-          completedCount: _completedCount,
-          totalCount: _chunkStates.length,
-        ));
+        _emitProcessing();
         return result;
       } on AllKeysBlockedException {
         // Все ключи заблокированы и таймаут (10 мин) истёк — пробрасываем напрямую,
         // чтобы Future.wait→catch вывел понятное сообщение, а не «Неизвестная ошибка».
         rethrow;
+      } on KeyExhaustedException {
+        // Кредиты ключа исчерпаны (Deepgram HTTP 402) — ключ выводится из ротации
+        // навсегда. networkAttempt/rateLimitAttempt НЕ инкрементируются (это не
+        // транзиентная ошибка), но exhaustedAttempt — да: иначе misbehaving-провайдер,
+        // отдающий 402 на все ключи, крутил бы цикл по всему пулу без потолка.
+        exhaustedAttempt++;
+        _pool.reportExhausted(key);
+        if (exhaustedAttempt >= maxAttempts) {
+          // Исчерпан лимит попыток на исчерпанных ключах — пробрасываем понятную причину.
+          throw const KeyExhaustedException();
+        }
+        _updateChunkState(index, ChunkRetrying(index, attempt: 0));
+        // Продолжаем цикл — без rethrow.
       } on RateLimitException catch (e) {
-        attempt++;
+        rateLimitAttempt++;
         // Сообщаем пулу о блокировке ключа на указанное время.
         _pool.reportRateLimited(key, e.retryAfterSeconds);
-        if (attempt >= maxAttempts) {
+        if (rateLimitAttempt >= maxAttempts) {
           // Исчерпаны все попытки из-за rate-limit — сообщаем корректную причину.
-          throw const NetworkException('Превышено число попыток (rate limit)');
+          // Бросаем RateLimitException (а не NetworkException), чтобы ассемблер
+          // и UI не маскировали лимит запросов под сетевую ошибку.
+          throw const RateLimitException('Превышено число попыток (rate limit)');
         }
-        _updateChunkState(index, ChunkRetrying(index, attempt: attempt));
+        _updateChunkState(index, ChunkRetrying(index, attempt: rateLimitAttempt));
         // Не ждём явно: следующая итерация вызовет acquireKey() и дождётся живого ключа.
       } on AuthException {
         // Неверный ключ — пробрасываем немедленно без ретрая.
         rethrow;
       } on NetworkException {
-        attempt++;
-        if (attempt >= maxAttempts) {
+        networkAttempt++;
+        if (networkAttempt >= maxAttempts) {
           throw const NetworkException('Превышено максимальное число попыток');
         }
-        _updateChunkState(index, ChunkRetrying(index, attempt: attempt));
-        await Future.delayed(_retryDelay(attempt));
+        _updateChunkState(index, ChunkRetrying(index, attempt: networkAttempt));
+        await Future.delayed(_retryDelay(networkAttempt));
       }
     }
 
@@ -314,13 +369,19 @@ class ChunkedTranscriptionController extends ChangeNotifier {
 
   /// Собирает финальный [TranscriptionResult] из результатов чанков.
   ///
-  /// Для каждого сегмента вычисляет абсолютное время:
-  /// `absoluteStart = chunkIndex * chunkDuration + segment.start`.
+  /// Абсолютное время сегмента считается по фактическому кумулятивному
+  /// смещению чанка (`cumulativeStart + segment.start`), а не по усреднённой
+  /// длительности `i * chunkDuration` (WR-06). Кумулятивное смещение
+  /// накапливается из реальных `r.duration` каждого чанка, поэтому укороченный
+  /// последний чанк (типичное поведение ffmpeg-сегментации) не сдвигает
+  /// таймкоды последующих чанков. [fallbackChunkDuration] используется лишь
+  /// когда чанк не сообщил длительность (`r.duration <= 0`), чтобы смещение
+  /// не схлопнулось в ноль.
   /// [text] форматирует в `[HH:MM:SS] segment.text` (timestamped).
   /// [plainText] содержит тот же текст без временных меток (Bug-2).
   TranscriptionResult _assembleResult(
     List<TranscriptionResult> results,
-    double chunkDuration,
+    double fallbackChunkDuration,
   ) {
     // timestamped-буфер: `[HH:MM:SS] текст`
     final buffer = StringBuffer();
@@ -330,31 +391,39 @@ class ChunkedTranscriptionController extends ChangeNotifier {
     double totalDuration = 0.0;
     String language = '';
 
+    // Кумулятивное смещение начала текущего чанка от старта файла.
+    double cumulativeStart = 0.0;
+
     for (var i = 0; i < results.length; i++) {
       final r = results[i];
-      totalDuration += r.duration;
       if (language.isEmpty) language = r.language;
+
+      // Реальная длительность чанка; если провайдер её не вернул — берём
+      // усреднённый fallback, чтобы кумулятивное смещение не остановилось.
+      final chunkSpan = r.duration > 0 ? r.duration : fallbackChunkDuration;
 
       if (r.segments.isNotEmpty) {
         // Есть сегменты — собираем с таймкодами.
         for (final seg in r.segments) {
-          final absoluteStart = i * chunkDuration + seg.start;
+          final absoluteStart = cumulativeStart + seg.start;
           final ts = _formatTimecode(absoluteStart);
           buffer.write('[$ts] ${seg.text.trim()}\n');
           plainBuffer.write('${seg.text.trim()}\n');
           allSegments.add(TranscriptionSegment(
             start: absoluteStart,
-            end: i * chunkDuration + seg.end,
+            end: cumulativeStart + seg.end,
             text: seg.text,
           ));
         }
       } else {
         // Нет сегментов — используем весь текст чанка с таймкодом начала.
-        final offsetStart = i * chunkDuration;
-        final ts = _formatTimecode(offsetStart);
+        final ts = _formatTimecode(cumulativeStart);
         buffer.write('[$ts] ${r.text.trim()}\n');
         plainBuffer.write('${r.text.trim()}\n');
       }
+
+      totalDuration += r.duration;
+      cumulativeStart += chunkSpan;
     }
 
     return TranscriptionResult(

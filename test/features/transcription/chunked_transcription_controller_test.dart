@@ -1,255 +1,14 @@
-import 'dart:convert';
-import 'dart:io';
-import 'dart:typed_data';
-
 import 'package:ezctx/core/error/app_exception.dart';
 import 'package:ezctx/features/settings/api_key_repository.dart';
-import 'package:ezctx/features/transcription/audio_chunking_service.dart';
 import 'package:ezctx/features/transcription/audio_metadata.dart';
 import 'package:ezctx/features/transcription/chunked_transcription_controller.dart';
-import 'package:ezctx/features/transcription/groq_api_service.dart';
-import 'package:ezctx/features/transcription/groq_key_pool.dart';
+import 'package:ezctx/features/transcription/key_pool.dart';
 import 'package:ezctx/features/transcription/normalized_audio_file.dart';
 import 'package:ezctx/features/transcription/transcription_options.dart';
 import 'package:ezctx/features/transcription/transcription_result.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-// ---------------------------------------------------------------------------
-// Ручные моки.
-// ---------------------------------------------------------------------------
-
-/// Мок GroqApiService с настраиваемым обработчиком.
-class _MockGroqApiService extends GroqApiService {
-  _MockGroqApiService(this._handler) : super();
-
-  final Future<TranscriptionResult> Function(
-    List<int> bytes,
-    String filename,
-    String apiKey,
-  ) _handler;
-
-  int callCount = 0;
-
-  @override
-  Future<TranscriptionResult> transcribeChunk({
-    required List<int> bytes,
-    required String filename,
-    required String apiKey,
-    TranscriptionOptions options = const TranscriptionOptions.defaults(),
-  }) async {
-    callCount++;
-    return _handler(bytes, filename, apiKey);
-  }
-}
-
-/// Файл-заглушка: реализует [File] без обращения к файловой системе.
-class _FakeChunkFile implements File {
-  _FakeChunkFile(this._filePath);
-
-  final String _filePath;
-  bool deleted = false;
-
-  @override
-  String get path => _filePath;
-
-  @override
-  Uri get uri => Uri.file(_filePath);
-
-  @override
-  bool get isAbsolute => true;
-
-  @override
-  File get absolute => this;
-
-  @override
-  Directory get parent => throw UnimplementedError();
-
-  @override
-  Future<Uint8List> readAsBytes() async => Uint8List.fromList([1, 2, 3]);
-
-  @override
-  Uint8List readAsBytesSync() => Uint8List.fromList([1, 2, 3]);
-
-  @override
-  Future<File> delete({bool recursive = false}) async {
-    deleted = true;
-    return this;
-  }
-
-  @override
-  void deleteSync({bool recursive = false}) => deleted = true;
-
-  @override
-  Future<bool> exists() async => !deleted;
-
-  @override
-  bool existsSync() => !deleted;
-
-  @override
-  Future<int> length() async => 3;
-
-  @override
-  int lengthSync() => 3;
-
-  @override
-  Future<File> create({bool recursive = false, bool exclusive = false}) =>
-      throw UnimplementedError();
-
-  @override
-  void createSync({bool recursive = false, bool exclusive = false}) =>
-      throw UnimplementedError();
-
-  @override
-  Future<File> copy(String newPath) => throw UnimplementedError();
-
-  @override
-  File copySync(String newPath) => throw UnimplementedError();
-
-  @override
-  Future<DateTime> lastAccessed() => throw UnimplementedError();
-
-  @override
-  DateTime lastAccessedSync() => throw UnimplementedError();
-
-  @override
-  Future<DateTime> lastModified() => throw UnimplementedError();
-
-  @override
-  DateTime lastModifiedSync() => throw UnimplementedError();
-
-  @override
-  Future<RandomAccessFile> open({FileMode mode = FileMode.read}) =>
-      throw UnimplementedError();
-
-  @override
-  Stream<List<int>> openRead([int? start, int? end]) =>
-      throw UnimplementedError();
-
-  @override
-  RandomAccessFile openSync({FileMode mode = FileMode.read}) =>
-      throw UnimplementedError();
-
-  @override
-  IOSink openWrite({
-    FileMode mode = FileMode.write,
-    Encoding encoding = utf8,
-  }) =>
-      throw UnimplementedError();
-
-  @override
-  Future<List<String>> readAsLines({Encoding encoding = utf8}) =>
-      throw UnimplementedError();
-
-  @override
-  List<String> readAsLinesSync({Encoding encoding = utf8}) =>
-      throw UnimplementedError();
-
-  @override
-  Future<String> readAsString({Encoding encoding = utf8}) =>
-      throw UnimplementedError();
-
-  @override
-  String readAsStringSync({Encoding encoding = utf8}) =>
-      throw UnimplementedError();
-
-  @override
-  Future<File> rename(String newPath) => throw UnimplementedError();
-
-  @override
-  File renameSync(String newPath) => throw UnimplementedError();
-
-  @override
-  Future<String> resolveSymbolicLinks() => throw UnimplementedError();
-
-  @override
-  String resolveSymbolicLinksSync() => throw UnimplementedError();
-
-  @override
-  Future setLastAccessed(DateTime time) => throw UnimplementedError();
-
-  @override
-  void setLastAccessedSync(DateTime time) => throw UnimplementedError();
-
-  @override
-  Future setLastModified(DateTime time) => throw UnimplementedError();
-
-  @override
-  void setLastModifiedSync(DateTime time) => throw UnimplementedError();
-
-  @override
-  Future<FileStat> stat() => throw UnimplementedError();
-
-  @override
-  FileStat statSync() => throw UnimplementedError();
-
-  @override
-  Stream<FileSystemEvent> watch({
-    int events = FileSystemEvent.all,
-    bool recursive = false,
-  }) =>
-      throw UnimplementedError();
-
-  @override
-  Future<File> writeAsBytes(
-    List<int> bytes, {
-    FileMode mode = FileMode.write,
-    bool flush = false,
-  }) =>
-      throw UnimplementedError();
-
-  @override
-  void writeAsBytesSync(
-    List<int> bytes, {
-    FileMode mode = FileMode.write,
-    bool flush = false,
-  }) =>
-      throw UnimplementedError();
-
-  @override
-  Future<File> writeAsString(
-    String contents, {
-    FileMode mode = FileMode.write,
-    Encoding encoding = utf8,
-    bool flush = false,
-  }) =>
-      throw UnimplementedError();
-
-  @override
-  void writeAsStringSync(
-    String contents, {
-    FileMode mode = FileMode.write,
-    Encoding encoding = utf8,
-    bool flush = false,
-  }) =>
-      throw UnimplementedError();
-}
-
-/// Мок AudioChunkingService — возвращает заданные файлы без ffmpeg.
-class _MockAudioChunkingService extends AudioChunkingService {
-  _MockAudioChunkingService({
-    required this.chunkFiles,
-    this.metadata = const AudioMetadata(
-      name: 'test.mp3',
-      durationSeconds: 2400.0,
-      sizeBytes: 1024,
-    ),
-  });
-
-  final List<_FakeChunkFile> chunkFiles;
-  final AudioMetadata metadata;
-
-  @override
-  Future<AudioMetadata> getMetadata(String filePath) async => metadata;
-
-  @override
-  Future<List<File>> split(
-    String filePath,
-    double totalDurationSeconds, {
-    String? outputDir,
-  }) async {
-    return chunkFiles;
-  }
-}
+import '../../helpers/transcription_mocks.dart';
 
 // ---------------------------------------------------------------------------
 // Константы.
@@ -261,7 +20,7 @@ const _testKey = ApiKeyView(
 );
 
 final _dummyFile = NormalizedAudioFile(
-  path: '/tmp/test_lecture.mp3',
+  path: '/tmp/test_lecture.ogg',
   // 9000s = 2.5 ч → chunkDuration = 9000/2 = 4500s → offset чанка 1 = [01:15:00]
   durationSeconds: 9000.0,
 );
@@ -289,14 +48,14 @@ void main() {
     // 1. Успешная транскрибация одного чанка.
     // -----------------------------------------------------------------------
     test('успех: один чанк → ChunkedSuccess с текстом', () async {
-      final chunk = _FakeChunkFile('/tmp/chunk_000.mp3');
-      final apiService = _MockGroqApiService(
+      final chunk = FakeChunkFile('/tmp/chunk_000.ogg');
+      final apiService = MockTranscriptionProvider(
         (_, __, ___) async => _makeResult(text: 'Лекция по физике'),
       );
-      final chunkingService = _MockAudioChunkingService(chunkFiles: [chunk]);
+      final chunkingService = MockAudioChunkingService(chunkFiles: [chunk]);
 
       final ctrl = ChunkedTranscriptionController(
-        pool: GroqKeyPool(initialKeys: [_testKey.raw]),
+        pool: KeyPool(initialKeys: [_testKey.raw]),
         apiService: apiService,
         chunkingService: chunkingService,
       );
@@ -312,17 +71,17 @@ void main() {
     // 2. Retry на NetworkException → итог ChunkedSuccess.
     // -----------------------------------------------------------------------
     test('retry: NetworkException на первом вызове → второй вызов успешен', () async {
-      final chunk = _FakeChunkFile('/tmp/chunk_000.mp3');
+      final chunk = FakeChunkFile('/tmp/chunk_000.ogg');
       int calls = 0;
-      final apiService = _MockGroqApiService((_, __, ___) async {
+      final apiService = MockTranscriptionProvider((_, __, ___) async {
         calls++;
         if (calls == 1) throw const NetworkException('timeout');
         return _makeResult(text: 'Успех после retry');
       });
-      final chunkingService = _MockAudioChunkingService(chunkFiles: [chunk]);
+      final chunkingService = MockAudioChunkingService(chunkFiles: [chunk]);
 
       final ctrl = ChunkedTranscriptionController(
-        pool: GroqKeyPool(initialKeys: [_testKey.raw]),
+        pool: KeyPool(initialKeys: [_testKey.raw]),
         apiService: apiService,
         chunkingService: chunkingService,
         retryDelay: (_) => Duration.zero,
@@ -338,14 +97,14 @@ void main() {
     // 3. AuthException — не ретраится.
     // -----------------------------------------------------------------------
     test('нет retry на AuthException: mock вызван ровно 1 раз', () async {
-      final chunk = _FakeChunkFile('/tmp/chunk_000.mp3');
-      final apiService = _MockGroqApiService(
+      final chunk = FakeChunkFile('/tmp/chunk_000.ogg');
+      final apiService = MockTranscriptionProvider(
         (_, __, ___) async => throw const AuthException('Неверный ключ'),
       );
-      final chunkingService = _MockAudioChunkingService(chunkFiles: [chunk]);
+      final chunkingService = MockAudioChunkingService(chunkFiles: [chunk]);
 
       final ctrl = ChunkedTranscriptionController(
-        pool: GroqKeyPool(initialKeys: [_testKey.raw]),
+        pool: KeyPool(initialKeys: [_testKey.raw]),
         apiService: apiService,
         chunkingService: chunkingService,
       );
@@ -370,10 +129,10 @@ void main() {
 
       final chunks = List.generate(
         totalChunks,
-        (i) => _FakeChunkFile('/tmp/chunk_${i.toString().padLeft(3, '0')}.mp3'),
+        (i) => FakeChunkFile('/tmp/chunk_${i.toString().padLeft(3, '0')}.ogg'),
       );
 
-      final apiService = _MockGroqApiService((_, __, ___) async {
+      final apiService = MockTranscriptionProvider((_, __, ___) async {
         concurrent++;
         if (concurrent > maxObservedConcurrent) {
           maxObservedConcurrent = concurrent;
@@ -382,11 +141,11 @@ void main() {
         concurrent--;
         return _makeResult();
       });
-      final chunkingService = _MockAudioChunkingService(chunkFiles: chunks);
+      final chunkingService = MockAudioChunkingService(chunkFiles: chunks);
 
       // 2 ключа → aliveKeyCount=2 → semaphore=min(2, kMaxConcurrentChunks)=2
       final ctrl = ChunkedTranscriptionController(
-        pool: GroqKeyPool(initialKeys: [_testKey.raw, 'second-key-${_testKey.raw}']),
+        pool: KeyPool(initialKeys: [_testKey.raw, 'second-key-${_testKey.raw}']),
         apiService: apiService,
         chunkingService: chunkingService,
       );
@@ -407,8 +166,8 @@ void main() {
     // -----------------------------------------------------------------------
     test('таймкоды: chunk 0 → [00:00:00], chunk 1 offset 4500s → [01:15:00]', () async {
       final chunks = [
-        _FakeChunkFile('/tmp/chunk_000.mp3'),
-        _FakeChunkFile('/tmp/chunk_001.mp3'),
+        FakeChunkFile('/tmp/chunk_000.ogg'),
+        FakeChunkFile('/tmp/chunk_001.ogg'),
       ];
 
       final seg0 = TranscriptionSegment(
@@ -428,25 +187,32 @@ void main() {
       );
 
       int callIndex = 0;
-      final apiService = _MockGroqApiService((_, __, ___) async {
+      final apiService = MockTranscriptionProvider((_, __, ___) async {
         final i = callIndex++;
         if (i == 0) {
-          return _makeResult(text: 'Начало лекции', segments: [seg0]);
+          // Реальная длительность чанка 0 = 4500s → чанк 1 начинается с 01:15:00.
+          // Кумулятивное смещение считается из r.duration (WR-06), а не из
+          // усреднённого total/N, поэтому duration здесь задан явно.
+          return _makeResult(
+            text: 'Начало лекции',
+            segments: [seg0],
+            duration: 4500.0,
+          );
         }
         return _makeResult(text: 'Продолжение', segments: [seg1, seg1b]);
       });
 
-      final chunkingService = _MockAudioChunkingService(
+      final chunkingService = MockAudioChunkingService(
         chunkFiles: chunks,
         metadata: const AudioMetadata(
-          name: 'test.mp3',
+          name: 'test.ogg',
           durationSeconds: 2400.0,
           sizeBytes: 1024,
         ),
       );
 
       final ctrl = ChunkedTranscriptionController(
-        pool: GroqKeyPool(initialKeys: [_testKey.raw]),
+        pool: KeyPool(initialKeys: [_testKey.raw]),
         apiService: apiService,
         chunkingService: chunkingService,
       );
@@ -462,21 +228,70 @@ void main() {
     });
 
     // -----------------------------------------------------------------------
+    // 5b. WR-06: таймкоды считаются по реальным r.duration, без дрейфа на
+    //     укороченном последнем чанке. Усреднённое total/N дало бы неверное
+    //     смещение для чанков 1 и 2.
+    // -----------------------------------------------------------------------
+    test('таймкоды WR-06: неравные чанки не дают дрейфа смещений', () async {
+      final chunks = [
+        FakeChunkFile('/tmp/chunk_000.ogg'),
+        FakeChunkFile('/tmp/chunk_001.ogg'),
+        FakeChunkFile('/tmp/chunk_002.ogg'),
+      ];
+
+      // Реальные длительности чанков: 3000 + 3000 + 1000 = 7000s.
+      // Усреднение дало бы 7000/3 ≈ 2333.3s на чанк → неверные смещения.
+      // Истинные смещения: чанк0=0, чанк1=3000 (00:50:00), чанк2=6000 (01:40:00).
+      final durations = [3000.0, 3000.0, 1000.0];
+      int callIndex = 0;
+      final apiService = MockTranscriptionProvider((_, __, ___) async {
+        final i = callIndex++;
+        return _makeResult(
+          text: 'Чанк $i',
+          // Один сегмент в начале чанка (start 0) → таймкод = смещение чанка.
+          segments: [TranscriptionSegment(start: 0.0, end: 5.0, text: 'Чанк $i')],
+          duration: durations[i],
+        );
+      });
+
+      final chunkingService = MockAudioChunkingService(chunkFiles: chunks);
+
+      final ctrl = ChunkedTranscriptionController(
+        // durationSeconds=9000 у _dummyFile → fallback total/N=3000; но он НЕ
+        // используется, т.к. r.duration > 0. Проверяем истинные смещения.
+        pool: KeyPool(initialKeys: [_testKey.raw]),
+        apiService: apiService,
+        chunkingService: chunkingService,
+      );
+
+      await ctrl.start(_dummyFile);
+
+      expect(ctrl.state, isA<ChunkedSuccess>());
+      final text = (ctrl.state as ChunkedSuccess).result.text;
+
+      expect(text, contains('[00:00:00]')); // чанк 0
+      expect(text, contains('[00:50:00]')); // чанк 1: смещение 3000s
+      expect(text, contains('[01:40:00]')); // чанк 2: смещение 6000s
+      // Усреднённое смещение чанка 2 было бы 2*2333=4666s=[01:17:46] — не должно встречаться.
+      expect(text, isNot(contains('[01:17:46]')));
+    });
+
+    // -----------------------------------------------------------------------
     // 6. Cleanup: tmp-чанки удаляются.
     // -----------------------------------------------------------------------
     test('cleanup: все tmp-чанки удалены после старта (success)', () async {
       final chunks = List.generate(
         3,
-        (i) => _FakeChunkFile('/tmp/chunk_$i.mp3'),
+        (i) => FakeChunkFile('/tmp/chunk_$i.ogg'),
       );
 
-      final apiService = _MockGroqApiService(
+      final apiService = MockTranscriptionProvider(
         (_, __, ___) async => _makeResult(),
       );
-      final chunkingService = _MockAudioChunkingService(chunkFiles: chunks);
+      final chunkingService = MockAudioChunkingService(chunkFiles: chunks);
 
       final ctrl = ChunkedTranscriptionController(
-        pool: GroqKeyPool(initialKeys: [_testKey.raw]),
+        pool: KeyPool(initialKeys: [_testKey.raw]),
         apiService: apiService,
         chunkingService: chunkingService,
       );
@@ -493,16 +308,16 @@ void main() {
     });
 
     // -----------------------------------------------------------------------
-    // Дополнительно: ChunkedMissingKey.
+    // Дополнительно: ChunkedMissingKey (Groq-default).
     // -----------------------------------------------------------------------
     test('отсутствие ключа → ChunkedMissingKey', () async {
-      final apiService = _MockGroqApiService(
+      final apiService = MockTranscriptionProvider(
         (_, __, ___) async => _makeResult(),
       );
-      final chunkingService = _MockAudioChunkingService(chunkFiles: []);
+      final chunkingService = MockAudioChunkingService(chunkFiles: []);
 
       final ctrl = ChunkedTranscriptionController(
-        pool: GroqKeyPool(),
+        pool: KeyPool(),
         apiService: apiService,
         chunkingService: chunkingService,
       );
@@ -511,5 +326,209 @@ void main() {
 
       expect(ctrl.state, isA<ChunkedMissingKey>());
     });
+
+    // -----------------------------------------------------------------------
+    // R-DG-06: Deepgram-пул без ключей → ChunkedMissingKey.
+    // Проверяет корректный выбор Deepgram-пула при nova-3 опциях.
+    // -----------------------------------------------------------------------
+    test('R-DG-06: пустой Deepgram-пул + nova-3 → ChunkedMissingKey', () async {
+      // Deepgram-провайдер с пустым пулом ключей.
+      final apiService = MockTranscriptionProvider(
+        (_, __, ___) async => _makeResult(),
+        providerId: TranscriptionProviderId.deepgram,
+      );
+      final chunkingService = MockAudioChunkingService(chunkFiles: []);
+
+      final ctrl = ChunkedTranscriptionController(
+        // Пустой Deepgram-пул — ключей нет.
+        pool: KeyPool(initialKeys: const []),
+        apiService: apiService,
+        chunkingService: chunkingService,
+      );
+
+      // Опции с моделью nova-3 (Deepgram).
+      const options = TranscriptionOptions(
+        model: TranscriptionModel.nova3,
+        language: TranscriptionLanguage.auto,
+      );
+
+      await ctrl.start(_dummyFile, options: options);
+
+      // Без ключей контроллер должен вернуть ChunkedMissingKey.
+      expect(ctrl.state, isA<ChunkedMissingKey>());
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // R-06: политика конкурентности Groq — дефолтный mock без concurrencyPolicy.
+  // -------------------------------------------------------------------------
+  group('R-06: concurrencyFor — Groq-политика (дефолт)', () {
+    test('concurrencyFor(1)==1 при дефолтной политике', () {
+      final provider = MockTranscriptionProvider((_, __, ___) async => _makeResult());
+      // 1 живой ключ → дефолт Groq: clamp(1, kMaxConcurrentChunks) = 1
+      expect(provider.concurrencyFor(1), equals(1));
+    });
+
+    test('concurrencyFor(3)==3 при дефолтной политике', () {
+      final provider = MockTranscriptionProvider((_, __, ___) async => _makeResult());
+      // 3 живых ключа → дефолт Groq: clamp(3, kMaxConcurrentChunks) = 3
+      expect(provider.concurrencyFor(3), equals(3));
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // R-07: политика конкурентности Deepgram — настраиваемая concurrencyPolicy.
+  // -------------------------------------------------------------------------
+  group('R-07: concurrencyFor — Deepgram-политика (настраиваемая)', () {
+    test('concurrencyFor(1)==5 при Deepgram-политике (n > 0 ? 5 : 0)', () {
+      final provider = MockTranscriptionProvider(
+        (_, __, ___) async => _makeResult(),
+        concurrencyPolicy: (n) => n > 0 ? 5 : 0,
+      );
+      // 1 живой ключ → Deepgram-политика: 5
+      expect(provider.concurrencyFor(1), equals(5));
+    });
+
+    test('concurrencyFor(0)==0 при Deepgram-политике (n > 0 ? 5 : 0)', () {
+      final provider = MockTranscriptionProvider(
+        (_, __, ___) async => _makeResult(),
+        concurrencyPolicy: (n) => n > 0 ? 5 : 0,
+      );
+      // 0 живых ключей → Deepgram-политика: 0
+      expect(provider.concurrencyFor(0), equals(0));
+    });
+
+    // CR-01: concurrencyFor(0)==0, прогнанный ЧЕРЕЗ контроллер, не должен
+    // приводить к вечному зависанию _Semaphore(0). Контроллер обязан
+    // обнулить порог до 1 и завершиться (acquireKey сам бросит исключение,
+    // если живых ключей нет). Оборачиваем в timeout — при регрессии
+    // (deadlock) тест упадёт по таймауту, а не зависнет навсегда.
+    test(
+      'concurrencyFor(0)==0 через контроллер → завершается, не зависает',
+      () async {
+        final chunk = FakeChunkFile('/tmp/chunk_000.ogg');
+        final apiService = MockTranscriptionProvider(
+          (_, __, ___) async => _makeResult(text: 'OK'),
+          // Политика, которая при любом числе ключей возвращает 0 —
+          // воспроизводит Deepgram-без-живых-ключей напрямую.
+          concurrencyPolicy: (_) => 0,
+        );
+        final chunkingService = MockAudioChunkingService(chunkFiles: [chunk]);
+
+        final ctrl = ChunkedTranscriptionController(
+          pool: KeyPool(initialKeys: [_testKey.raw]),
+          apiService: apiService,
+          chunkingService: chunkingService,
+        );
+
+        // start() не должен зависнуть: при флоре до 1 чанк обрабатывается.
+        await ctrl.start(_dummyFile).timeout(
+              const Duration(seconds: 5),
+              onTimeout: () => fail(
+                'start() завис при concurrencyFor(0)==0 — _Semaphore(0) deadlock',
+              ),
+            );
+
+        // Живой ключ есть → чанк успешно обработан, без зависания.
+        expect(ctrl.state, isA<ChunkedSuccess>());
+      },
+    );
+
+    // CR-01 (продолжение): concurrency 0 И нет живых ключей → контроллер
+    // должен завершиться ошибкой (ChunkedError), а не зависнуть.
+    test(
+      'concurrencyFor(0)==0 без живых ключей → ChunkedError, не зависает',
+      () async {
+        final chunk = FakeChunkFile('/tmp/chunk_000.ogg');
+        final apiService = MockTranscriptionProvider(
+          (_, __, ___) async => _makeResult(),
+          concurrencyPolicy: (_) => 0,
+        );
+        final chunkingService = MockAudioChunkingService(chunkFiles: [chunk]);
+
+        // Пул с ключом, который сразу исчерпан → aliveKeyCount==0,
+        // _blockedUntil пуст → acquireKey бросит AllKeysBlockedException.
+        final pool = KeyPool(initialKeys: ['only-key-test']);
+        pool.reportExhausted('only-key-test');
+
+        final ctrl = ChunkedTranscriptionController(
+          pool: pool,
+          apiService: apiService,
+          chunkingService: chunkingService,
+        );
+
+        await ctrl.start(_dummyFile).timeout(
+              const Duration(seconds: 5),
+              onTimeout: () => fail(
+                'start() завис вместо немедленной ошибки при отсутствии ключей',
+              ),
+            );
+
+        expect(ctrl.state, isA<ChunkedError>());
+      },
+    );
+  });
+
+  // -------------------------------------------------------------------------
+  // R-08: KeyExhaustedException → reportExhausted без инкремента счётчиков.
+  // -------------------------------------------------------------------------
+  group('R-08: KeyExhaustedException → reportExhausted', () {
+    test(
+      'первый ключ исчерпан → reportExhausted, второй ключ успешен, state==ChunkedSuccess',
+      () async {
+        final chunk = FakeChunkFile('/tmp/chunk_000.ogg');
+        int callCount = 0;
+        // Первый вызов: бросает KeyExhaustedException (ключ k1).
+        // Второй вызов: успех (ключ k2).
+        final apiService = MockTranscriptionProvider((_, __, String apiKey) async {
+          callCount++;
+          if (callCount == 1) {
+            throw const KeyExhaustedException();
+          }
+          return _makeResult(text: 'Успех со вторым ключом');
+        });
+        final chunkingService = MockAudioChunkingService(chunkFiles: [chunk]);
+
+        // Пул из 2 ключей — первый будет exhausted, второй используется.
+        final pool = KeyPool(initialKeys: ['key1-test', 'key2-test']);
+
+        final ctrl = ChunkedTranscriptionController(
+          pool: pool,
+          apiService: apiService,
+          chunkingService: chunkingService,
+        );
+
+        await ctrl.start(_dummyFile);
+
+        // Итог — успешная транскрибация со вторым ключом.
+        expect(
+          ctrl.state,
+          isA<ChunkedSuccess>(),
+          reason: 'После exhausted-ключа контроллер должен использовать второй ключ',
+        );
+
+        // Первый ключ должен быть exhausted — aliveKeyCount уменьшился.
+        expect(
+          pool.aliveKeyCount,
+          equals(1),
+          reason: 'После reportExhausted(key1) должен остаться 1 живой ключ',
+        );
+
+        // Также проверяем через статусы: первый ключ — ExhaustedKeyStatus.
+        final statuses = pool.getStatuses();
+        expect(
+          statuses.any((s) => s is ExhaustedKeyStatus),
+          isTrue,
+          reason: 'Один из ключей должен иметь статус ExhaustedKeyStatus',
+        );
+
+        // mock вызван дважды: первый раз KeyExhaustedException, второй — успех.
+        expect(
+          callCount,
+          equals(2),
+          reason: 'transcribeChunk должен быть вызван 2 раза (1 exhausted + 1 успех)',
+        );
+      },
+    );
   });
 }

@@ -8,7 +8,7 @@ class ApiKeyView {
   const ApiKeyView({required this.raw, required this.masked});
 }
 
-/// Repository для управления Groq API-ключами.
+/// Repository для управления API-ключами провайдера (namespace задаётся SecureStorageService).
 /// Единственный потребитель SecureStorageService в feature-слое.
 class ApiKeyRepository {
   ApiKeyRepository(this._storage);
@@ -40,12 +40,12 @@ class ApiKeyRepository {
     await _storage.removeApiKey(value);
   }
 
-  /// Маскирует ключ: последние 4 символа видны для идентификации, остальное — точки.
+  /// Маскирует ключ: последние 4 символа видны для идентификации,
+  /// остальное — точки пропорционально длине ключа.
   static String mask(String key) {
-    if (key.length < 8) {
-      return '•' * 8;
-    }
+    if (key.length < 8) return '•' * 8;
     final tail = key.substring(key.length - 4);
-    return '${'•' * 16}$tail';
+    final dots = '•' * (key.length - 4).clamp(4, 32);
+    return '$dots$tail';
   }
 }

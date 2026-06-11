@@ -1,13 +1,28 @@
 import 'package:flutter/foundation.dart';
 
-/// Поддерживаемые модели Groq Whisper.
-enum WhisperModel {
-  largeV3('whisper-large-v3'),
-  turbo('whisper-large-v3-turbo');
+/// Идентификатор провайдера транскрибации. Провайдер всегда выводится
+/// из выбранной модели через [TranscriptionModel.provider].
+enum TranscriptionProviderId { groq, deepgram }
 
-  const WhisperModel(this.apiValue);
+/// Поддерживаемые модели транскрибации (мульти-провайдерные).
+/// Каждая модель привязана к провайдеру и хранит строковое значение API.
+enum TranscriptionModel {
+  whisperLargeV3(TranscriptionProviderId.groq, 'whisper-large-v3'),
+  whisperTurbo(TranscriptionProviderId.groq, 'whisper-large-v3-turbo'),
+  nova3(TranscriptionProviderId.deepgram, 'nova-3');
+
+  const TranscriptionModel(this.provider, this.apiValue);
+  final TranscriptionProviderId provider;
   final String apiValue;
 }
+
+/// Алиасы старых строковых значений `model` (формат `transcription_options_v1`
+/// до введения мульти-провайдерной модели). Нужны для миграции хранилища
+/// без потери выбора пользователя и без исключений при загрузке.
+const Map<String, TranscriptionModel> _legacyModelAliases = {
+  'largeV3': TranscriptionModel.whisperLargeV3,
+  'turbo': TranscriptionModel.whisperTurbo,
+};
 
 /// Язык распознавания. [auto] — поле language не передаётся в запрос Groq.
 enum TranscriptionLanguage {
@@ -36,10 +51,10 @@ class TranscriptionOptions {
   });
 
   const TranscriptionOptions.defaults()
-      : model = WhisperModel.largeV3,
+      : model = TranscriptionModel.whisperLargeV3,
         language = TranscriptionLanguage.auto;
 
-  final WhisperModel model;
+  final TranscriptionModel model;
   final TranscriptionLanguage language;
 
   Map<String, String> toJson() => {
@@ -48,10 +63,16 @@ class TranscriptionOptions {
       };
 
   factory TranscriptionOptions.fromJson(Map<String, dynamic> json) {
-    final model = WhisperModel.values.firstWhere(
-      (m) => m.name == json['model'],
-      orElse: () => WhisperModel.largeV3,
-    );
+    // Сначала проверяем legacy-алиасы (старый формат хранилища
+    // transcription_options_v1, например "largeV3"/"turbo"), затем —
+    // новые имена членов enum. Любое неизвестное значение → fallback
+    // на whisperLargeV3 без исключения (см. T-07-01).
+    final rawModel = json['model'];
+    final model = _legacyModelAliases[rawModel] ??
+        TranscriptionModel.values.firstWhere(
+          (m) => m.name == rawModel,
+          orElse: () => TranscriptionModel.whisperLargeV3,
+        );
     final language = TranscriptionLanguage.values.firstWhere(
       (l) => l.name == json['language'],
       orElse: () => TranscriptionLanguage.auto,
@@ -60,7 +81,7 @@ class TranscriptionOptions {
   }
 
   TranscriptionOptions copyWith({
-    WhisperModel? model,
+    TranscriptionModel? model,
     TranscriptionLanguage? language,
   }) =>
       TranscriptionOptions(

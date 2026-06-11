@@ -36,6 +36,10 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen>
     with SingleTickerProviderStateMixin {
   ChunkedTranscriptionController? _chunkedController;
 
+  /// true, если текущая сессия обрабатывается Deepgram-провайдером.
+  /// Используется для выбора пула ключей и динамического сообщения ChunkedMissingKey.
+  bool _isDeepgram = false;
+
   bool _normalizing = false;
   NormalizedAudioFile? _normalizedFile;
   String? _normalizationError;
@@ -122,11 +126,21 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen>
     if (!mounted) return;
     setState(() => _normalizing = false);
 
+    // Определяем провайдер по выбранной модели и выбираем соответствующий пул.
+    _isDeepgram =
+        _transcriptionOptions.model.provider == TranscriptionProviderId.deepgram;
+
     _chunkedController = ChunkedTranscriptionController(
-      pool: ref.read(groqKeyPoolProvider),
-      apiService: ref.read(groqApiServiceProvider),
+      pool: _isDeepgram
+          ? ref.read(deepgramKeyPoolProvider)
+          : ref.read(groqKeyPoolProvider),
+      apiService: _isDeepgram
+          ? ref.read(deepgramTranscriptionProviderProvider)
+          : ref.read(groqTranscriptionProviderProvider),
       chunkingService: ref.read(audioChunkingServiceProvider),
     );
+    // Слушатель добавляется ДО вызова start(), чтобы не пропустить уведомления,
+    // которые могут быть испущены до первой точки приостановки внутри start().
     _chunkedController!.addListener(_onChunkedStateChange);
     await _chunkedController!.start(_normalizedFile!, options: _transcriptionOptions);
   }
@@ -156,6 +170,13 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen>
     _ticker?.cancel();
     _chunkedController?.removeListener(_onChunkedStateChange);
     _chunkedController?.dispose();
+    // Удаляем старый нормализованный файл до сброса ссылки,
+    // иначе tmp-файл осиротеет и не будет удалён в dispose().
+    if (_normalizedFile != null) {
+      try {
+        File(_normalizedFile!.path).deleteSync();
+      } catch (_) {}
+    }
     setState(() {
       _elapsed = Duration.zero;
       _startedAt = DateTime.now();
@@ -402,7 +423,10 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen>
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Добавьте API-ключ Groq для начала транскрибации',
+              // Сообщение динамично: имя провайдера зависит от выбранной модели.
+              _isDeepgram
+                  ? 'Добавьте API-ключ Deepgram для начала транскрибации'
+                  : 'Добавьте API-ключ Groq для начала транскрибации',
               style: AppTextStyles.label.copyWith(color: palette.bad),
             ),
             const SizedBox(height: AppSpacing.sm),

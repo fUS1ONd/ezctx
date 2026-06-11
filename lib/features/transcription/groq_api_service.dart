@@ -10,6 +10,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/error/app_exception.dart';
 import 'selected_audio_file.dart';
 import 'transcription_options.dart';
+import 'transcription_provider.dart';
 import 'transcription_result.dart';
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -70,7 +71,15 @@ int _parseDurationString(String s) {
     total += int.parse(minutesMatch.group(1)!) * 60;
   }
 
-  // Секунды (включая дробные): "59.56s"
+  // Миллисекунды: "500ms" — обрабатываем ДО секунд, чтобы не спутать суффикс "s".
+  // Округляем вверх: 500ms → 1 с (лучше подождать лишнюю секунду, чем не подождать).
+  final msMatch = RegExp(r'(\d+)ms').firstMatch(s);
+  if (msMatch != null) {
+    total += (int.parse(msMatch.group(1)!) / 1000).ceil();
+  }
+
+  // Секунды (включая дробные): "59.56s" — ищем только если нет "ms" суффикса перед "s".
+  // RegExp r'([\d.]+)s' не совпадёт с "500ms", так как перед "s" стоит "m", а не цифра/точка.
   final secondsMatch = RegExp(r'([\d.]+)s').firstMatch(s);
   if (secondsMatch != null) {
     total += double.parse(secondsMatch.group(1)!).ceil();
@@ -79,12 +88,13 @@ int _parseDurationString(String s) {
   return total > 0 ? total : 60;
 }
 
-/// HTTP-клиент для Groq Whisper. Phase 1: single-shot (один файл, один запрос).
-/// Чанкование и параллельность — Phase 2.
-class GroqApiService {
+/// HTTP-клиент для Groq Whisper, реализующий провайдеро-независимый
+/// интерфейс [TranscriptionProvider]. Phase 1: single-shot (один файл,
+/// один запрос). Чанкование и параллельность — Phase 2.
+class GroqProvider implements TranscriptionProvider {
   /// [clientFactory] инжектируется для тестирования через MockClient.
   /// В production вызов без аргумента создаёт стандартный http.Client.
-  GroqApiService({http.Client Function()? clientFactory})
+  GroqProvider({http.Client Function()? clientFactory})
       : _clientFactory = clientFactory ?? (() => http.Client());
 
   final http.Client Function() _clientFactory;
@@ -96,6 +106,7 @@ class GroqApiService {
 
   /// Транскрибация одного чанка из байт. Используется в Phase 2 чанкованием.
   /// Бросает [AuthException] / [NetworkException] / [RateLimitException] / [InternalException].
+  @override
   Future<TranscriptionResult> transcribeChunk({
     required List<int> bytes,
     required String filename,
@@ -118,8 +129,9 @@ class GroqApiService {
             'file',
             bytes,
             filename: filename,
-            // Явно указываем audio/mpeg — fromBytes не выводит тип из расширения.
-            contentType: MediaType('audio', 'mpeg'),
+            // Явно указываем audio/ogg — fromBytes не выводит тип из расширения;
+            // формат нормализации — opus/.ogg (фаза 08).
+            contentType: MediaType('audio', 'ogg'),
           ),
         );
       // Передаём язык только если явно задан (auto — не передаём).
@@ -157,9 +169,11 @@ class GroqApiService {
         );
       }
       // Для всех остальных ошибок включаем тело ответа Groq для диагностики.
-      throw NetworkException(
-        'Groq ${response.statusCode}: ${response.body}',
-      );
+      // Обрезаем до 200 символов, чтобы API-ключ не просочился в логи через тело ответа.
+      final safeBody = response.body.length > 200
+          ? '${response.body.substring(0, 200)}…'
+          : response.body;
+      throw NetworkException('Groq ${response.statusCode}: $safeBody');
     } on SocketException {
       throw const NetworkException(_networkErrorMessage);
     } on TimeoutException {
@@ -242,4 +256,15 @@ class GroqApiService {
       client.close();
     }
   }
+
+  /// Политика конкурентности Groq — «поток на ключ»: число параллельных
+  /// чанков ограничено количеством живых ключей, но не менее 1 и не более
+  /// [AppConstants.kMaxConcurrentChunks]. Перенесено из контроллера без
+  /// изменения поведения.
+  @override
+  int concurrencyFor(int aliveKeyCount) =>
+      aliveKeyCount.clamp(1, AppConstants.kMaxConcurrentChunks);
+
+  @override
+  TranscriptionProviderId get id => TranscriptionProviderId.groq;
 }

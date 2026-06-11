@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:ezctx/core/constants/app_constants.dart';
 import 'package:ezctx/core/error/app_exception.dart';
 import 'package:ezctx/features/transcription/audio_chunking_service.dart';
 import 'package:ffmpeg_kit_flutter_new/media_information.dart';
@@ -93,16 +94,16 @@ void main() {
       final outDir = await _tmpDir();
       addTearDown(() => outDir.deleteSync(recursive: true));
 
-      await File('${outDir.path}/chunk_000.mp3').create();
-      await File('${outDir.path}/chunk_001.mp3').create();
+      await File('${outDir.path}/chunk_000.ogg').create();
+      await File('${outDir.path}/chunk_001.ogg').create();
 
       final service = AudioChunkingService(ffmpegOverride: (_) async {});
-      // 84 мин = 5040s > порога 4920s → N=2
-      final chunks = await service.split('/fake/input.mp3', 5040.0, outputDir: outDir.path);
+      // 108 мин = 6480s > порога 3240s → N=2
+      final chunks = await service.split('/fake/input.ogg', 6480.0, outputDir: outDir.path);
 
       expect(chunks.length, equals(2));
-      expect(chunks[0].path, endsWith('chunk_000.mp3'));
-      expect(chunks[1].path, endsWith('chunk_001.mp3'));
+      expect(chunks[0].path, endsWith('chunk_000.ogg'));
+      expect(chunks[1].path, endsWith('chunk_001.ogg'));
     });
 
     test('4 чанка (часовое аудио)', () async {
@@ -110,29 +111,29 @@ void main() {
       addTearDown(() => outDir.deleteSync(recursive: true));
 
       for (var i = 0; i < 4; i++) {
-        await File('${outDir.path}/chunk_00$i.mp3').create();
+        await File('${outDir.path}/chunk_00$i.ogg').create();
       }
 
       final service = AudioChunkingService(ffmpegOverride: (_) async {});
-      // 330 мин = 19800s → N=ceil(19800/4920)=5, но тест проверяет возвращаемые файлы
-      final chunks = await service.split('/fake/long.mp3', 19800.0, outputDir: outDir.path);
+      // 330 мин = 19800s → N=ceil(19800/3240)=7, но тест проверяет возвращаемые файлы
+      final chunks = await service.split('/fake/long.ogg', 19800.0, outputDir: outDir.path);
 
       expect(chunks.length, equals(4));
     });
 
-    test('1 чанк (70 мин = 4200s, меньше порога 4920s)', () async {
+    test('1 чанк (50 мин = 3000s, меньше порога 3240s)', () async {
       final outDir = await _tmpDir();
       addTearDown(() => outDir.deleteSync(recursive: true));
 
-      await File('${outDir.path}/chunk_000.mp3').create();
+      await File('${outDir.path}/chunk_000.ogg').create();
 
       final service = AudioChunkingService(ffmpegOverride: (_) async {});
-      final chunks = await service.split('/fake/short.mp3', 4200.0, outputDir: outDir.path);
+      final chunks = await service.split('/fake/short.ogg', 3000.0, outputDir: outDir.path);
 
       expect(chunks.length, equals(1));
     });
 
-    test('84 мин (5040s): N=2, optimalDuration=2520 → содержит -segment_time 2520.0', () async {
+    test('108 мин (6480s): N=2, optimalDuration=3240 → содержит -segment_time 3240.0', () async {
       final outDir = await _tmpDir();
       addTearDown(() => outDir.deleteSync(recursive: true));
 
@@ -141,16 +142,22 @@ void main() {
         ffmpegOverride: (cmd) async { capturedCommand = cmd; },
       );
 
-      await service.split('/input/audio.mp3', 5040.0, outputDir: outDir.path);
+      await service.split('/input/audio.ogg', 6480.0, outputDir: outDir.path);
 
       expect(capturedCommand, isNotNull);
       expect(capturedCommand, contains('-f segment'));
-      expect(capturedCommand, contains('-segment_time 2520.0'));
+      expect(capturedCommand, contains('-segment_time 3240.0'));
       expect(capturedCommand, contains('-c:a copy'));
-      expect(capturedCommand, contains('chunk_%03d.mp3'));
+      expect(capturedCommand, contains('chunk_%03d.ogg'));
     });
 
-    test('150 мин (9000s): N=2, optimalDuration=4500 → содержит -segment_time 4500.0', () async {
+    // Регрессия: `-f segment -c:a copy` на Opus сохраняет исходные абсолютные
+    // таймстемпы (granule-позиции). Без -reset_timestamps второй чанк начинался
+    // с отметки ~2332с и сообщал длительность всей записи (~4664с) → Groq Whisper
+    // принимал его за 77-минутный поток и отдавал HTTP 502 service_unavailable.
+    // Первый чанк (0→2332с) проходил, последующие ломались. Флаг обнуляет
+    // таймстемпы каждого сегмента к нулю — проверено сквозным запросом в Groq.
+    test('команда содержит -reset_timestamps 1 (иначе Groq 502 на чанках > первого)', () async {
       final outDir = await _tmpDir();
       addTearDown(() => outDir.deleteSync(recursive: true));
 
@@ -159,13 +166,13 @@ void main() {
         ffmpegOverride: (cmd) async { capturedCommand = cmd; },
       );
 
-      await service.split('/input/audio.mp3', 9000.0, outputDir: outDir.path);
+      await service.split('/input/audio.ogg', 6480.0, outputDir: outDir.path);
 
       expect(capturedCommand, isNotNull);
-      expect(capturedCommand, contains('-segment_time 4500.0'));
+      expect(capturedCommand, contains('-reset_timestamps 1'));
     });
 
-    test('165 мин (9900s): N=3, optimalDuration=3300 → содержит -segment_time 3300.0', () async {
+    test('150 мин (9000s): N=3, optimalDuration=3000 → содержит -segment_time 3000.0', () async {
       final outDir = await _tmpDir();
       addTearDown(() => outDir.deleteSync(recursive: true));
 
@@ -174,10 +181,25 @@ void main() {
         ffmpegOverride: (cmd) async { capturedCommand = cmd; },
       );
 
-      await service.split('/input/audio.mp3', 9900.0, outputDir: outDir.path);
+      await service.split('/input/audio.ogg', 9000.0, outputDir: outDir.path);
 
       expect(capturedCommand, isNotNull);
-      expect(capturedCommand, contains('-segment_time 3300.0'));
+      expect(capturedCommand, contains('-segment_time 3000.0'));
+    });
+
+    test('165 мин (9900s): N=4, optimalDuration=2475 → содержит -segment_time 2475.0', () async {
+      final outDir = await _tmpDir();
+      addTearDown(() => outDir.deleteSync(recursive: true));
+
+      String? capturedCommand;
+      final service = AudioChunkingService(
+        ffmpegOverride: (cmd) async { capturedCommand = cmd; },
+      );
+
+      await service.split('/input/audio.ogg', 9900.0, outputDir: outDir.path);
+
+      expect(capturedCommand, isNotNull);
+      expect(capturedCommand, contains('-segment_time 2475.0'));
     });
 
     test('ошибка ffmpeg → InternalException', () async {
@@ -190,9 +212,9 @@ void main() {
         },
       );
 
-      // 5040s > kChunkThresholdSeconds → shortcircuit не срабатывает, ffmpeg вызывается
+      // 6480s > kChunkThresholdSeconds → shortcircuit не срабатывает, ffmpeg вызывается
       await expectLater(
-        () => service.split('/fake/input.mp3', 5040.0, outputDir: outDir.path),
+        () => service.split('/fake/input.ogg', 6480.0, outputDir: outDir.path),
         throwsA(isA<InternalException>()),
       );
     });
@@ -204,8 +226,21 @@ void main() {
       final service = AudioChunkingService(ffmpegOverride: (_) async {});
 
       await expectLater(
-        () => service.split('/fake/input.mp3', 0.0, outputDir: outDir.path),
+        () => service.split('/fake/input.ogg', 0.0, outputDir: outDir.path),
         throwsA(isA<InternalException>()),
+      );
+    });
+
+    // CHUNK-05: VBR-граничный тест. Документирует осознанное решение (RESEARCH.md Q4):
+    // (1) AppConstants.maxFileSizeBytes = 19 MB = 19 922 944 байт — входной guard, против него assert.
+    // (2) Реальный лимит Groq Whisper = 18.5 MB = 19 398 656 байт.
+    // (3) 3240 × 6000 = 19 440 000 ≈ 18.54 MB — CBR-потолок формально на ~41 KB выше Groq-лимита,
+    //     но реальный речевой opus VBR (~30-40 kbps) даёт 12-16 MB с двойным запасом.
+    //     Runtime-guard не реализован осознанно (Q2 RESOLVED: Don't Hand-Roll).
+    test('CHUNK-05 VBR-граница: 3240с × 6000 B/s <= maxFileSizeBytes', () {
+      expect(
+        AppConstants.kChunkThresholdSeconds * 6000,
+        lessThanOrEqualTo(AppConstants.maxFileSizeBytes),
       );
     });
   });
@@ -217,10 +252,10 @@ void main() {
       final service = AudioChunkingService(
         ffmpegOverride: (_) async { ffmpegCalled = true; },
       );
-      final result = await service.split('/tmp/fake.mp3', 300.0);
+      final result = await service.split('/tmp/fake.ogg', 300.0);
       expect(ffmpegCalled, isFalse);
       expect(result, hasLength(1));
-      expect(result.first.path, equals('/tmp/fake.mp3'));
+      expect(result.first.path, equals('/tmp/fake.ogg'));
     });
 
     // R2: граничный случай — duration == kChunkThresholdSeconds попадает в shortcircuit
@@ -229,22 +264,22 @@ void main() {
       final service = AudioChunkingService(
         ffmpegOverride: (_) async { ffmpegCalled = true; },
       );
-      const threshold = 4920.0; // AppConstants.kChunkThresholdSeconds
-      final result = await service.split('/tmp/fake.mp3', threshold);
+      final threshold = AppConstants.kChunkThresholdSeconds.toDouble();
+      final result = await service.split('/tmp/fake.ogg', threshold);
       expect(ffmpegCalled, isFalse);
       expect(result, hasLength(1));
-      expect(result.first.path, equals('/tmp/fake.mp3'));
+      expect(result.first.path, equals('/tmp/fake.ogg'));
     });
 
     // R5: валидация спецсимволов работает ДО shortcircuit
     test('R5: пути со спецсимволами отклоняются даже для коротких файлов', () async {
       final service = AudioChunkingService();
       await expectLater(
-        () => service.split('/tmp/bad"name.mp3', 300.0),
+        () => service.split('/tmp/bad"name.ogg', 300.0),
         throwsA(isA<InternalException>()),
       );
       await expectLater(
-        () => service.split('/tmp/bad\$name.mp3', 300.0),
+        () => service.split('/tmp/bad\$name.ogg', 300.0),
         throwsA(isA<InternalException>()),
       );
     });

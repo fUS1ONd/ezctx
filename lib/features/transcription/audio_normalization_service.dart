@@ -8,8 +8,9 @@ import 'package:ezctx/core/error/app_exception.dart';
 import 'audio_chunking_service.dart';
 import 'normalized_audio_file.dart';
 
-/// Сервис нормализации аудио: конвертирует входной файл в mp3 32k/16kHz/Mono
+/// Сервис нормализации аудио: конвертирует входной файл в opus 48k/16kHz/Mono (.ogg)
 /// через ffmpeg для последующего чанкования и отправки в Groq Whisper API.
+/// libopus доступен в Full-GPL сборке ffmpeg_kit_flutter_new 4.1.0 — fallback на mp3 не нужен.
 class AudioNormalizationService {
   /// Переопределение ffmpeg — инжектируется только в тестах.
   final Future<void> Function(String command)? _ffmpegOverride;
@@ -28,7 +29,7 @@ class AudioNormalizationService {
         _chunkingService = chunkingService ?? const AudioChunkingService(),
         _outputPathOverride = outputPathOverride;
 
-  /// Нормализует аудиофайл [inputPath] в mp3 32k/16kHz/Mono во временную директорию.
+  /// Нормализует аудиофайл [inputPath] в opus 48k/16kHz/Mono (.ogg) во временную директорию.
   ///
   /// Возвращает [NormalizedAudioFile] с путём и длительностью нормализованного файла.
   /// Бросает [InternalException] при ошибке ffmpeg.
@@ -39,12 +40,14 @@ class AudioNormalizationService {
       outPath = _outputPathOverride;
     } else {
       final tmpDir = (await getTemporaryDirectory()).path;
-      outPath = '$tmpDir/ezctx_norm_${DateTime.now().millisecondsSinceEpoch}.mp3';
+      outPath = '$tmpDir/ezctx_norm_${DateTime.now().millisecondsSinceEpoch}.ogg';
     }
 
-    // Конвертация в mp3 32k/16kHz/Mono: оптимальный баланс качества и размера для ASR
+    // Конвертация в opus 48k/16kHz/Mono: улучшенное качество ASR (CER ~5% vs ~12.35% mp3 32k).
+    // -vn: defensive отбрасывание видеодорожки (вход может быть mp4/webm).
+    // libopus доступен в Full-GPL сборке ffmpeg_kit_flutter_new 4.1.0, fallback не нужен.
     final command =
-        '-i "$inputPath" -b:a 32k -ac 1 -ar 16000 -codec:a libmp3lame -y "$outPath"';
+        '-i "$inputPath" -vn -c:a libopus -b:a 48k -ac 1 -ar 16000 -y "$outPath"';
 
     final ffmpegOverride = _ffmpegOverride;
     if (ffmpegOverride != null) {

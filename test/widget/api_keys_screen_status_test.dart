@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:ezctx/features/transcription/groq_key_pool.dart';
+import 'package:ezctx/features/transcription/key_pool.dart';
 import 'package:ezctx/ui/widgets/key_status_tile.dart';
 
 void main() {
@@ -60,6 +60,46 @@ void main() {
 
       // Отсчёт должен уменьшиться
       expect(find.textContaining('До 00:01:'), findsOneWidget);
+    });
+
+    testWidgets('исчерпанный ключ показывает Исчерпан', (tester) async {
+      // Тест RED: KeyStatusTile пока не имеет ветки ExhaustedKeyStatus,
+      // поэтому этот тест должен упасть до реализации.
+      const status = ExhaustedKeyStatus(key: 'test_key');
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: KeyStatusTile(status: status),
+          ),
+        ),
+      );
+
+      // Должен быть текст «Исчерпан»
+      expect(find.text('Исчерпан'), findsOneWidget);
+      // Не должно быть текста «Активен» при статусе Exhausted
+      expect(find.text('Активен'), findsNothing);
+      // Не должно быть таймера (текст «До »)
+      expect(find.textContaining('До '), findsNothing);
+    });
+
+    testWidgets('исчерпанный ключ не запускает таймер', (tester) async {
+      const status = ExhaustedKeyStatus(key: 'test_key');
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: KeyStatusTile(status: status),
+          ),
+        ),
+      );
+
+      // Продвигаем время — таймер не должен менять отображение
+      await tester.pump(const Duration(seconds: 2));
+
+      // Статус должен оставаться «Исчерпан»
+      expect(find.text('Исчерпан'), findsOneWidget);
+      expect(find.textContaining('До '), findsNothing);
     });
   });
 }

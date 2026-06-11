@@ -24,9 +24,9 @@ void main() {
     );
   });
 
-  group('GroqApiService', () {
+  group('GroqProvider', () {
     test('успешный 200 → TranscriptionResult с text и words', () async {
-      final service = GroqApiService(
+      final service = GroqProvider(
         clientFactory: () => MockClient((req) async {
           expect(req.method, 'POST');
           expect(req.url.toString(), contains('api.groq.com'));
@@ -65,7 +65,7 @@ void main() {
     });
 
     test('HTTP 401 → AuthException', () async {
-      final service = GroqApiService(
+      final service = GroqProvider(
         clientFactory: () => MockClient((_) async => http.Response('', 401)),
       );
       expect(
@@ -75,7 +75,7 @@ void main() {
     });
 
     test('HTTP 500 → NetworkException', () async {
-      final service = GroqApiService(
+      final service = GroqProvider(
         clientFactory: () => MockClient((_) async => http.Response('', 500)),
       );
       expect(
@@ -85,7 +85,7 @@ void main() {
     });
 
     test('HTTP 524 (Cloudflare timeout) → NetworkException', () async {
-      final service = GroqApiService(
+      final service = GroqProvider(
         clientFactory: () => MockClient((_) async => http.Response('', 524)),
       );
       expect(
@@ -95,7 +95,7 @@ void main() {
     });
 
     test('невалидный JSON в 200 → InternalException', () async {
-      final service = GroqApiService(
+      final service = GroqProvider(
         clientFactory: () =>
             MockClient((_) async => http.Response('not json', 200)),
       );

@@ -11,13 +11,13 @@
 
 ### Constraints
 
-- **Tech stack**: Flutter (Dart) — единый кодбейз под Android/Windows/iOS, зрелый `ffmpeg_kit_flutter`, простой перенос React-дизайна.
+- **Tech stack**: Flutter (Dart) — единый кодбейз под Android/Windows/iOS, зрелый `ffmpeg_kit_flutter_new`, простой перенос React-дизайна.
 - **Платформа v1**: только Android — собирается с Windows+WSL без Mac.
-- **API**: только Groq Whisper (free tier), без серверной части.
+- **API**: Groq Whisper и Deepgram nova-3 (оба free tier), без серверной части.
 - **Бюджет на распространение**: $0 на v1 (APK + бета через Firebase App Distribution), Google Play ($25 разово) — по необходимости.
 - **Хранение секретов**: API-ключи только в `flutter_secure_storage`, никогда не в репозитории и не в сборке.
-- **ffmpeg на Android**: через `ffmpeg_kit_flutter` (содержит ffmpeg + ffprobe).
-- **Размер чанка**: ≤ 19 MB (баланс битрейта/длительности; базово 20 мин при mp3 128 kbps).
+- **ffmpeg на Android**: через `ffmpeg_kit_flutter_new` (содержит ffmpeg + ffprobe).
+- **Размер чанка**: ≤ 19 MB под лимит Groq; нормализация в `opus 48k/16kHz/mono` (контейнер `.ogg`, MIME `audio/ogg`), порог нарезки ~54 мин (`kChunkThresholdSeconds = 3240`). libopus доступен в Full-GPL сборке `ffmpeg_kit_flutter_new` — fallback на mp3 не требуется.
 <!-- GSD:project-end -->
 
 <!-- GSD:stack-start source:STACK.md -->
@@ -75,19 +75,6 @@ Bash разрешён только для: `git add/commit/push/checkout`, `mkdi
 4. Workflow на тег запустится автоматически — проверить в Actions, что APK опубликованы на странице Releases.
 
 Дебажные APK на каждый push/PR в `main` собирает `build-debug-apk.yml` (артефакт, без релиза).
-
-<!-- GSD:workflow-start source:GSD defaults -->
-## GSD Workflow Enforcement
-
-Before using Edit, Write, or other file-changing tools, start work through a GSD command so planning artifacts and execution context stay in sync.
-
-Use these entry points:
-- `/gsd-quick` for small fixes, doc updates, and ad-hoc tasks
-- `/gsd-debug` for investigation and bug fixing
-- `/gsd-execute-phase` for planned phase work
-
-Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.
-<!-- GSD:workflow-end -->
 
 <!-- GSD:profile-start -->
 ## Developer Profile

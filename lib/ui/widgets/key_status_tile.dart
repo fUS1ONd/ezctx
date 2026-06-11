@@ -4,7 +4,7 @@ import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/constants/design_tokens.dart';
-import '../../features/transcription/groq_key_pool.dart';
+import '../../features/transcription/key_pool.dart';
 
 /// Отображает статус одного API-ключа: зелёный «Активен» или красный «До HH:MM:SS».
 ///
@@ -87,6 +87,22 @@ class _KeyStatusTileState extends State<KeyStatusTile> {
     );
   }
 
+  /// Бейдж исчерпанного ключа (D-01..D-04):
+  /// оранжевая иконка money_off_outlined + текст «Исчерпан», без таймера.
+  Widget _exhaustedBadge() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.money_off_outlined, size: 16, color: Colors.orange),
+        const SizedBox(width: AppSpacing.xs),
+        Text(
+          'Исчерпан',
+          style: AppTextStyles.label.copyWith(color: Colors.orange),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
@@ -99,6 +115,8 @@ class _KeyStatusTileState extends State<KeyStatusTile> {
       if (remaining.isNegative) return _activeBadge(palette);
       return _blockedBadge(_formatRemaining(remaining), palette);
     }
+    // Ключ исчерпал кредиты провайдера (Deepgram HTTP 402) — без таймера (D-04)
+    if (s is ExhaustedKeyStatus) return _exhaustedBadge();
     return _activeBadge(palette);
   }
 }
