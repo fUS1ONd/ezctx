@@ -4,7 +4,8 @@
 //  • Фон делегирован общему `GradientBackground` — корректен в обеих темах.
 //  • Status-карточка, ряды, divider, OptionsSheet — все используют palette.
 //
-// Проводка та же: apiKeysProvider, themeModeProvider, transcriptionOptionsRepoProvider.
+// Мульти-провайдерная проводка: groqKeyPoolProvider, deepgramKeyPoolProvider,
+// themeModeProvider, transcriptionOptionsRepoProvider.
 
 import 'dart:ui';
 
@@ -14,10 +15,23 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/design_tokens.dart';
 import '../../core/providers/repository_providers.dart';
+import '../../core/providers/service_providers.dart';
 import '../../core/providers/theme_provider.dart';
 import '../../features/transcription/transcription_options.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/gradient_background.dart';
+import '../widgets/no_keys_dialog.dart';
+
+/// Русская плюрализация счётчика ключей.
+/// Экспортируется на уровне файла для unit-тестирования.
+String pluralizeKeys(int n) {
+  if (n == 0) return 'Нет ключей';
+  final mod10 = n % 10;
+  final mod100 = n % 100;
+  if (mod10 == 1 && mod100 != 11) return '$n ключ';
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return '$n ключа';
+  return '$n ключей';
+}
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -71,18 +85,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ThemeMode.system => 'Автоматически',
       };
 
-  String _keyCountLabel(int count) {
-    if (count == 0) return 'Нет ключей';
-    if (count == 1) return '1 активен';
-    return '$count активных';
-  }
-
   @override
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
-    final keysAsync = ref.watch(apiKeysProvider);
-    final keyCount = keysAsync.maybeWhen(data: (k) => k.length, orElse: () => 0);
     final palette = context.palette;
+
+    // Получаем оба пула через ref.read — подписка идёт через ListenableBuilder
+    final groqPool = ref.read(groqKeyPoolProvider);
+    final deepgramPool = ref.read(deepgramKeyPoolProvider);
+    // Активный пул определяется провайдером выбранной модели
+    final activePool = _options.model.provider == TranscriptionProviderId.deepgram
+        ? deepgramPool
+        : groqPool;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -100,12 +114,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
 
-              // Статус-карточка Groq (реактивная)
+              // Мультипровайдерная реактивная StatusCard (ListenableBuilder, D-11..D-13)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: _StatusCard(
-                  connected: keyCount > 0,
-                  modelName: _options.model.apiValue,
+                child: ListenableBuilder(
+                  // key: пересоздаём виджет при смене провайдера (Pitfall 3)
+                  key: ValueKey(_options.model.provider),
+                  listenable: activePool,
+                  builder: (context, _) {
+                    final liveCount = activePool.aliveKeyCount;
+                    return _StatusCard(
+                      modelLabel: _modelLabel(_options.model),
+                      providerLabel: _options.model.provider ==
+                              TranscriptionProviderId.deepgram
+                          ? 'Deepgram'
+                          : 'Groq',
+                      keyCount: liveCount,
+                    );
+                  },
                 ),
               ),
 
@@ -116,15 +142,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   icon: _IconKind.key,
                   iconGradient: const [Color(0xFFFF8A4D), Color(0xFFFF5B3A)],
                   title: 'API-ключи',
-                  detail: keysAsync.maybeWhen(
-                    data: (_) => _keyCountLabel(keyCount),
-                    loading: () => '...',
-                    orElse: () => '—',
-                  ),
-                  onTap: () => Navigator.pushNamed(
-                    context,
-                    AppConstants.routeApiKeys,
-                  ),
+                  // Показываем счётчик ключей активного провайдера
+                  detail: pluralizeKeys(activePool.aliveKeyCount),
+                  onTap: () {
+                    // D-09: открываем вкладку активного провайдера (аргумент для app.dart)
+                    final tab = _options.model.provider ==
+                            TranscriptionProviderId.deepgram
+                        ? 'deepgram'
+                        : 'groq';
+                    Navigator.pushNamed(
+                      context,
+                      AppConstants.routeApiKeys,
+                      arguments: tab,
+                    );
+                  },
                 ),
                 _Row(
                   icon: _IconKind.wave,
@@ -133,16 +164,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   detail: _modelLabel(_options.model),
                   onTap: () => _pickOne<TranscriptionModel>(
                     title: 'Модель',
-                    // nova3 скрыта до Phase 10: DeepgramProvider ещё не реализован.
-                    // Показывать её в UI нельзя — запрос уйдёт на Groq с model=nova-3,
-                    // что вернёт ошибку 400.
-                    options: TranscriptionModel.values
-                        .where((m) => m != TranscriptionModel.nova3)
-                        .toList(),
+                    // D-14: nova3 включена — DeepgramProvider реализован в Phase 10
+                    options: TranscriptionModel.values,
                     value: _options.model,
                     label: _modelLabel,
-                    onChanged: (m) =>
-                        _saveOptions(_options.copyWith(model: m)),
+                    onChanged: (m) async {
+                      await _saveOptions(_options.copyWith(model: m));
+                      // D-05, D-06: при выборе nova3 без ключей Deepgram → диалог
+                      if (m == TranscriptionModel.nova3 && mounted) {
+                        final pool = ref.read(deepgramKeyPoolProvider);
+                        if (pool.aliveKeyCount == 0) {
+                          await NoKeysDialog.show(
+                            // ignore: use_build_context_synchronously
+                            context,
+                            title: 'Нужен ключ Deepgram',
+                            bodyText:
+                                'Nova-3 работает через Deepgram. Добавьте '
+                                'API-ключ Deepgram — free-tier хватает на часы аудио.',
+                            onOpenSettings: () => Navigator.pushNamed(
+                              context,
+                              AppConstants.routeApiKeys,
+                              arguments: 'deepgram',
+                            ),
+                          );
+                        }
+                      }
+                    },
                   ),
                 ),
                 _Row(
@@ -354,15 +401,32 @@ class _Row extends StatelessWidget {
   }
 }
 
-// ─── Реактивная Status-карточка ─────────────────────────
+// ─── Мультипровайдерная реактивная Status-карточка (D-11..D-13) ─────────────
 class _StatusCard extends StatelessWidget {
-  final bool connected;
-  final String modelName;
-  const _StatusCard({required this.connected, required this.modelName});
+  /// Метка модели (например, «Whisper Large v3», «Nova-3»)
+  final String modelLabel;
+
+  /// Метка провайдера («Groq» или «Deepgram»)
+  final String providerLabel;
+
+  /// Количество живых ключей активного провайдера
+  final int keyCount;
+
+  const _StatusCard({
+    required this.modelLabel,
+    required this.providerLabel,
+    required this.keyCount,
+  });
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    // D-11: строка статуса с провайдером и счётчиком ключей
+    final connected = keyCount > 0;
+    final statusText = connected
+        ? '$modelLabel · $providerLabel · ${pluralizeKeys(keyCount)} · Подключено'
+        : '$modelLabel · $providerLabel · Нет ключей';
+
     return GlassCard(
       borderRadius: 30,
       padding: const EdgeInsets.all(18),
@@ -382,29 +446,16 @@ class _StatusCard extends StatelessWidget {
             ],
           ),
           alignment: Alignment.center,
-          child: const Text(
-            'G',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
-              fontSize: 18,
-            ),
-          ),
+          // Провайдеро-нейтральная иконка ключа
+          child: const Icon(Icons.vpn_key_rounded,
+              color: Colors.white, size: 22),
         ),
         const SizedBox(width: 14),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                connected ? 'Подключено к Groq' : 'Нет API-ключа',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: palette.ink1,
-                ),
-              ),
-              const SizedBox(height: 4),
+              // Статус подключения (одна строка для обоих провайдеров)
               Row(children: [
                 Icon(
                   Icons.circle,
@@ -414,7 +465,7 @@ class _StatusCard extends StatelessWidget {
                 const SizedBox(width: 6),
                 Flexible(
                   child: Text(
-                    connected ? modelName : 'Добавьте ключ для транскрибации',
+                    statusText,
                     style: TextStyle(fontSize: 13, color: palette.ink2),
                     overflow: TextOverflow.ellipsis,
                   ),
