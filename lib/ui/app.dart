@@ -28,7 +28,9 @@ class EzCtxApp extends ConsumerWidget {
         Widget page;
         switch (settings.name) {
           case AppConstants.routeApiKeys:
-            page = const ApiKeysScreen();
+            // T-11-08: fallback на 'groq' при некорректном/null аргументе (Pitfall 4)
+            final tab = settings.arguments as String? ?? 'groq';
+            page = ApiKeysScreen(initialTab: tab);
           case AppConstants.routeProcessing:
             page = const ProcessingScreen();
           case AppConstants.routeResult:
