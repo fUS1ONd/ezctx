@@ -421,11 +421,13 @@ class _StatusCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    // D-11: строка статуса с провайдером и счётчиком ключей
+    // D-11: строка статуса с провайдером и счётчиком ключей.
+    // Двухстрочная вёрстка: модель — заголовок, провайдер + подключение — подзаголовок,
+    // чтобы длинный текст не обрезался на узких экранах.
     final connected = keyCount > 0;
     final statusText = connected
-        ? '$modelLabel · $providerLabel · ${pluralizeKeys(keyCount)} · Подключено'
-        : '$modelLabel · $providerLabel · Нет ключей';
+        ? '$providerLabel · ${pluralizeKeys(keyCount)} · Подключено'
+        : '$providerLabel · Нет ключей';
 
     return GlassCard(
       borderRadius: 30,
@@ -455,7 +457,19 @@ class _StatusCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Статус подключения (одна строка для обоих провайдеров)
+              // Строка 1: модель — заголовок карточки
+              Text(
+                modelLabel,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: palette.ink1,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              // Строка 2: точка состояния + провайдер и статус подключения
               Row(children: [
                 Icon(
                   Icons.circle,
@@ -467,6 +481,7 @@ class _StatusCard extends StatelessWidget {
                   child: Text(
                     statusText,
                     style: TextStyle(fontSize: 13, color: palette.ink2),
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
