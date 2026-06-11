@@ -104,9 +104,13 @@ class _PrimaryButtonState extends State<PrimaryButton> {
                   // Отступ через токен вместо magic number
                   const SizedBox(width: AppSpacing.sm),
                 ],
-                Text(
-                  widget.label,
-                  style: AppTextStyles.heading.copyWith(color: Colors.white),
+                // Flexible предотвращает overflow при узких constraints
+                Flexible(
+                  child: Text(
+                    widget.label,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.heading.copyWith(color: Colors.white),
+                  ),
                 ),
               ],
             ),

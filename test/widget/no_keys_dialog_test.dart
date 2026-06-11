@@ -3,9 +3,19 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ezctx/ui/widgets/no_keys_dialog.dart';
 
+/// Задаём размер экрана 800×1200 логических пикселей,
+/// чтобы PrimaryButton внутри диалога не переполнялся по ширине.
+void _setPhoneViewport(WidgetTester tester) {
+  tester.view.physicalSize = const Size(800, 1200);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+}
+
 void main() {
   group('NoKeysDialog', () {
     testWidgets('Groq-дефолт: заголовок «Нужен ключ Groq» виден', (tester) async {
+      _setPhoneViewport(tester);
       // Без параметров — должны применяться Groq-дефолты
       await tester.pumpWidget(
         MaterialApp(
@@ -27,6 +37,7 @@ void main() {
     });
 
     testWidgets('Deepgram-вариант: заголовок «Нужен ключ Deepgram» виден', (tester) async {
+      _setPhoneViewport(tester);
       // Передаём Deepgram-параметры
       await tester.pumpWidget(
         MaterialApp(
@@ -54,6 +65,7 @@ void main() {
 
     testWidgets('onOpenSettings callback вызывается при нажатии «Открыть настройки»',
         (tester) async {
+      _setPhoneViewport(tester);
       // Флаг для проверки вызова callback
       var called = false;
 
