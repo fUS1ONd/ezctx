@@ -205,6 +205,8 @@ class _KeysTabContentState extends ConsumerState<_KeysTabContent> {
     try {
       // Сохраняем в защищённом хранилище и добавляем в пул ротации
       await ref.read(widget.repoProvider).addKey(rawKey);
+      // CR-03: проверяем mounted после первого await перед setState/ref
+      if (!mounted) return;
       ref.read(widget.poolProvider).addKey(rawKey);
       _inputController.clear();
       ref.invalidate(widget.keysProvider);
@@ -297,6 +299,8 @@ class _KeysTabContentState extends ConsumerState<_KeysTabContent> {
       },
     );
     if (confirmed == true) {
+      // CR-01: проверяем mounted после await диалога перед обращением к ref/setState
+      if (!mounted) return;
       // Удаляем из хранилища и из пула ротации текущей вкладки
       await ref.read(widget.repoProvider).removeKey(key.raw);
       ref.read(widget.poolProvider).removeKey(key.raw);
@@ -446,10 +450,17 @@ class _KeysTabContentState extends ConsumerState<_KeysTabContent> {
           const SizedBox(height: AppSpacing.md),
           // Ссылка на консоль провайдера для получения ключа
           GestureDetector(
-            onTap: () => launchUrl(
-              Uri.parse(widget.getKeyUrl),
-              mode: LaunchMode.externalApplication,
-            ),
+            onTap: () async {
+              // CR-02: await + обработка ошибки, чтобы не игнорировать сбой запуска URL
+              try {
+                await launchUrl(
+                  Uri.parse(widget.getKeyUrl),
+                  mode: LaunchMode.externalApplication,
+                );
+              } catch (_) {
+                // Не можем открыть браузер — игнорируем молча, URL отображён пользователю
+              }
+            },
             child: Text(
               widget.getKeyLabel,
               style: AppTextStyles.label.copyWith(

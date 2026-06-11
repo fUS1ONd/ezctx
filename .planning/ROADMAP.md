@@ -55,8 +55,14 @@ Plans:
 
 ### 11 — UI: выбор провайдера/языка + раздельные ключи  `[feature/UI]`
 Функциональный контракт + UI/UX-агент (liquid glass). Выбор модели/языка, два набора
-ключей, статус «исчерпан». Запуск через `/gsd-ui-phase`.
+ключей, статус «исчерпан».
 Зависимости: 10. → `11-SPEC.md`
+**Plans:** 4 plans (waves: 1=01/02 parallel, 2=03, 3=04)
+Plans:
+- [x] 11-01-PLAN.md — KeyStatusTile ветка ExhaustedKeyStatus + LiquidGlassTabBar text-only (nullable icon)
+- [x] 11-02-PLAN.md — NoKeysDialog параметризация (Groq-дефолт + Deepgram-вариант, обратная совместимость)
+- [x] 11-03-PLAN.md — ApiKeysScreen → TabBar Groq/Deepgram (раздельные repo/pool) + app.dart routing (initialTab)
+- [x] 11-04-PLAN.md — SettingsScreen: nova3 в пикере, мультипровайдерная StatusCard, NoKeysDialog-проводка, ru-плюрализация
 
 ### 12 — Валидация тестов (Nyquist)  `[test]`
 Ревью осмысленности тест-кейсов + граничные случаи по фазам 07–11. Запуск через
@@ -73,4 +79,4 @@ Plans:
 
 ## Следующий шаг
 
-`/gsd-execute-phase 10` — исполнить планы фазы 10 (DeepgramProvider + DI-проводка).
+`/gsd-execute-phase 11` — исполнить планы фазы 11 (UI: выбор провайдера/языка + раздельные ключи).
