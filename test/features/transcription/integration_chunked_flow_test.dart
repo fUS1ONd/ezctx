@@ -170,6 +170,76 @@ void main() {
     });
 
     // -----------------------------------------------------------------------
+    // Сценарий 5 (DG-04): code-switching — чанки возвращают разные языки.
+    // -----------------------------------------------------------------------
+    test('сценарий 5 — code-switching: language = первый непустой язык чанка', () async {
+      final chunks = [
+        FakeChunkFile('/tmp/chunk_000.ogg'),
+        FakeChunkFile('/tmp/chunk_001.ogg'),
+      ];
+
+      int callIndex = 0;
+      final apiService = MockTranscriptionProvider((_, __, ___) async {
+        final i = callIndex++;
+        // Чанк 0 → 'ru', чанк 1 → 'en' (code-switching)
+        return TranscriptionResult(
+          text: i == 0 ? 'Русский текст' : 'English text',
+          language: i == 0 ? 'ru' : 'en',
+          duration: 30.0,
+          words: const [],
+          segments: const [],
+        );
+      });
+
+      final ctrl = ChunkedTranscriptionController(
+        pool: KeyPool(initialKeys: [_testKey.raw]),
+        apiService: apiService,
+        chunkingService: MockAudioChunkingService(chunkFiles: chunks),
+      );
+
+      await ctrl.start(_dummyFile);
+
+      expect(ctrl.state, isA<ChunkedSuccess>());
+      final result = (ctrl.state as ChunkedSuccess).result;
+      // Первый непустой язык выигрывает — 'ru' от чанка 0.
+      expect(result.language, equals('ru'),
+          reason: 'При code-switching побеждает язык первого чанка');
+    });
+
+    test('сценарий 5b — пустой язык первого чанка: берётся язык второго', () async {
+      final chunks = [
+        FakeChunkFile('/tmp/chunk_000.ogg'),
+        FakeChunkFile('/tmp/chunk_001.ogg'),
+      ];
+
+      int callIndex = 0;
+      final apiService = MockTranscriptionProvider((_, __, ___) async {
+        final i = callIndex++;
+        return TranscriptionResult(
+          text: i == 0 ? 'Тишина' : 'Текст',
+          language: i == 0 ? '' : 'ru',
+          duration: 30.0,
+          words: const [],
+          segments: const [],
+        );
+      });
+
+      final ctrl = ChunkedTranscriptionController(
+        pool: KeyPool(initialKeys: [_testKey.raw]),
+        apiService: apiService,
+        chunkingService: MockAudioChunkingService(chunkFiles: chunks),
+      );
+
+      await ctrl.start(_dummyFile);
+
+      expect(ctrl.state, isA<ChunkedSuccess>());
+      final result = (ctrl.state as ChunkedSuccess).result;
+      // Первый чанк вернул пустой язык → берём язык второго чанка.
+      expect(result.language, equals('ru'),
+          reason: 'Пустой язык первого чанка пропускается, берётся первый непустой');
+    });
+
+    // -----------------------------------------------------------------------
     // Сценарий 4: Cleanup — оба файла удалены, даже при AuthException.
     // -----------------------------------------------------------------------
     test('сценарий 4 — cleanup: оба tmp-файла удалены при AuthException', () async {
