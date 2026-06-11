@@ -2,7 +2,6 @@
 //
 // Widget-тесты для ApiKeysScreen: вкладки Groq/Deepgram, initialTab, переключение.
 
-import 'package:ezctx/core/providers/repository_providers.dart';
 import 'package:ezctx/core/providers/service_providers.dart';
 import 'package:ezctx/core/providers/storage_providers.dart';
 import 'package:ezctx/core/storage/secure_storage_service.dart';
