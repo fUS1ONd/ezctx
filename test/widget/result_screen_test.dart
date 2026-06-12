@@ -39,6 +39,9 @@ class _StubHistoryRepository implements HistoryRepository {
 
   @override
   Future<List<String>> distinctProviders() async => [];
+
+  @override
+  Future<void> update(HistoryEntry entry) async {}
 }
 
 void main() {

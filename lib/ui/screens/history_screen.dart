@@ -21,9 +21,12 @@ import 'detail_screen.dart';
 /// Нормальный текст: palette.ink2, w400. Выделенный: palette.accent, w700.
 /// Публичная функция — используется в widget-тестах (Task 3).
 ///
-/// Алгоритм: split по «, затем каждая часть начиная с 1-й разбивается по »
-/// на (выделено, обычный). Это корректно работает с натуральными «» в тексте,
-/// так как сниппет FTS5 всегда оборачивает совпадение парными маркерами (WR-02).
+/// CR-06: маркеры \x02 (STX) и \x03 (ETX) — управляющие символы, не встречаются
+/// в тексте расшифровок. Ранее использовались «», которые ложно подсвечивали
+/// натуральные цитаты в русском тексте.
+///
+/// Алгоритм: split по \x02, затем каждая часть начиная с 1-й разбивается по \x03
+/// на (выделено, обычный).
 Widget buildSnippet(String snippet, AppPalette palette) {
   final spans = <TextSpan>[];
 
@@ -40,14 +43,14 @@ Widget buildSnippet(String snippet, AppPalette palette) {
         height: 1.4,
       );
 
-  final outer = snippet.split('«');
+  final outer = snippet.split('\x02');
   for (var i = 0; i < outer.length; i++) {
     if (i == 0) {
-      // Часть до первого «: всегда обычный текст.
+      // Часть до первого \x02: всегда обычный текст.
       if (outer[i].isNotEmpty) spans.add(TextSpan(text: outer[i], style: normal()));
     } else {
-      // Часть после «: до » — выделено, после » — обычный текст.
-      final inner = outer[i].split('»');
+      // Часть после \x02: до \x03 — выделено, после \x03 — обычный текст.
+      final inner = outer[i].split('\x03');
       if (inner[0].isNotEmpty) spans.add(TextSpan(text: inner[0], style: highlight()));
       if (inner.length > 1 && inner[1].isNotEmpty) {
         spans.add(TextSpan(text: inner[1], style: normal()));
@@ -109,6 +112,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
   /// Деструктивное удаление всей истории с подтверждением (ACT-04, T-03-09).
   Future<void> _onClearAll() async {
+    // Захват repo ДО await — ref недоступен после dispose (CR-01, T-03-08).
+    final repo = ref.read(historyRepositoryProvider);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) {
@@ -137,8 +142,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       },
     );
     if (confirmed != true) return;
-    // Захват repo ДО await — ref недоступен после dispose (Pitfall 4, T-03-08).
-    final repo = ref.read(historyRepositoryProvider);
     await repo.clear();
   }
 
@@ -151,9 +154,17 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       builder: (_) => LongPressBottomSheet(
         entry: entry,
         onFavoriteToggle: () async {
-          // Захват repo ДО await (Pitfall 4, T-03-08).
+          // Захват repo ДО await (T-03-08). try/catch — CR-05: Future иначе discarded без фидбека.
           final repo = widgetRef.read(historyRepositoryProvider);
-          await repo.update(entry.copyWith(isFavorite: !entry.isFavorite));
+          try {
+            await repo.update(entry.copyWith(isFavorite: !entry.isFavorite));
+          } catch (e) {
+            if (ctx.mounted) {
+              ScaffoldMessenger.of(ctx).showSnackBar(
+                const SnackBar(content: Text('Не удалось сохранить')),
+              );
+            }
+          }
         },
         onCopy: () async {
           try {
@@ -183,6 +194,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           }
         },
         onDelete: () async {
+          // Захват repo ДО await — widgetRef недоступен после dispose (CR-02, T-03-08).
+          final repo = widgetRef.read(historyRepositoryProvider);
           // Показываем AlertDialog подтверждения удаления (D-07, T-03-09).
           final confirmed = await showDialog<bool>(
             context: ctx,
@@ -213,8 +226,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             },
           );
           if (confirmed != true) return;
-          // Захват repo ДО await (Pitfall 4, T-03-08).
-          final repo = widgetRef.read(historyRepositoryProvider);
           await repo.remove(entry.id);
         },
       ),
@@ -635,26 +646,25 @@ class _HistoryList extends StatelessWidget {
                 color: Colors.white, size: 24),
           ),
           onDismissed: (direction) async {
-            // Захват repo ДО await — ref недоступен после dispose (Pitfall 4, T-03-08).
+            // Захват repo и messenger ДО await: после await list rebuild снимает ctx с дерева
+            // и ctx.mounted == false → SnackBar не показался бы (CR-03, T-03-08).
             final repo = widgetRef.read(historyRepositoryProvider);
+            final messenger = ScaffoldMessenger.of(ctx);
+            final badColor = ctx.palette.glassBgDeep;
             try {
               await repo.remove(entry.id);
-              if (ctx.mounted) {
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  SnackBar(
-                    content: const Text('Запись удалена'),
-                    backgroundColor: ctx.palette.glassBgDeep,
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              }
+              messenger.showSnackBar(
+                SnackBar(
+                  content: const Text('Запись удалена'),
+                  backgroundColor: badColor,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
             } catch (e) {
               // При ошибке drift восстановит запись через watch() (Pitfall 1, T-03-07).
-              if (ctx.mounted) {
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  const SnackBar(content: Text('Не удалось удалить')),
-                );
-              }
+              messenger.showSnackBar(
+                const SnackBar(content: Text('Не удалось удалить')),
+              );
             }
           },
           child: GestureDetector(

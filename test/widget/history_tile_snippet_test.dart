@@ -1,6 +1,7 @@
 // GREEN-реализация widget-теста сниппета (план 02-03, Task 3).
 // BRWS-01: карточка показывает сниппет совпадения при активном поиске.
-// Маркеры «» парсятся в TextSpan с выделением (жирный + accent цвет).
+// CR-06: маркеры \x02/\x03 (STX/ETX) парсятся в TextSpan с выделением (жирный + accent цвет).
+// Старые маркеры «» заменены — они ложно подсвечивали натуральные цитаты в тексте.
 import 'package:ezctx/core/constants/design_tokens.dart';
 import 'package:ezctx/core/providers/history_provider.dart';
 import 'package:ezctx/features/history/filter_notifier.dart';
@@ -126,6 +127,9 @@ void main() {
   group('buildSnippet — юнит-тесты парсинга маркеров FTS5', () {
     // Используем light-палитру напрямую (без контекста).
     const palette = AppPalette.light;
+    // CR-06: маркеры STX (\x02) и ETX (\x03) вместо «».
+    const open = '\x02';
+    const close = '\x03';
 
     test('BRWS-01: текст без маркеров → 1 span с w400 и ink2', () {
       final widget = buildSnippet('просто текст', palette);
@@ -138,43 +142,37 @@ void main() {
       expect(spans[0].style?.color, palette.ink2);
     });
 
-    test('BRWS-01: «совпадение» → 1 выделенный span с w700 и accent', () {
-      final widget = buildSnippet('«совпадение»', palette);
+    test('BRWS-01: \\x02совпадение\\x03 → 1 выделенный span с w700 и accent', () {
+      final widget = buildSnippet('${open}совпадение$close', palette);
       final richText = widget as RichText;
       final spans = collectTextSpans(richText.text);
-      // Один span: «совпадение»
       expect(spans, hasLength(1));
       expect(spans[0].text, 'совпадение');
       expect(spans[0].style?.fontWeight, FontWeight.w700);
       expect(spans[0].style?.color, palette.accent);
     });
 
-    test('BRWS-01: «начало «совпадение» конец» → 3 spans, выделен средний', () {
-      // Маркеры FTS5: «совпадение» в середине.
-      final widget = buildSnippet('начало «совпадение» конец', palette);
+    test('BRWS-01: начало \\x02совпадение\\x03 конец → 3 spans, выделен средний', () {
+      final widget = buildSnippet('начало ${open}совпадение$close конец', palette);
       final richText = widget as RichText;
       final spans = collectTextSpans(richText.text);
       expect(spans.length, greaterThanOrEqualTo(2));
 
-      // Ищем выделенный span.
       final highlightSpans = spans
           .where((s) => s.style?.fontWeight == FontWeight.w700)
           .toList();
       expect(highlightSpans, isNotEmpty,
           reason: 'Должен быть хотя бы один выделенный span');
-      // Текст выделенного фрагмента.
       expect(
         highlightSpans.any((s) => s.text?.contains('совпадение') == true),
         isTrue,
-        reason: 'Выделен должен быть текст «совпадение»',
+        reason: 'Выделен должен быть текст совпадение',
       );
-      // Цвет выделения — accent.
       for (final hs in highlightSpans) {
         expect(hs.style?.color, palette.accent,
             reason: 'Выделенный span должен иметь цвет palette.accent');
       }
 
-      // Проверяем нормальный текст (w400 + ink2).
       final normalSpans = spans
           .where((s) => s.style?.fontWeight == FontWeight.w400)
           .toList();
@@ -186,16 +184,29 @@ void main() {
       }
     });
 
-    test('BRWS-01: маркеры «» не присутствуют в тексте spans', () {
-      final widget = buildSnippet('до «выделено» после', palette);
+    test('BRWS-01: маркеры \\x02/\\x03 не присутствуют в тексте spans', () {
+      final widget = buildSnippet('до ${open}выделено$close после', palette);
       final richText = widget as RichText;
       final spans = collectTextSpans(richText.text);
       for (final span in spans) {
-        expect(span.text, isNot(contains('«')),
-            reason: 'Маркер « не должен попасть в текст span');
-        expect(span.text, isNot(contains('»')),
-            reason: 'Маркер » не должен попасть в текст span');
+        expect(span.text, isNot(contains(open)),
+            reason: 'Маркер \\x02 не должен попасть в текст span');
+        expect(span.text, isNot(contains(close)),
+            reason: 'Маркер \\x03 не должен попасть в текст span');
       }
+    });
+
+    test('BRWS-01: натуральные «» в тексте НЕ подсвечиваются (CR-06)', () {
+      // Текст с русскими кавычками без FTS-маркеров.
+      final widget = buildSnippet('сказал «привет» другу', palette);
+      final richText = widget as RichText;
+      final spans = collectTextSpans(richText.text);
+      // Весь текст — нормальный (нет highlight spans).
+      expect(
+        spans.every((s) => s.style?.fontWeight != FontWeight.w700),
+        isTrue,
+        reason: 'Натуральные «» не должны создавать выделенные spans',
+      );
     });
 
     test('BRWS-01: пустой snippet → RichText с пустым списком spans', () {
@@ -203,17 +214,16 @@ void main() {
       expect(widget, isA<RichText>());
       final richText = widget as RichText;
       final spans = collectTextSpans(richText.text);
-      // Пустая строка — spans пустые.
       expect(spans.where((s) => s.text?.isNotEmpty == true), isEmpty);
     });
   });
 
   group('HistoryScreen widget — интеграция с провайдерами', () {
     testWidgets(
-      'BRWS-01: _HistoryTile рендерит snippet с выделенными «» фрагментами',
+      'BRWS-01: _HistoryTile рендерит snippet с выделенными \\x02/\\x03 фрагментами',
       (tester) async {
-        // Запись со сниппетом: «совпадение» выделено.
-        final entry = _makeEntry(snippet: 'начало «совпадение» конец');
+        // Запись со сниппетом: \x02совпадение\x03 выделено (CR-06 маркеры).
+        final entry = _makeEntry(snippet: 'начало \x02совпадение\x03 конец');
         await tester.pumpWidget(_buildApp(entries: [entry]));
         await tester.pumpAndSettle();
 

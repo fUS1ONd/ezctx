@@ -75,6 +75,9 @@ class _FakeHistoryRepository implements HistoryRepository {
   @override
   Future<List<String>> distinctProviders() async => [];
 
+  @override
+  Future<void> update(HistoryEntry entry) async {}
+
   Future<void> dispose() => _controller.close();
 }
 

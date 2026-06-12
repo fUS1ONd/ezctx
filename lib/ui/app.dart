@@ -37,8 +37,9 @@ class EzCtxApp extends ConsumerWidget {
           case AppConstants.routeResult:
             page = const ResultScreen();
           case AppConstants.routeHistoryDetail:
-            // Аргумент всегда DetailArgs — переход из доверенного _HistoryTile (T-03-06).
-            final args = settings.arguments as DetailArgs;
+            // CR-04: type-guard вместо голого cast — защита от тестов и случайных pushNamed.
+            final args = settings.arguments;
+            if (args is! DetailArgs) return null;
             page = DetailScreen(entry: args.entry, searchTerm: args.searchTerm);
           default:
             return null;

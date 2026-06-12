@@ -110,8 +110,9 @@ class DriftHistoryRepository implements HistoryRepository {
         'SELECT t.id, t.title, t.file_name, t.size_bytes, t.duration_sec, '
         't.language, t.provider, t.is_favorite, t.created_at, '
         't.plain_path, t.timestamped_path, t.plain_text, '
-        // Маркеры «» для RichText-подсветки (D-02/D-08); 10 токенов контекста.
-        "snippet(transcripts_fts, 0, '«', '»', '…', 10) AS snippet "
+        // CR-06: маркеры \x02/\x03 (STX/ETX) — не встречаются в тексте расшифровок,
+        // исключают ложную подсветку натуральных «» из plainText.
+        "snippet(transcripts_fts, 0, '\x02', '\x03', '…', 10) AS snippet "
         'FROM transcripts_fts '
         'JOIN transcripts t ON transcripts_fts.rowid = t.id '
         'WHERE transcripts_fts MATCH ? ',
