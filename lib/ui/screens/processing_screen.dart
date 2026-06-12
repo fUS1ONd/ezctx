@@ -156,7 +156,7 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen>
             Navigator.pushReplacementNamed(
               context,
               AppConstants.routeResult,
-              arguments: ResultArgs(file: _file!, result: s.result),
+              arguments: ResultArgs(file: _file!, result: s.result, options: _transcriptionOptions),
             );
           }
         });

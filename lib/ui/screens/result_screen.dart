@@ -1,8 +1,12 @@
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../core/providers/history_provider.dart';
 import '../../core/services/clipboard_service.dart';
 
 import '../../core/constants/design_tokens.dart';
+import '../../features/history/history_entry.dart';
 import '../../features/transcription/result_args.dart';
 import '../../features/transcription/transcript_writer.dart';
 import '../widgets/glass_card.dart';
@@ -57,14 +61,15 @@ class _TranscriptViewState extends State<_TranscriptView> {
 /// Отображает текст, кнопку «Скопировать» с визуальным feedback, сохраняет txt.
 /// Переключатель «С метками / Без меток» (Bug-2): всегда виден; при отсутствии
 /// таймкодов оба режима показывают одинаковый текст — это ожидаемое поведение.
-class ResultScreen extends StatefulWidget {
+/// Конвертирован в ConsumerStatefulWidget для доступа к historyRepositoryProvider (HIST-01).
+class ResultScreen extends ConsumerStatefulWidget {
   const ResultScreen({super.key});
 
   @override
-  State<ResultScreen> createState() => _ResultScreenState();
+  ConsumerState<ResultScreen> createState() => _ResultScreenState();
 }
 
-class _ResultScreenState extends State<ResultScreen> {
+class _ResultScreenState extends ConsumerState<ResultScreen> {
   ResultArgs? _args;
   bool _copied = false;
   String? _savedPath;
@@ -101,12 +106,21 @@ class _ResultScreenState extends State<ResultScreen> {
   }
 
   Future<void> _saveTranscripts() async {
-    // Защита от повторного сохранения при быстром navigate-back+forward.
+    // Защита от повторного сохранения при быстром navigate-back+forward (D-02).
     if (_transcriptsSaved) return;
     _transcriptsSaved = true;
+
+    // Захватываем репозиторий ДО первого await: ref недоступен после dispose
+    // ConsumerState (быстрый уход с экрана во время записи файлов бросил бы
+    // StateError), иначе автозапись в историю была бы молча потеряна.
+    final historyRepo = ref.read(historyRepositoryProvider);
+
+    // Запись файлов и автосохранение в историю — независимые блоки:
+    // ошибка при записи файлов не должна предотвращать сохранение в историю (HIST-01).
+    ({String plainPath, String timestampedPath})? paths;
     try {
       // Сохраняем оба формата: plain (для LLM) и с таймкодами (для истории).
-      final paths = await const TranscriptWriter().writeBoth(
+      paths = await const TranscriptWriter().writeBoth(
         baseName: _args!.file.name,
         plainText: _args!.result.plainText,
         timestampedText: _args!.result.text,
@@ -116,16 +130,46 @@ class _ResultScreenState extends State<ResultScreen> {
         baseName: _args!.file.name,
         segments: _args!.result.segments,
       );
-      if (mounted) {
-        // Показываем папку (не полный путь), так как файлов теперь несколько.
-        final sep = paths.plainPath.lastIndexOf('/');
-        final folderPath =
-            sep > 0 ? paths.plainPath.substring(0, sep) : paths.plainPath;
-        setState(() => _savedPath = folderPath);
-      }
     } catch (e, st) {
-      debugPrint('_saveTranscripts: $e\n$st');
+      debugPrint('_saveTranscripts file write error: $e\n$st');
     }
+
+    // Автозапись в историю (HIST-01, D-03: пустой текст не сохраняем).
+    // Выполняется независимо от успеха записи файлов.
+    if (_args!.result.plainText.trim().isNotEmpty) {
+      try {
+        await historyRepo.add(HistoryEntry(
+          id: '', // drift присваивает autoincrement id; игнорируется при INSERT
+          fileName: _args!.file.name,
+          title: _fileNameWithoutExtension(_args!.file.name),
+          sizeBytes: _args!.file.sizeBytes,
+          durationSec: _args!.result.duration,
+          language: _args!.result.language,
+          provider: _args!.options.model.provider, // D-08: провайдер из ResultArgs.options
+          isFavorite: false, // D-09
+          createdAt: clock.now(),
+          plainPath: paths?.plainPath ?? '',
+          timestampedPath: paths?.timestampedPath ?? '',
+          plainText: _args!.result.plainText,
+        ));
+      } catch (e, st) {
+        debugPrint('_saveTranscripts history save error: $e\n$st');
+      }
+    }
+
+    if (mounted && paths != null) {
+      // Показываем папку (не полный путь), так как файлов теперь несколько.
+      final sep = paths.plainPath.lastIndexOf('/');
+      final folderPath =
+          sep > 0 ? paths.plainPath.substring(0, sep) : paths.plainPath;
+      setState(() => _savedPath = folderPath);
+    }
+  }
+
+  /// Возвращает имя файла без расширения (хелпер для title записи).
+  static String _fileNameWithoutExtension(String name) {
+    final dot = name.lastIndexOf('.');
+    return dot > 0 ? name.substring(0, dot) : name;
   }
 
   /// Возвращает текст в текущем режиме отображения (для копирования и показа).

@@ -1,4 +1,9 @@
+import 'package:flutter/foundation.dart';
+
+import '../transcription/transcription_options.dart';
+
 // Модель одной записи в истории расшифровок.
+@immutable
 class HistoryEntry {
   const HistoryEntry({
     required this.id,
@@ -9,6 +14,12 @@ class HistoryEntry {
     required this.createdAt,
     required this.plainPath,
     required this.timestampedPath,
+    // Новые поля фазы 01 (D-08, D-09, D-05).
+    required this.title,
+    required this.provider,
+    this.isFavorite = false,
+    required this.plainText,
+    this.snippet,
   });
 
   final String id;
@@ -19,6 +30,23 @@ class HistoryEntry {
   final DateTime createdAt;
   final String plainPath;
   final String timestampedPath;
+
+  // Заголовок записи (по умолчанию — имя файла без расширения).
+  final String title;
+
+  // Провайдер транскрибации, которым создана запись (D-08).
+  final TranscriptionProviderId provider;
+
+  // Флаг избранного, по умолчанию false (D-09).
+  final bool isFavorite;
+
+  // Тело plain-текста расшифровки — источник правды для FTS5 (D-05).
+  final String plainText;
+
+  // Сниппет FTS5 snippet() — присутствует только при активном поиске (BRWS-01).
+  // null означает: поиск неактивен или запись не содержит совпадений.
+  // Поле не хранится в БД — только в результатах customSelect.
+  final String? snippet;
 
   String get sizeFormatted {
     if (sizeBytes < 1024) return '$sizeBytes Б';

@@ -408,7 +408,7 @@ class _FilterChip extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppRadius.pill),
             // Активный: полупрозрачный accent, неактивный: glassBgFlat (UI-SPEC §2).
             color: isActive
-                ? palette.accent.withOpacity(0.12)
+                ? palette.accent.withValues(alpha: 0.12)
                 : palette.glassBgFlat,
             border: Border.all(
               color: isActive ? palette.accent : palette.glassRim,
