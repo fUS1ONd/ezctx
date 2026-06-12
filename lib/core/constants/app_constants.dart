@@ -57,4 +57,6 @@ class AppConstants {
   static const String routeApiKeys = '/settings/api-keys';
   static const String routeProcessing = '/processing';
   static const String routeResult = '/result';
+  // Маршрут detail-экрана истории с полным текстом и метаданными (BRWS-03, ACT-01..04).
+  static const String routeHistoryDetail = '/history/detail';
 }
