@@ -103,9 +103,10 @@ class DriftHistoryRepository implements HistoryRepository {
         'JOIN transcripts t ON transcripts_fts.rowid = t.id '
         'WHERE transcripts_fts MATCH ? ',
       );
-      // Суффиксный wildcard «*» — prefix-поиск: «лекц*» найдёт «лекция», «лекции» и т.д.
-      // Только через Variable — предотвращает FTS5-инъекцию (Security Domain, T-02-04).
-      vars.add(Variable.withString('${spec.searchTerm}*'));
+      // FTS5 phrase quotes: обёртка "..." подавляет интерпретацию OR/AND/NOT как операторов.
+      // Внутренние кавычки экранируются удвоением (""). Суффикс * = prefix-поиск (T-02-04).
+      final escaped = spec.searchTerm.replaceAll('"', '""');
+      vars.add(Variable.withString('"$escaped"*'));
     } else {
       // Обычная ветка (нет поиска): NULL вместо snippet, простой SELECT.
       sql.write('SELECT t.*, NULL AS snippet FROM transcripts t WHERE 1=1 ');

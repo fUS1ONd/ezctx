@@ -13,12 +13,11 @@ class FilterNotifier extends Notifier<FilterSpec> {
   Timer? _debounce;
 
   @override
-  FilterSpec build() => const FilterSpec();
-
-  /// Отменяем таймер при destroy — предотвращаем утечку памяти (T-02-07, A4 из RESEARCH.md).
-  // ignore: must_call_super — Notifier в Riverpod 2.x не объявляет dispose как super-метод.
-  void dispose() {
-    _debounce?.cancel();
+  FilterSpec build() {
+    // ref.onDispose — единственный способ cleanup в Riverpod 2.x Notifier (T-02-07).
+    // dispose() как override здесь не вызывается фреймворком, поэтому используем хук.
+    ref.onDispose(() => _debounce?.cancel());
+    return const FilterSpec();
   }
 
   /// Обновляет строку поиска с debounce 250 мс (SRCH-03).
@@ -119,23 +118,16 @@ class FilterNotifier extends Notifier<FilterSpec> {
   }
 
   /// Проверяет, совпадает ли dateRange с сегодняшним днём (D-06, Pitfall 4).
-  /// Сравнение start == начало дня AND end == конец дня (23:59:59).
+  /// Flutter's showDateRangePicker возвращает midnight (00:00:00) для обеих дат,
+  /// поэтому сравниваем только год/месяц/день, игнорируя время (WR-01).
   bool _isTodayRange(DateTimeRange range) {
     final now = DateTime.now();
-    final todayStart = DateTime(now.year, now.month, now.day);
-    final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59);
-    return _isSameDay(range.start, todayStart) &&
-        _isSameDay(range.end, todayEnd);
+    return _isSameDay(range.start, now) && _isSameDay(range.end, now);
   }
 
-  /// Проверяет совпадение двух дат до секунды (вспомогательный метод D-06).
+  /// Сравнивает две даты только по году/месяцу/дню (D-06).
   bool _isSameDay(DateTime a, DateTime b) {
-    return a.year == b.year &&
-        a.month == b.month &&
-        a.day == b.day &&
-        a.hour == b.hour &&
-        a.minute == b.minute &&
-        a.second == b.second;
+    return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 }
 

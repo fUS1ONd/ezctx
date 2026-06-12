@@ -1,6 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show DateTimeRange;
 
+// Sentinel для copyWith: позволяет явно передать null в nullable-поля.
+const Object _absent = Object();
+
 // Пресеты длительности расшифровки (D-04 — взаимоисключающие radio-чипы).
 // short=<10мин, medium=10–60мин, long=>1ч.
 enum DurationPreset { short, medium, long }
@@ -31,7 +34,8 @@ class FilterSpec {
     this.providers = const {},
     this.offset = 0,
     this.pageSize = 50,
-  });
+  })  : assert(offset >= 0, 'offset не может быть отрицательным'),
+        assert(pageSize > 0, 'pageSize должен быть > 0');
 
   final String searchTerm;
 
@@ -71,15 +75,15 @@ class FilterSpec {
   // Сбрасывает все поля к дефолтам (полный reset фильтров и поиска).
   FilterSpec resetAll() => const FilterSpec();
 
-  /// copyWith с nullable параметрами по образцу TranscriptionOptions.
-  /// Для nullable-полей (durationPreset, dateRange) сброс в null осуществляется
-  /// через resetAll() или прямую передачу null-обёртки в FilterNotifier (план 02).
+  /// copyWith с sentinel-pattern для nullable-полей (durationPreset, dateRange).
+  /// По умолчанию поле сохраняется. Передача явного null обнуляет поле:
+  ///   `spec.copyWith(durationPreset: null)` — сброс пресета.
   FilterSpec copyWith({
     String? searchTerm,
-    DurationPreset? durationPreset,
+    Object? durationPreset = _absent,
     bool? todayOnly,
     bool? favoriteOnly,
-    DateTimeRange? dateRange,
+    Object? dateRange = _absent,
     Set<String>? languages,
     Set<String>? providers,
     int? offset,
@@ -87,10 +91,14 @@ class FilterSpec {
   }) =>
       FilterSpec(
         searchTerm: searchTerm ?? this.searchTerm,
-        durationPreset: durationPreset ?? this.durationPreset,
+        durationPreset: durationPreset == _absent
+            ? this.durationPreset
+            : durationPreset as DurationPreset?,
         todayOnly: todayOnly ?? this.todayOnly,
         favoriteOnly: favoriteOnly ?? this.favoriteOnly,
-        dateRange: dateRange ?? this.dateRange,
+        dateRange: dateRange == _absent
+            ? this.dateRange
+            : dateRange as DateTimeRange?,
         languages: languages ?? this.languages,
         providers: providers ?? this.providers,
         offset: offset ?? this.offset,

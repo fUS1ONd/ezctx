@@ -8,7 +8,6 @@ import '../../core/providers/history_provider.dart';
 import '../../features/history/filter_notifier.dart';
 import '../../features/history/filter_spec.dart';
 import '../../features/history/history_entry.dart';
-import '../../features/history/history_repository.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/gradient_background.dart';
 import '../widgets/primary_button.dart';
@@ -16,32 +15,39 @@ import '../widgets/primary_button.dart';
 /// Парсит строку сниппета с маркерами FTS5 «» в стилизованный RichText.
 /// Нормальный текст: palette.ink2, w400. Выделенный: palette.accent, w700.
 /// Публичная функция — используется в widget-тестах (Task 3).
+///
+/// Алгоритм: split по «, затем каждая часть начиная с 1-й разбивается по »
+/// на (выделено, обычный). Это корректно работает с натуральными «» в тексте,
+/// так как сниппет FTS5 всегда оборачивает совпадение парными маркерами (WR-02).
 Widget buildSnippet(String snippet, AppPalette palette) {
-  final parts = snippet.split(RegExp(r'«|»'));
   final spans = <TextSpan>[];
-  // Начальное состояние: первая часть НЕ выделена (обычный текст).
-  // Каждый разделитель «» переключает флаг (пустая часть от начального «
-  // переключит флаг в true перед первым реальным словом).
-  bool isHighlight = false;
 
-  for (final part in parts) {
-    if (part.isEmpty) {
-      // Пустая часть = маркер-разделитель → переключаем состояние выделения.
-      isHighlight = !isHighlight;
-      continue;
-    }
-    spans.add(TextSpan(
-      text: part,
-      style: TextStyle(
+  TextStyle normal() => TextStyle(
         fontSize: 13,
-        fontWeight: isHighlight ? FontWeight.w700 : FontWeight.w400,
-        color: isHighlight ? palette.accent : palette.ink2,
+        fontWeight: FontWeight.w400,
+        color: palette.ink2,
         height: 1.4,
-      ),
-    ));
-    // После каждого непустого фрагмента состояние переключается
-    // (следующий разделитель снова его переключит).
-    isHighlight = !isHighlight;
+      );
+  TextStyle highlight() => TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+        color: palette.accent,
+        height: 1.4,
+      );
+
+  final outer = snippet.split('«');
+  for (var i = 0; i < outer.length; i++) {
+    if (i == 0) {
+      // Часть до первого «: всегда обычный текст.
+      if (outer[i].isNotEmpty) spans.add(TextSpan(text: outer[i], style: normal()));
+    } else {
+      // Часть после «: до » — выделено, после » — обычный текст.
+      final inner = outer[i].split('»');
+      if (inner[0].isNotEmpty) spans.add(TextSpan(text: inner[0], style: highlight()));
+      if (inner.length > 1 && inner[1].isNotEmpty) {
+        spans.add(TextSpan(text: inner[1], style: normal()));
+      }
+    }
   }
 
   return RichText(
@@ -63,6 +69,8 @@ class HistoryScreen extends ConsumerStatefulWidget {
 class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   late final TextEditingController _searchController;
   late final ScrollController _scrollController;
+  // Guard против накопления offset: loadMore вызывается однократно до следующего рендера.
+  bool _isLoadingMore = false;
 
   @override
   void initState() {
@@ -80,10 +88,17 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   }
 
   /// Вызывает loadMore при приближении к концу скролла на 300px (BRWS-02).
+  /// Guard _isLoadingMore предотвращает дублирующие вызовы за один кадр.
   void _onScroll() {
+    if (_isLoadingMore) return;
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 300) {
+      _isLoadingMore = true;
       ref.read(filterNotifierProvider.notifier).loadMore();
+      // Сбрасываем флаг после следующего кадра, чтобы данные успели прийти.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _isLoadingMore = false;
+      });
     }
   }
 
@@ -112,7 +127,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             providers: const {},
           );
         },
-        repo: ref.read(historyRepositoryProvider),
+        loadLanguages: () => ref.read(historyRepositoryProvider).distinctLanguages(),
+        loadProviders: () => ref.read(historyRepositoryProvider).distinctProviders(),
       ),
     );
   }
@@ -659,15 +675,17 @@ class _FiltersSheet extends StatefulWidget {
     required this.initialSpec,
     required this.onApply,
     required this.onReset,
-    required this.repo,
+    required this.loadLanguages,
+    required this.loadProviders,
   });
 
   final FilterSpec initialSpec;
   final void Function(DateTimeRange? dateRange, Set<String> languages,
       Set<String> providers) onApply;
   final VoidCallback onReset;
-  // Репозиторий для загрузки динамических значений (D-07).
-  final HistoryRepository repo;
+  // Callback-функции вместо ссылки на репозиторий — всегда читают свежий экземпляр (WR-05).
+  final Future<List<String>> Function() loadLanguages;
+  final Future<List<String>> Function() loadProviders;
 
   @override
   State<_FiltersSheet> createState() => _FiltersSheetState();
@@ -696,8 +714,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
 
   /// Загружает доступные языки и провайдеры из истории (D-07).
   Future<void> _loadDistinctValues() async {
-    final langs = await widget.repo.distinctLanguages();
-    final provs = await widget.repo.distinctProviders();
+    final langs = await widget.loadLanguages();
+    final provs = await widget.loadProviders();
     if (mounted) {
       setState(() {
         _languages = langs;
