@@ -18,7 +18,12 @@ class DriftHistoryRepository implements HistoryRepository {
   @override
   Stream<List<HistoryEntry>> watchAll() {
     return (_db.select(_db.transcripts)
-          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+          ..orderBy([
+            (t) => OrderingTerm.desc(t.createdAt),
+            // Вторичный ключ: при равном createdAt (секундная точность хранения
+            // DateTime) гарантирует стабильный порядок по времени вставки.
+            (t) => OrderingTerm.desc(t.id),
+          ]))
         .watch()
         .map((rows) => rows.map(_rowToEntry).toList());
   }
@@ -27,7 +32,10 @@ class DriftHistoryRepository implements HistoryRepository {
   @override
   Future<List<HistoryEntry>> list() async {
     final rows = await (_db.select(_db.transcripts)
-          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+          ..orderBy([
+            (t) => OrderingTerm.desc(t.createdAt),
+            (t) => OrderingTerm.desc(t.id),
+          ]))
         .get();
     return rows.map(_rowToEntry).toList();
   }

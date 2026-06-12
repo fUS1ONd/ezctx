@@ -110,6 +110,11 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
     if (_transcriptsSaved) return;
     _transcriptsSaved = true;
 
+    // Захватываем репозиторий ДО первого await: ref недоступен после dispose
+    // ConsumerState (быстрый уход с экрана во время записи файлов бросил бы
+    // StateError), иначе автозапись в историю была бы молча потеряна.
+    final historyRepo = ref.read(historyRepositoryProvider);
+
     // Запись файлов и автосохранение в историю — независимые блоки:
     // ошибка при записи файлов не должна предотвращать сохранение в историю (HIST-01).
     ({String plainPath, String timestampedPath})? paths;
@@ -133,8 +138,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
     // Выполняется независимо от успеха записи файлов.
     if (_args!.result.plainText.trim().isNotEmpty) {
       try {
-        final repo = ref.read(historyRepositoryProvider);
-        await repo.add(HistoryEntry(
+        await historyRepo.add(HistoryEntry(
           id: '', // drift присваивает autoincrement id; игнорируется при INSERT
           fileName: _args!.file.name,
           title: _fileNameWithoutExtension(_args!.file.name),
