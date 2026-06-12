@@ -41,6 +41,10 @@ class _StubHistoryRepository implements HistoryRepository {
 
   @override
   Future<List<String>> distinctProviders() async => [];
+
+  // Добавлен в плане 03-01 — update() обновляет title и isFavorite (ACT-01, ACT-02).
+  @override
+  Future<void> update(HistoryEntry entry) async {}
 }
 
 // Вспомогательная фабрика записи для тестов.
