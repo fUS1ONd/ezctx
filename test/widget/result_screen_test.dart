@@ -30,6 +30,15 @@ class _StubHistoryRepository implements HistoryRepository {
 
   @override
   Future<void> clear() async {}
+
+  @override
+  Stream<List<HistoryEntry>> watchSearch(_) => const Stream.empty();
+
+  @override
+  Future<List<String>> distinctLanguages() async => [];
+
+  @override
+  Future<List<String>> distinctProviders() async => [];
 }
 
 void main() {

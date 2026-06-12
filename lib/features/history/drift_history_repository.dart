@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 
 import '../../core/database/app_database.dart';
 import '../transcription/transcription_options.dart';
+import 'filter_spec.dart';
 import 'history_entry.dart';
 import 'history_repository.dart';
 
@@ -69,6 +70,27 @@ class DriftHistoryRepository implements HistoryRepository {
   /// Очищает всю историю.
   @override
   Future<void> clear() => _db.delete(_db.transcripts).go();
+
+  /// Параметризованный поиск с фильтрами — реализуется в плане 02.
+  @override
+  Stream<List<HistoryEntry>> watchSearch(FilterSpec spec) {
+    // TODO(plan-02): реализовать FTS5-запрос через customSelect.
+    throw UnimplementedError('watchSearch: будет реализовано в плане 02');
+  }
+
+  /// Список уникальных языков — реализуется в плане 02.
+  @override
+  Future<List<String>> distinctLanguages() {
+    // TODO(plan-02): SELECT DISTINCT language FROM transcripts.
+    throw UnimplementedError('distinctLanguages: будет реализовано в плане 02');
+  }
+
+  /// Список уникальных провайдеров — реализуется в плане 02.
+  @override
+  Future<List<String>> distinctProviders() {
+    // TODO(plan-02): SELECT DISTINCT provider FROM transcripts.
+    throw UnimplementedError('distinctProviders: будет реализовано в плане 02');
+  }
 
   // Маппинг drift row → HistoryEntry.
   HistoryEntry _rowToEntry(Transcript row) => HistoryEntry(
