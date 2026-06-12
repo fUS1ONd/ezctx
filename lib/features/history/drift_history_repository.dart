@@ -73,6 +73,19 @@ class DriftHistoryRepository implements HistoryRepository {
   @override
   Future<void> clear() => _db.delete(_db.transcripts).go();
 
+  /// Патч-обновление: меняет только title и isFavorite по первичному ключу entry.id.
+  /// Остальные поля (plainText, fileName, createdAt и т.д.) остаются без изменений —
+  /// companion с Value.absent() для незаданных полей исключает их из UPDATE.
+  /// Типизированный drift API исключает SQL-инъекции (T-03-01).
+  @override
+  Future<void> update(HistoryEntry entry) =>
+      (_db.update(_db.transcripts)
+            ..where((t) => t.id.equals(int.parse(entry.id))))
+          .write(TranscriptsCompanion(
+            title: Value(entry.title),
+            isFavorite: Value(entry.isFavorite),
+          ));
+
   /// Параметризованный поиск с фильтрами (SRCH-01/02, FILT-01..06, BRWS-02).
   /// При активном searchTerm использует FTS5 MATCH + snippet().
   /// Сортировка: created_at DESC, id DESC (D-01 — не bm25).

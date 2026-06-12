@@ -184,6 +184,67 @@ void main() {
     });
   });
 
+  // ACT-01, ACT-02: патч-обновление title и isFavorite через update().
+  group('update()', () {
+    test('update() меняет title, остальные поля не изменяются', () async {
+      // Добавляем запись и читаем реальный id из БД.
+      await repo.add(_makeEntry(
+        title: 'Исходный заголовок',
+        plainText: 'Исходный текст',
+      ));
+      final before = await repo.list();
+      final realId = before.first.id;
+
+      // Обновляем только title через copyWith.
+      await repo.update(before.first.copyWith(title: 'Новый заголовок'));
+
+      final after = await repo.list();
+      expect(after.first.title, equals('Новый заголовок'));
+      // plainText и другие поля не изменились.
+      expect(after.first.plainText, equals('Исходный текст'));
+      expect(after.first.fileName, equals(before.first.fileName));
+      expect(after.first.id, equals(realId));
+    });
+
+    test('update() устанавливает isFavorite=true, остальные поля не изменяются', () async {
+      // Запись с isFavorite=false по умолчанию.
+      await repo.add(_makeEntry(isFavorite: false));
+      final before = await repo.list();
+      expect(before.first.isFavorite, isFalse);
+
+      // Обновляем только isFavorite.
+      await repo.update(before.first.copyWith(isFavorite: true));
+
+      final after = await repo.list();
+      expect(after.first.isFavorite, isTrue);
+      // Остальные поля не изменились.
+      expect(after.first.title, equals(before.first.title));
+      expect(after.first.durationSec, equals(before.first.durationSec));
+    });
+
+    test('update() меняет title, но не трогает plainText/fileName/createdAt', () async {
+      final now = DateTime(2026, 3, 15, 10, 0);
+      await repo.add(_makeEntry(
+        fileName: 'неизменный_файл.mp3',
+        title: 'Старое имя',
+        plainText: 'Расшифровка лекции.',
+        createdAt: now,
+      ));
+      final before = await repo.list();
+
+      await repo.update(before.first.copyWith(title: 'Новое имя'));
+
+      final after = await repo.list();
+      expect(after.first.title, equals('Новое имя'));
+      expect(after.first.plainText, equals('Расшифровка лекции.'));
+      expect(after.first.fileName, equals('неизменный_файл.mp3'));
+      expect(
+        after.first.createdAt.millisecondsSinceEpoch,
+        equals(before.first.createdAt.millisecondsSinceEpoch),
+      );
+    });
+  });
+
   // remove() и clear().
   group('remove + clear', () {
     test('remove() удаляет строку по id', () async {
