@@ -235,7 +235,7 @@ void main() {
       },
     );
 
-    // ACT-03: Copy → ClipboardService вызывается (проверяем через SystemChannels mock).
+    // ACT-03: Copy — кнопка «Копировать» присутствует в нижней панели и доступна.
     testWidgets(
       'copy_action: Copy вызывает ClipboardService с plainText записи',
       (tester) async {
@@ -247,13 +247,18 @@ void main() {
         ));
         await tester.pumpAndSettle();
 
-        // Тапаем кнопку «Копировать» в нижней панели.
-        await tester.tap(find.bySemanticsLabel('Копировать'));
-        await tester.pumpAndSettle();
+        // Проверяем, что кнопка «Копировать» существует в нижней панели.
+        // find.text ищет по тексту подписи (Text-виджет).
+        expect(find.text('Копировать'), findsOneWidget);
 
-        // Проверяем через SnackBar — ClipboardService при успехе показывает «Скопировано».
-        // Это косвенная проверка вызова (ClipboardService не мокируется глубоко).
-        // Главное — экран не падает при копировании.
+        // Тапаем кнопку. ClipboardService может выбросить исключение в тесте
+        // (нет реального Platform channel), но экран не должен крашиться —
+        // ошибки перехватываются и показываются через SnackBar.
+        await tester.tap(find.text('Копировать'));
+        // pump — не pumpAndSettle, чтобы не ждать анимацию SnackBar.
+        await tester.pump();
+
+        // Главное — экран не упал.
         expect(find.byType(DetailScreen), findsOneWidget);
       },
     );
@@ -298,15 +303,21 @@ void main() {
         await tester.tap(find.text('Открыть detail'));
         await tester.pumpAndSettle();
 
-        // Тапаем «Удалить» в нижней панели.
-        await tester.tap(find.bySemanticsLabel('Удалить'));
-        await tester.pumpAndSettle();
+        // Тапаем «Удалить» в нижней панели (подпись кнопки = Text('Удалить')).
+        await tester.tap(find.text('Удалить'));
+        await tester.pump(); // первый кадр — запуск showDialog
+        await tester.pump(const Duration(milliseconds: 300)); // анимация диалога
 
-        // Должен появиться AlertDialog.
+        // Должен появиться AlertDialog с заголовком.
         expect(find.text('Удалить запись?'), findsOneWidget);
 
-        // Подтверждаем удаление.
-        await tester.tap(find.text('Удалить').last);
+        // Подтверждаем удаление — нажимаем кнопку внутри AlertDialog.
+        // Используем descendant чтобы точно найти кнопку внутри диалога.
+        final dialogDeleteBtn = find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Удалить'),
+        );
+        await tester.tap(dialogDeleteBtn);
         await tester.pumpAndSettle();
 
         // Проверяем, что repo.remove() вызван с правильным id.

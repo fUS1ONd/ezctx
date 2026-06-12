@@ -594,6 +594,7 @@ class _BottomBar extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Один элемент нижней панели: иконка + подпись.
+/// Тап по всей области (иконка или подпись) вызывает [onTap].
 class _BottomAction extends StatelessWidget {
   const _BottomAction({
     required this.icon,
@@ -614,21 +615,26 @@ class _BottomAction extends StatelessWidget {
 
     return GestureDetector(
       onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          GlassIconBtn(
-            icon: icon,
-            semanticLabel: label,
-            onPressed: onTap,
-            iconSize: AppSpacing.md,
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            label,
-            style: AppTextStyles.label.copyWith(color: effectiveColor),
-          ),
-        ],
+      child: Semantics(
+        label: label,
+        button: true,
+        excludeSemantics: true, // дочерние Semantics не дублируются
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            GlassIconBtn(
+              icon: icon,
+              semanticLabel: label,
+              onPressed: onTap,
+              iconSize: AppSpacing.md,
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              label,
+              style: AppTextStyles.label.copyWith(color: effectiveColor),
+            ),
+          ],
+        ),
       ),
     );
   }
