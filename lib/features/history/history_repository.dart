@@ -22,4 +22,8 @@ abstract class HistoryRepository {
 
   /// Список уникальных провайдеров из истории для чипов bottom sheet (D-07, FILT-03).
   Future<List<String>> distinctProviders();
+
+  /// Обновляет title и isFavorite существующей записи (ACT-01, ACT-02).
+  /// Идентификация по entry.id. Остальные поля (plainText, fileName и т.д.) не изменяются.
+  Future<void> update(HistoryEntry entry);
 }

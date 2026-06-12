@@ -48,6 +48,42 @@ class HistoryEntry {
   // Поле не хранится в БД — только в результатах customSelect.
   final String? snippet;
 
+  /// Возвращает копию записи с заменёнными полями.
+  /// Незаданные параметры сохраняют значения текущего объекта.
+  /// Используется для optimistic UI при переименовании (ACT-01) и
+  /// тогглировании избранного (ACT-02) без перезаписи всех полей.
+  HistoryEntry copyWith({
+    String? id,
+    String? fileName,
+    int? sizeBytes,
+    double? durationSec,
+    String? language,
+    DateTime? createdAt,
+    String? plainPath,
+    String? timestampedPath,
+    String? title,
+    TranscriptionProviderId? provider,
+    bool? isFavorite,
+    String? plainText,
+    String? snippet,
+  }) {
+    return HistoryEntry(
+      id: id ?? this.id,
+      fileName: fileName ?? this.fileName,
+      sizeBytes: sizeBytes ?? this.sizeBytes,
+      durationSec: durationSec ?? this.durationSec,
+      language: language ?? this.language,
+      createdAt: createdAt ?? this.createdAt,
+      plainPath: plainPath ?? this.plainPath,
+      timestampedPath: timestampedPath ?? this.timestampedPath,
+      title: title ?? this.title,
+      provider: provider ?? this.provider,
+      isFavorite: isFavorite ?? this.isFavorite,
+      plainText: plainText ?? this.plainText,
+      snippet: snippet ?? this.snippet,
+    );
+  }
+
   String get sizeFormatted {
     if (sizeBytes < 1024) return '$sizeBytes Б';
     if (sizeBytes < 1024 * 1024) return '${(sizeBytes / 1024).toStringAsFixed(1)} КБ';
