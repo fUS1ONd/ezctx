@@ -19,6 +19,7 @@ class HistoryEntry {
     required this.provider,
     this.isFavorite = false,
     required this.plainText,
+    this.snippet,
   });
 
   final String id;
@@ -41,6 +42,11 @@ class HistoryEntry {
 
   // Тело plain-текста расшифровки — источник правды для FTS5 (D-05).
   final String plainText;
+
+  // Сниппет FTS5 snippet() — присутствует только при активном поиске (BRWS-01).
+  // null означает: поиск неактивен или запись не содержит совпадений.
+  // Поле не хранится в БД — только в результатах customSelect.
+  final String? snippet;
 
   String get sizeFormatted {
     if (sizeBytes < 1024) return '$sizeBytes Б';
