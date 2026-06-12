@@ -109,9 +109,13 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
     // Защита от повторного сохранения при быстром navigate-back+forward (D-02).
     if (_transcriptsSaved) return;
     _transcriptsSaved = true;
+
+    // Запись файлов и автосохранение в историю — независимые блоки:
+    // ошибка при записи файлов не должна предотвращать сохранение в историю (HIST-01).
+    ({String plainPath, String timestampedPath})? paths;
     try {
       // Сохраняем оба формата: plain (для LLM) и с таймкодами (для истории).
-      final paths = await const TranscriptWriter().writeBoth(
+      paths = await const TranscriptWriter().writeBoth(
         baseName: _args!.file.name,
         plainText: _args!.result.plainText,
         timestampedText: _args!.result.text,
@@ -121,9 +125,14 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
         baseName: _args!.file.name,
         segments: _args!.result.segments,
       );
+    } catch (e, st) {
+      debugPrint('_saveTranscripts file write error: $e\n$st');
+    }
 
-      // Автозапись в историю (HIST-01, D-03: пустой текст не сохраняем).
-      if (_args!.result.plainText.trim().isNotEmpty) {
+    // Автозапись в историю (HIST-01, D-03: пустой текст не сохраняем).
+    // Выполняется независимо от успеха записи файлов.
+    if (_args!.result.plainText.trim().isNotEmpty) {
+      try {
         final repo = ref.read(historyRepositoryProvider);
         await repo.add(HistoryEntry(
           id: '', // drift присваивает autoincrement id; игнорируется при INSERT
@@ -135,21 +144,21 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
           provider: _args!.options.model.provider, // D-08: провайдер из ResultArgs.options
           isFavorite: false, // D-09
           createdAt: clock.now(),
-          plainPath: paths.plainPath,
-          timestampedPath: paths.timestampedPath,
+          plainPath: paths?.plainPath ?? '',
+          timestampedPath: paths?.timestampedPath ?? '',
           plainText: _args!.result.plainText,
         ));
+      } catch (e, st) {
+        debugPrint('_saveTranscripts history save error: $e\n$st');
       }
+    }
 
-      if (mounted) {
-        // Показываем папку (не полный путь), так как файлов теперь несколько.
-        final sep = paths.plainPath.lastIndexOf('/');
-        final folderPath =
-            sep > 0 ? paths.plainPath.substring(0, sep) : paths.plainPath;
-        setState(() => _savedPath = folderPath);
-      }
-    } catch (e, st) {
-      debugPrint('_saveTranscripts: $e\n$st');
+    if (mounted && paths != null) {
+      // Показываем папку (не полный путь), так как файлов теперь несколько.
+      final sep = paths.plainPath.lastIndexOf('/');
+      final folderPath =
+          sep > 0 ? paths.plainPath.substring(0, sep) : paths.plainPath;
+      setState(() => _savedPath = folderPath);
     }
   }
 
