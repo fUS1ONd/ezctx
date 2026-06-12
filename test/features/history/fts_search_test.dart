@@ -67,18 +67,18 @@ void main() {
     expect(results.first.plainText, contains('лекция'));
   });
 
-  // SRCH-02: результат поиска содержит сниппет с маркерами «».
-  test('SRCH-02: watchSearch заполняет snippet с маркерами «»', () async {
+  // SRCH-02: результат поиска содержит сниппет с маркерами \x02/\x03 (CR-06).
+  test('SRCH-02: watchSearch заполняет snippet с маркерами \x02/\x03', () async {
     await repo.add(_makeEntry(plainText: 'лекция по биохимии'));
 
     final spec = const FilterSpec(searchTerm: 'лекц');
     final results = await repo.watchSearch(spec).first;
 
     expect(results, hasLength(1));
-    // Сниппет должен присутствовать и содержать маркеры «»
+    // Сниппет должен присутствовать и содержать маркеры STX/ETX (CR-06).
     expect(results.first.snippet, isNotNull);
-    expect(results.first.snippet, contains('«'));
-    expect(results.first.snippet, contains('»'));
+    expect(results.first.snippet, contains('\x02'));
+    expect(results.first.snippet, contains('\x03'));
   });
 
   // snippet == null при пустом searchTerm.
