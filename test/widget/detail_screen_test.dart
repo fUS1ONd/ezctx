@@ -1,12 +1,14 @@
-// Widget-тесты detail-экрана (план 03-02, Wave 2).
+// Widget-тесты detail-экрана (план 03-02, Wave 2) + swipe_delete (план 03-03).
 // Стаб-репозиторий реализует весь контракт HistoryRepository (включая update()).
 
 import 'package:ezctx/core/providers/history_provider.dart';
+import 'package:ezctx/features/history/filter_notifier.dart';
 import 'package:ezctx/features/history/filter_spec.dart';
 import 'package:ezctx/features/history/history_entry.dart';
 import 'package:ezctx/features/history/history_repository.dart';
 import 'package:ezctx/features/transcription/transcription_options.dart';
 import 'package:ezctx/ui/screens/detail_screen.dart';
+import 'package:ezctx/ui/screens/history_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -325,13 +327,55 @@ void main() {
       },
     );
 
-    // ACT-04: свайп влево на карточке (реализован в plan 03-03, оставить skip).
+    // ACT-04: свайп влево на карточке в HistoryScreen → repo.remove(entry.id).
+    // Реализован в plan 03-03: Dismissible добавлен в history_screen._HistoryList.
     testWidgets(
-      'swipe_delete: свайп влево → repo.remove(entry.id)',
-      skip: true, // план 03-03 — Dismissible добавляется в history_screen
+      'swipe_delete: свайп влево на карточке → repo.remove(entry.id)',
       (tester) async {
-        // TODO план 03-03: dismiss Dismissible → stub.removedIds.contains(entry.id).
+        final stub = _StubHistoryRepository();
+        final entry = _makeTestEntry(id: '55');
+
+        // Отображаем HistoryScreen с одной записью.
+        await tester.pumpWidget(ProviderScope(
+          overrides: [
+            historyRepositoryProvider.overrideWithValue(stub),
+            searchResultsProvider.overrideWith(
+              (ref) => Stream.value([entry]),
+            ),
+            filterNotifierProvider.overrideWith(
+              () => _FixedFilterNotifier(const FilterSpec()),
+            ),
+          ],
+          child: MaterialApp(
+            theme: ThemeData(
+              colorScheme: ColorScheme.fromSeed(seedColor: Colors.orange),
+              useMaterial3: true,
+            ),
+            home: const HistoryScreen(),
+          ),
+        ));
+        await tester.pumpAndSettle();
+
+        // Проверяем, что карточка отображается.
+        expect(find.text('Тестовая запись'), findsOneWidget);
+
+        // Свайп endToStart по карточке — удаление (D-05).
+        await tester.drag(
+            find.text('Тестовая запись'), const Offset(-500, 0));
+        await tester.pumpAndSettle();
+
+        // repo.remove() должен быть вызван с id = '55'.
+        expect(stub.removedIds, contains('55'));
       },
     );
   });
+}
+
+// Notifier с фиксированным состоянием FilterSpec.
+class _FixedFilterNotifier extends FilterNotifier {
+  final FilterSpec _fixedSpec;
+  _FixedFilterNotifier(this._fixedSpec);
+
+  @override
+  FilterSpec build() => _fixedSpec;
 }

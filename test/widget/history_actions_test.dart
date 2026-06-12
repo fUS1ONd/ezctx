@@ -169,9 +169,11 @@ void main() {
             ),
             navigatorObservers: [observer],
             // onGenerateRoute нужен чтобы pushNamed не бросил исключение.
+            // settings передаётся в MaterialPageRoute — observer получит route.settings.name.
             onGenerateRoute: (settings) {
               if (settings.name == AppConstants.routeHistoryDetail) {
                 return MaterialPageRoute(
+                  settings: settings, // обязательно для корректного settings.name
                   builder: (_) => const Scaffold(
                     body: Text('DetailScreen stub'),
                   ),

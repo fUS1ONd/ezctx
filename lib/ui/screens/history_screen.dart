@@ -2,15 +2,20 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 
+import '../../core/constants/app_constants.dart';
 import '../../core/constants/design_tokens.dart';
 import '../../core/providers/history_provider.dart';
+import '../../core/services/clipboard_service.dart';
 import '../../features/history/filter_notifier.dart';
 import '../../features/history/filter_spec.dart';
 import '../../features/history/history_entry.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/gradient_background.dart';
+import '../widgets/long_press_bottom_sheet.dart';
 import '../widgets/primary_button.dart';
+import 'detail_screen.dart';
 
 /// Парсит строку сниппета с маркерами FTS5 «» в стилизованный RichText.
 /// Нормальный текст: palette.ink2, w400. Выделенный: palette.accent, w700.
@@ -102,6 +107,120 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     }
   }
 
+  /// Деструктивное удаление всей истории с подтверждением (ACT-04, T-03-09).
+  Future<void> _onClearAll() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final palette = ctx.palette;
+        return AlertDialog(
+          title: Text(
+            'Очистить историю?',
+            style: AppTextStyles.heading.copyWith(color: palette.ink1),
+          ),
+          content: Text(
+            'Все записи будут удалены безвозвратно.',
+            style: AppTextStyles.body.copyWith(color: palette.ink2),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Отмена'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: TextButton.styleFrom(foregroundColor: context.palette.bad),
+              child: const Text('Очистить'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true) return;
+    // Захват repo ДО await — ref недоступен после dispose (Pitfall 4, T-03-08).
+    final repo = ref.read(historyRepositoryProvider);
+    await repo.clear();
+  }
+
+  /// Открывает bottom sheet с действиями над записью по long-press (D-06, T-03-08).
+  void _showLongPressSheet(BuildContext ctx, WidgetRef widgetRef, HistoryEntry entry) {
+    showModalBottomSheet(
+      context: ctx,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => LongPressBottomSheet(
+        entry: entry,
+        onFavoriteToggle: () async {
+          // Захват repo ДО await (Pitfall 4, T-03-08).
+          final repo = widgetRef.read(historyRepositoryProvider);
+          await repo.update(entry.copyWith(isFavorite: !entry.isFavorite));
+        },
+        onCopy: () async {
+          try {
+            await ClipboardService.copyText(entry.plainText);
+            if (ctx.mounted) {
+              ScaffoldMessenger.of(ctx).showSnackBar(
+                SnackBar(
+                  content: const Text('Скопировано'),
+                  backgroundColor: ctx.palette.glassBgDeep,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+          } catch (e) {
+            if (ctx.mounted) {
+              ScaffoldMessenger.of(ctx).showSnackBar(
+                SnackBar(content: Text('Ошибка копирования: $e')),
+              );
+            }
+          }
+        },
+        onShare: () async {
+          try {
+            await Share.share(entry.plainText);
+          } catch (e, st) {
+            debugPrint('share error: $e\n$st');
+          }
+        },
+        onDelete: () async {
+          // Показываем AlertDialog подтверждения удаления (D-07, T-03-09).
+          final confirmed = await showDialog<bool>(
+            context: ctx,
+            builder: (dialogCtx) {
+              final palette = dialogCtx.palette;
+              return AlertDialog(
+                title: Text(
+                  'Удалить запись?',
+                  style: AppTextStyles.heading.copyWith(color: palette.ink1),
+                ),
+                content: Text(
+                  'Это действие нельзя отменить.',
+                  style: AppTextStyles.body.copyWith(color: palette.ink2),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogCtx, false),
+                    child: const Text('Отмена'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogCtx, true),
+                    style: TextButton.styleFrom(
+                        foregroundColor: dialogCtx.palette.bad),
+                    child: const Text('Удалить'),
+                  ),
+                ],
+              );
+            },
+          );
+          if (confirmed != true) return;
+          // Захват repo ДО await (Pitfall 4, T-03-08).
+          final repo = widgetRef.read(historyRepositoryProvider);
+          await repo.remove(entry.id);
+        },
+      ),
+    );
+  }
+
   /// Открывает bottom sheet с расширенными фильтрами (UI-SPEC §4).
   void _showFiltersSheet() {
     showModalBottomSheet(
@@ -147,9 +266,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Заголовок «История».
+              // Заголовок «История» + overflow-меню «Очистить историю» (ACT-04, Pitfall 7).
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+                padding: const EdgeInsets.fromLTRB(20, 20, 8, 8),
                 child: Row(
                   children: [
                     Text(
@@ -158,6 +277,20 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                           color: palette.ink1, fontSize: 30),
                     ),
                     const Spacer(),
+                    // Overflow-меню: «Очистить историю» (D-07 Claude's Discretion).
+                    PopupMenuButton<String>(
+                      icon: Icon(Icons.more_vert, color: palette.ink2),
+                      tooltip: 'Дополнительно',
+                      onSelected: (value) {
+                        if (value == 'clear') _onClearAll();
+                      },
+                      itemBuilder: (_) => [
+                        const PopupMenuItem<String>(
+                          value: 'clear',
+                          child: Text('Очистить историю'),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -323,6 +456,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                     return _HistoryList(
                       entries: entries,
                       scrollController: _scrollController,
+                      widgetRef: ref,
+                      spec: spec,
+                      onLongPress: _showLongPressSheet,
                     );
                   },
                 ),
@@ -450,25 +586,96 @@ class _FilterChip extends StatelessWidget {
   }
 }
 
-/// Список записей истории с поддержкой ленивой пагинации (BRWS-02).
+/// Список записей истории с поддержкой ленивой пагинации (BRWS-02),
+/// свайп-удаления (D-05) и long-press bottom sheet (D-06).
 class _HistoryList extends StatelessWidget {
   const _HistoryList({
     required this.entries,
     required this.scrollController,
+    required this.widgetRef,
+    required this.spec,
+    required this.onLongPress,
   });
 
   final List<HistoryEntry> entries;
   final ScrollController scrollController;
 
+  /// ref из ConsumerStatefulWidget — нужен для Dismissible.onDismissed и навигации.
+  final WidgetRef widgetRef;
+
+  /// Текущий FilterSpec — для прокидывания searchTerm в DetailArgs.
+  final FilterSpec spec;
+
+  /// Колбэк long-press: открывает LongPressBottomSheet (D-06).
+  final void Function(BuildContext, WidgetRef, HistoryEntry) onLongPress;
+
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
+    final palette = context.palette;
+
     return ListView.separated(
       controller: scrollController,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       itemCount: entries.length,
       separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (_, i) => _HistoryTile(entry: entries[i], now: now),
+      itemBuilder: (ctx, i) {
+        final entry = entries[i];
+
+        return Dismissible(
+          // Уникальный ключ по id — обязателен (T-03-10, Pitfall 4).
+          key: ValueKey(entry.id),
+          direction: DismissDirection.endToStart,
+          // Красный фон со значком удаления (UI-SPEC §Swipe-Dismiss).
+          background: Container(
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.only(right: 20),
+            color: palette.bad,
+            child: const Icon(Icons.delete_outline,
+                color: Colors.white, size: 24),
+          ),
+          onDismissed: (direction) async {
+            // Захват repo ДО await — ref недоступен после dispose (Pitfall 4, T-03-08).
+            final repo = widgetRef.read(historyRepositoryProvider);
+            try {
+              await repo.remove(entry.id);
+              if (ctx.mounted) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  SnackBar(
+                    content: const Text('Запись удалена'),
+                    backgroundColor: ctx.palette.glassBgDeep,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            } catch (e) {
+              // При ошибке drift восстановит запись через watch() (Pitfall 1, T-03-07).
+              if (ctx.mounted) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(content: Text('Не удалось удалить')),
+                );
+              }
+            }
+          },
+          child: GestureDetector(
+            // Long-press → bottom sheet с действиями (D-06).
+            onLongPress: () => onLongPress(ctx, widgetRef, entry),
+            // Тап → переход на detail-экран с searchTerm (BRWS-03).
+            onTap: () {
+              Navigator.pushNamed(
+                ctx,
+                AppConstants.routeHistoryDetail,
+                arguments: DetailArgs(
+                  entry: entry,
+                  // Прокидываем searchTerm только если он непустой (D-08).
+                  searchTerm: spec.searchTerm.isEmpty ? null : spec.searchTerm,
+                ),
+              );
+            },
+            child: _HistoryTile(entry: entry, now: now),
+          ),
+        );
+      },
     );
   }
 }
