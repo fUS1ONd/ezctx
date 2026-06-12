@@ -72,11 +72,56 @@ void main() {
     });
 
     test('HIST-02: watchAll() эмитит новый список после add()', () async {
-      // Пропускаем первое (пустое) значение, ждём второго после add().
-      final future = repo.watchAll().skip(1).first;
+      // Подписываемся на стрим до выполнения add().
+      // takeWhile с условием — безопаснее skip(1).first для in-memory drift:
+      // ждём первого непустого эмита или таймаут.
+      final emits = <List<dynamic>>[];
+      final subscription = repo.watchAll().listen(emits.add);
+
+      // Ждём первого (пустого) эмита.
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      // Добавляем запись — должен прийти второй эмит.
       await repo.add(_makeEntry());
-      final entries = await future;
-      expect(entries, hasLength(1));
+
+      // Ждём, пока стрим не эмитит непустой список (до 5 сек).
+      final deadline = DateTime.now().add(const Duration(seconds: 5));
+      while (emits.isEmpty || emits.last.isEmpty) {
+        if (DateTime.now().isAfter(deadline)) break;
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
+
+      await subscription.cancel();
+
+      // Последний эмит должен содержать одну запись.
+      expect(emits.last, hasLength(1));
+    });
+
+    test('HIST-02: watchAll() эмитит пустой список после clear()', () async {
+      // Добавляем запись, ждём непустого эмита, вызываем clear().
+      await repo.add(_makeEntry());
+
+      final emits = <List<dynamic>>[];
+      final subscription = repo.watchAll().listen(emits.add);
+
+      // Ждём первого (непустого) эмита.
+      final deadline = DateTime.now().add(const Duration(seconds: 5));
+      while (emits.isEmpty || emits.last.isEmpty) {
+        if (DateTime.now().isAfter(deadline)) break;
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
+      expect(emits.last, hasLength(1));
+
+      // Очищаем — должен прийти пустой эмит.
+      await repo.clear();
+      final deadline2 = DateTime.now().add(const Duration(seconds: 5));
+      while (emits.last.isNotEmpty) {
+        if (DateTime.now().isAfter(deadline2)) break;
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
+
+      await subscription.cancel();
+      expect(emits.last, isEmpty);
     });
   });
 
