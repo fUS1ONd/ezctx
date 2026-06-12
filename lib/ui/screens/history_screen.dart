@@ -19,11 +19,14 @@ import '../widgets/primary_button.dart';
 Widget buildSnippet(String snippet, AppPalette palette) {
   final parts = snippet.split(RegExp(r'«|»'));
   final spans = <TextSpan>[];
-  // Определяем начальное состояние: начинается ли строка с выделенного фрагмента.
-  bool isHighlight = snippet.startsWith('«');
+  // Начальное состояние: первая часть НЕ выделена (обычный текст).
+  // Каждый разделитель «» переключает флаг (пустая часть от начального «
+  // переключит флаг в true перед первым реальным словом).
+  bool isHighlight = false;
 
   for (final part in parts) {
     if (part.isEmpty) {
+      // Пустая часть = маркер-разделитель → переключаем состояние выделения.
       isHighlight = !isHighlight;
       continue;
     }
@@ -36,6 +39,8 @@ Widget buildSnippet(String snippet, AppPalette palette) {
         height: 1.4,
       ),
     ));
+    // После каждого непустого фрагмента состояние переключается
+    // (следующий разделитель снова его переключит).
     isHighlight = !isHighlight;
   }
 
