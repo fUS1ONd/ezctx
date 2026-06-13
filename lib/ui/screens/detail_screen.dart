@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
@@ -534,40 +536,45 @@ class _BottomBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    return ClipRect(
-      child: Container(
-        decoration: BoxDecoration(
-          color: palette.glassBgDeep,
-          border: Border(
-            top: BorderSide(color: palette.glassRim, width: 0.5),
+    // ClipRRect + BackdropFilter — стеклянный размытый фон по паттерну
+    // long_press_bottom_sheet.dart (D-09), вместо обычного ClipRect.
+    return ClipRRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+        child: Container(
+          decoration: BoxDecoration(
+            color: palette.glassBgDeep,
+            border: Border(
+              top: BorderSide(color: palette.glassRim, width: 0.5),
+            ),
           ),
-        ),
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.md,
-          AppSpacing.sm,
-          AppSpacing.md,
-          AppSpacing.md,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _BottomAction(
-              icon: Icons.copy_all_outlined,
-              label: 'Копировать',
-              onTap: onCopy,
-            ),
-            _BottomAction(
-              icon: Icons.share_outlined,
-              label: 'Поделиться',
-              onTap: onShare,
-            ),
-            _BottomAction(
-              icon: Icons.delete_outline,
-              label: 'Удалить',
-              color: palette.bad,
-              onTap: onDelete,
-            ),
-          ],
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md,
+            AppSpacing.sm,
+            AppSpacing.md,
+            AppSpacing.md,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _BottomAction(
+                icon: Icons.copy_all_outlined,
+                label: 'Копировать',
+                onTap: onCopy,
+              ),
+              _BottomAction(
+                icon: Icons.share_outlined,
+                label: 'Поделиться',
+                onTap: onShare,
+              ),
+              _BottomAction(
+                icon: Icons.delete_outline,
+                label: 'Удалить',
+                color: palette.bad,
+                onTap: onDelete,
+              ),
+            ],
+          ),
         ),
       ),
     );
