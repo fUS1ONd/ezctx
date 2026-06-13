@@ -68,13 +68,30 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
   void _scrollToFirstMatch() {
     final term = widget.searchTerm ?? '';
     final idx = _currentEntry.plainText.toLowerCase().indexOf(term.toLowerCase());
-    if (idx < 0 || !_scrollController.hasClients) return;
+    if (idx < 0 || !_scrollController.hasClients || !mounted) return;
 
-    // Эвристика: ~60 символов на строку при fontSize 16 и ширине ~360px.
-    const charsPerLine = 60;
-    const lineHeight = 24.0; // fontSize 16 * lineHeight 1.5
+    // WR-07: оценку смещения выводим из фактической раскладки, а не из
+    // зашитых констант (charsPerLine=60/lineHeight=24 ломались на планшетах,
+    // в landscape и при крупном системном шрифте).
+    //
+    // Реальная высота строки = fontSize * height * textScaler.
+    final bodyStyle = AppTextStyles.body;
+    final fontSize = bodyStyle.fontSize ?? 16.0;
+    final lineHeightFactor = bodyStyle.height ?? 1.5;
+    final textScale = MediaQuery.textScalerOf(context).scale(1.0);
+    final lineHeight = fontSize * lineHeightFactor * textScale;
+
+    // Ширина текстовой колонки = ширина экрана минус горизонтальные паддинги
+    // SliverPadding (AppSpacing.md с каждой стороны).
+    final textWidth =
+        (MediaQuery.of(context).size.width - AppSpacing.md * 2).clamp(1.0, 4096.0);
+    // Средняя ширина символа в кириллице/латинице ≈ 0.5 * fontSize (с учётом
+    // масштабирования). Из неё выводим количество символов на строку.
+    final avgCharWidth = (fontSize * textScale * 0.5).clamp(1.0, double.infinity);
+    final charsPerLine = (textWidth / avgCharWidth).floor().clamp(1, 1 << 30);
+
     final approxLines = idx ~/ charsPerLine;
-    final approxOffset = (approxLines * lineHeight).toDouble();
+    final approxOffset = approxLines * lineHeight;
 
     _scrollController.animateTo(
       approxOffset.clamp(0.0, _scrollController.position.maxScrollExtent),
@@ -163,6 +180,9 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
 
   /// Обработчик тоггла избранного из [_FavoriteButton].
   Future<void> _onFavoriteTap() async {
+    // WR-04: захватываем прошлое значение ДО await, чтобы откат вернулся
+    // именно к нему, а не к текущему (которое мог изменить второй быстрый тап).
+    final previous = _currentEntry;
     // Optimistic UI — переключаем немедленно (D-07 решение).
     final updated = _currentEntry.copyWith(isFavorite: !_currentEntry.isFavorite);
     setState(() => _currentEntry = updated);
@@ -172,9 +192,8 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
     try {
       await repo.update(updated);
     } catch (e) {
-      // Откат при ошибке.
-      setState(() => _currentEntry = _currentEntry.copyWith(
-          isFavorite: !_currentEntry.isFavorite));
+      // Откат к точному прошлому состоянию (WR-04).
+      if (mounted) setState(() => _currentEntry = previous);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Не удалось сохранить')),
