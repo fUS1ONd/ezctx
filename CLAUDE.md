@@ -44,6 +44,14 @@ Architecture not yet mapped. Follow existing patterns found in the codebase.
 No project skills found. Add skills to any of: `.claude/skills/`, `.agents/skills/`, `.cursor/skills/`, `.github/skills/`, or `.codex/skills/` with a `SKILL.md` index file.
 <!-- GSD:skills-end -->
 
+## Planning
+
+Каталог `.planning/` целиком в `.gitignore` — это dev-артефакты GSD (планы, контекст,
+roadmap, state). **Не коммитим планы в репо.** Артефакты фаз (`CONTEXT.md`, `PLAN.md`,
+`DISCUSSION-LOG.md` и т.п.) пишем на диск, но `git add`/`commit` по ним не делаем —
+коммит был бы no-op (файлы игнорируются). GSD-команды, которые сами вызывают
+`gsd-sdk query commit` по `.planning/`-файлам, в этом проекте пропускаем.
+
 ## Context Window
 
 Для команд с большим выводом ВСЕГДА используй `mcp__plugin_context-mode_context-mode__ctx_batch_execute` или `ctx_execute`. Никогда не запускай через Bash напрямую:
