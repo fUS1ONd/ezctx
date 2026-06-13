@@ -12,13 +12,16 @@ import 'glass_card.dart';
 ///
 /// [destructive] управляет цветом confirm-кнопки: `palette.bad` для
 /// деструктивных действий (удаление), `palette.accent` — для остальных.
+/// WR-06: безопасный дефолт — `false` (не деструктивно). Деструктивные
+/// вызовы (удаление/очистка) обязаны передавать `destructive: true` явно,
+/// иначе красная кнопка по умолчанию маскировала бы забытый флаг.
 Future<bool?> showGlassConfirmDialog({
   required BuildContext context,
   required String title,
   required String body,
   required String confirmLabel,
   required String cancelLabel,
-  bool destructive = true,
+  bool destructive = false,
 }) {
   return showDialog<bool>(
     context: context,

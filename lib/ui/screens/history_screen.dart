@@ -197,6 +197,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             body: 'Расшифровка будет удалена без возможности восстановления.',
             confirmLabel: 'Удалить запись',
             cancelLabel: 'Не удалять',
+            // WR-06: деструктивный вызов — флаг передаём явно.
+            destructive: true,
           );
           if (confirmed != true) return;
           await repo.remove(entry.id);
