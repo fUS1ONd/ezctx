@@ -211,70 +211,83 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              // Основная прокручиваемая область с AppBar внутри CustomScrollView.
+              // Основная прокручиваемая область с AppBar внутри CustomScrollView;
+              // нижний бар — плавающая пилюля поверх скролла (Stack/Positioned).
               Expanded(
-                child: CustomScrollView(
-                  controller: _scrollController,
-                  slivers: [
-                    // ── SliverAppBar ──────────────────────────────────────────
-                    SliverAppBar(
-                      backgroundColor: Colors.transparent,
-                      elevation: 0,
-                      leading: GlassIconBtn(
-                        icon: Icons.arrow_back,
-                        semanticLabel: 'Назад',
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                      leadingWidth: AppSpacing.lg + AppSpacing.md + AppSpacing.xxl,
-                      title: _InlineTitleWidget(
-                        entry: _currentEntry,
-                        onSave: _onTitleSaved,
-                      ),
-                      actions: [
-                        _FavoriteButton(
-                          isFavorite: _currentEntry.isFavorite,
-                          onTap: _onFavoriteTap,
+                child: Stack(
+                  children: [
+                    CustomScrollView(
+                      controller: _scrollController,
+                      slivers: [
+                        // ── SliverAppBar ──────────────────────────────────────
+                        SliverAppBar(
+                          backgroundColor: Colors.transparent,
+                          elevation: 0,
+                          leading: GlassIconBtn(
+                            icon: Icons.arrow_back,
+                            semanticLabel: 'Назад',
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                          leadingWidth:
+                              AppSpacing.lg + AppSpacing.md + AppSpacing.xxl,
+                          title: _InlineTitleWidget(
+                            entry: _currentEntry,
+                            onSave: _onTitleSaved,
+                          ),
+                          actions: [
+                            _FavoriteButton(
+                              isFavorite: _currentEntry.isFavorite,
+                              onTap: _onFavoriteTap,
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                          ],
                         ),
-                        const SizedBox(width: AppSpacing.sm),
+
+                        // ── Metadata strip ──────────────────────────────────────
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md,
+                              vertical: AppSpacing.sm,
+                            ),
+                            child: _MetadataStrip(entry: _currentEntry),
+                          ),
+                        ),
+
+                        // ── Полный текст расшифровки ────────────────────────────
+                        // Нижний отступ увеличен (xxl*2), чтобы текст докручивался
+                        // из-под плавающей пилюли _BottomBar.
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.md,
+                            AppSpacing.sm,
+                            AppSpacing.md,
+                            AppSpacing.xxl * 2,
+                          ),
+                          sliver: SliverToBoxAdapter(
+                            child: _buildHighlightedText(
+                              _currentEntry.plainText,
+                              widget.searchTerm,
+                              palette,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
 
-                    // ── Metadata strip ────────────────────────────────────────
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.md,
-                          vertical: AppSpacing.sm,
-                        ),
-                        child: _MetadataStrip(entry: _currentEntry),
-                      ),
-                    ),
-
-                    // ── Полный текст расшифровки ──────────────────────────────
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.md,
-                        AppSpacing.sm,
-                        AppSpacing.md,
-                        AppSpacing.xl,
-                      ),
-                      sliver: SliverToBoxAdapter(
-                        child: _buildHighlightedText(
-                          _currentEntry.plainText,
-                          widget.searchTerm,
-                          palette,
-                        ),
+                    // ── Bottom bar — плавающая glass-пилюля поверх текста ──────
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: _BottomBar(
+                        onCopy: _onCopyTap,
+                        onShare: _onShareTap,
+                        onDelete: _onDeleteTap,
                       ),
                     ),
                   ],
                 ),
-              ),
-
-              // ── Bottom bar ────────────────────────────────────────────────
-              _BottomBar(
-                onCopy: _onCopyTap,
-                onShare: _onShareTap,
-                onDelete: _onDeleteTap,
               ),
             ],
           ),
