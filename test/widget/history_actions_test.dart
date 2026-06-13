@@ -9,6 +9,7 @@ import 'package:ezctx/features/history/history_entry.dart';
 import 'package:ezctx/features/history/history_repository.dart';
 import 'package:ezctx/features/transcription/transcription_options.dart';
 import 'package:ezctx/ui/screens/history_screen.dart';
+import 'package:ezctx/ui/widgets/glass_confirm_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -196,9 +197,9 @@ void main() {
       },
     );
 
-    // ACT-04: overflow «Очистить историю» → AlertDialog → confirm → repo.clear().
+    // ACT-04: overflow «Очистить историю» → GlassConfirmDialog → confirm → repo.clear().
     testWidgets(
-      'clear_all: overflow → AlertDialog → confirm → repo.clear()',
+      'clear_all: overflow → GlassConfirmDialog → confirm → repo.clear()',
       (tester) async {
         final entry = _makeEntry();
         final stub = _StubRepo(entries: [entry]);
@@ -216,12 +217,12 @@ void main() {
         await tester.tap(find.text('Очистить историю'));
         await tester.pumpAndSettle();
 
-        // Появляется AlertDialog с подтверждением.
+        // Появляется GlassConfirmDialog с подтверждением.
         expect(find.text('Очистить историю?'), findsOneWidget);
 
         // Подтверждаем.
         final confirmBtn = find.descendant(
-          of: find.byType(AlertDialog),
+          of: find.byType(GlassConfirmDialog),
           matching: find.text('Очистить'),
         );
         await tester.tap(confirmBtn);

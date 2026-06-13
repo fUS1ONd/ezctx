@@ -12,6 +12,7 @@ import '../../features/history/filter_notifier.dart';
 import '../../features/history/filter_spec.dart';
 import '../../features/history/history_entry.dart';
 import '../widgets/glass_card.dart';
+import '../widgets/glass_confirm_dialog.dart';
 import '../widgets/gradient_background.dart';
 import '../widgets/long_press_bottom_sheet.dart';
 import '../widgets/primary_button.dart';
@@ -121,34 +122,13 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   Future<void> _onClearAll() async {
     // Захват repo ДО await — ref недоступен после dispose (CR-01, T-03-08).
     final repo = ref.read(historyRepositoryProvider);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        final palette = ctx.palette;
-        return AlertDialog(
-          title: Text(
-            'Очистить историю?',
-            style: AppTextStyles.heading.copyWith(color: palette.ink1),
-          ),
-          content: Text(
-            'Все записи будут удалены безвозвратно.',
-            style: AppTextStyles.body.copyWith(color: palette.ink2),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Отмена'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: TextButton.styleFrom(foregroundColor: context.palette.bad),
-              child: const Text('Очистить'),
-            ),
-          ],
-        );
-      },
+    final confirmed = await GlassConfirmDialog.show(
+      context,
+      title: 'Очистить историю?',
+      body: 'Все записи будут удалены безвозвратно.',
+      confirmLabel: 'Очистить',
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
     await repo.clear();
   }
 
@@ -194,36 +174,13 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         onDelete: () async {
           // Захват repo ДО await — widgetRef недоступен после dispose (CR-02, T-03-08).
           final repo = widgetRef.read(historyRepositoryProvider);
-          // Показываем AlertDialog подтверждения удаления (D-07, T-03-09).
-          final confirmed = await showDialog<bool>(
-            context: ctx,
-            builder: (dialogCtx) {
-              final palette = dialogCtx.palette;
-              return AlertDialog(
-                title: Text(
-                  'Удалить запись?',
-                  style: AppTextStyles.heading.copyWith(color: palette.ink1),
-                ),
-                content: Text(
-                  'Это действие нельзя отменить.',
-                  style: AppTextStyles.body.copyWith(color: palette.ink2),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(dialogCtx, false),
-                    child: const Text('Отмена'),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.pop(dialogCtx, true),
-                    style: TextButton.styleFrom(
-                        foregroundColor: dialogCtx.palette.bad),
-                    child: const Text('Удалить'),
-                  ),
-                ],
-              );
-            },
+          final confirmed = await GlassConfirmDialog.show(
+            ctx,
+            title: 'Удалить запись?',
+            body: 'Это действие нельзя отменить.',
+            confirmLabel: 'Удалить',
           );
-          if (confirmed != true) return;
+          if (!confirmed) return;
           await repo.remove(entry.id);
         },
       ),
