@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
@@ -7,7 +9,9 @@ import '../../core/constants/design_tokens.dart';
 import '../../core/providers/history_provider.dart';
 import '../../core/services/clipboard_service.dart';
 import '../../features/history/history_entry.dart';
+import '../../features/history/history_label_utils.dart';
 import '../widgets/glass_card.dart';
+import '../widgets/glass_confirm_dialog.dart';
 import '../widgets/glass_icon_btn.dart';
 import '../widgets/gradient_background.dart';
 
@@ -113,32 +117,13 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
   }
 
   Future<void> _onDeleteTap() async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassConfirmDialog(
       context: context,
-      builder: (ctx) {
-        final palette = ctx.palette;
-        return AlertDialog(
-          title: Text(
-            'Удалить запись?',
-            style: AppTextStyles.heading.copyWith(color: palette.ink1),
-          ),
-          content: Text(
-            'Это действие нельзя отменить.',
-            style: AppTextStyles.body.copyWith(color: palette.ink2),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Отмена'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: TextButton.styleFrom(foregroundColor: palette.bad),
-              child: const Text('Удалить'),
-            ),
-          ],
-        );
-      },
+      title: 'Удалить запись?',
+      body: 'Расшифровка будет удалена без возможности восстановления.',
+      confirmLabel: 'Удалить запись',
+      cancelLabel: 'Не удалять',
+      destructive: true,
     );
 
     if (confirmed != true) return;
@@ -486,9 +471,9 @@ class _MetadataStrip extends StatelessWidget {
     final chips = [
       (Icons.calendar_today_outlined, entry.relativeDate(now)),
       (Icons.timer_outlined, entry.durationFormatted),
-      (Icons.mic_none_outlined, entry.provider.name.toUpperCase()),
+      (Icons.mic_none_outlined, providerLabel(entry.provider.name)),
       (Icons.folder_outlined, entry.sizeFormatted),
-      (Icons.language_outlined, entry.language.isEmpty ? '—' : entry.language),
+      (Icons.language_outlined, languageLabel(entry.language)),
     ];
 
     return GlassCard(
@@ -551,40 +536,45 @@ class _BottomBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    return ClipRect(
-      child: Container(
-        decoration: BoxDecoration(
-          color: palette.glassBgDeep,
-          border: Border(
-            top: BorderSide(color: palette.glassRim, width: 0.5),
+    // ClipRRect + BackdropFilter — стеклянный размытый фон по паттерну
+    // long_press_bottom_sheet.dart (D-09), вместо обычного ClipRect.
+    return ClipRRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+        child: Container(
+          decoration: BoxDecoration(
+            color: palette.glassBgDeep,
+            border: Border(
+              top: BorderSide(color: palette.glassRim, width: 0.5),
+            ),
           ),
-        ),
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.md,
-          AppSpacing.sm,
-          AppSpacing.md,
-          AppSpacing.md,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _BottomAction(
-              icon: Icons.copy_all_outlined,
-              label: 'Копировать',
-              onTap: onCopy,
-            ),
-            _BottomAction(
-              icon: Icons.share_outlined,
-              label: 'Поделиться',
-              onTap: onShare,
-            ),
-            _BottomAction(
-              icon: Icons.delete_outline,
-              label: 'Удалить',
-              color: palette.bad,
-              onTap: onDelete,
-            ),
-          ],
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md,
+            AppSpacing.sm,
+            AppSpacing.md,
+            AppSpacing.md,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _BottomAction(
+                icon: Icons.copy_all_outlined,
+                label: 'Копировать',
+                onTap: onCopy,
+              ),
+              _BottomAction(
+                icon: Icons.share_outlined,
+                label: 'Поделиться',
+                onTap: onShare,
+              ),
+              _BottomAction(
+                icon: Icons.delete_outline,
+                label: 'Удалить',
+                color: palette.bad,
+                onTap: onDelete,
+              ),
+            ],
+          ),
         ),
       ),
     );

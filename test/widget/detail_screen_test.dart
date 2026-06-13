@@ -9,6 +9,7 @@ import 'package:ezctx/features/history/history_repository.dart';
 import 'package:ezctx/features/transcription/transcription_options.dart';
 import 'package:ezctx/ui/screens/detail_screen.dart';
 import 'package:ezctx/ui/screens/history_screen.dart';
+import 'package:ezctx/ui/widgets/glass_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -265,9 +266,9 @@ void main() {
       },
     );
 
-    // ACT-04: Delete → AlertDialog → confirm → repo.remove() → Navigator.pop.
+    // ACT-04: Delete → GlassCard (showGlassConfirmDialog) → confirm → repo.remove() → Navigator.pop.
     testWidgets(
-      'detail_delete: Delete → AlertDialog → confirm → repo.remove() → pop',
+      'detail_delete: Delete → GlassCard confirm → confirm → repo.remove() → pop',
       (tester) async {
         final stub = _StubHistoryRepository();
         final entry = _makeTestEntry(id: '99');
@@ -310,14 +311,22 @@ void main() {
         await tester.pump(); // первый кадр — запуск showDialog
         await tester.pump(const Duration(milliseconds: 300)); // анимация диалога
 
-        // Должен появиться AlertDialog с заголовком.
+        // Должен появиться стеклянный диалог (GlassCard внутри Dialog) с заголовком.
         expect(find.text('Удалить запись?'), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byType(Dialog),
+            matching: find.byType(GlassCard),
+          ),
+          findsOneWidget,
+        );
+        expect(find.byType(AlertDialog), findsNothing);
 
-        // Подтверждаем удаление — нажимаем кнопку внутри AlertDialog.
+        // Подтверждаем удаление — нажимаем кнопку внутри диалога.
         // Используем descendant чтобы точно найти кнопку внутри диалога.
         final dialogDeleteBtn = find.descendant(
-          of: find.byType(AlertDialog),
-          matching: find.text('Удалить'),
+          of: find.byType(Dialog),
+          matching: find.text('Удалить запись'),
         );
         await tester.tap(dialogDeleteBtn);
         await tester.pumpAndSettle();
