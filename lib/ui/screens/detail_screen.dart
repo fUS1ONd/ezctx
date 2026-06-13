@@ -537,6 +537,7 @@ class _MetaChip extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Нижняя панель действий: Copy, Share, Delete (D-01, ACT-03, ACT-04).
+/// Плавающая liquid-glass «пилюля» — в одном языке с TabBar и плашкой таймера.
 class _BottomBar extends StatelessWidget {
   const _BottomBar({
     required this.onCopy,
@@ -551,22 +552,21 @@ class _BottomBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    return ClipRect(
-      child: Container(
-        decoration: BoxDecoration(
-          color: palette.glassBgDeep,
-          border: Border(
-            top: BorderSide(color: palette.glassRim, width: 0.5),
-          ),
-        ),
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.md,
-          AppSpacing.sm,
-          AppSpacing.md,
-          AppSpacing.md,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.xs,
+        AppSpacing.md,
+        AppSpacing.md,
+      ),
+      child: GlassCard(
+        deep: true,
+        borderRadius: AppRadius.tile,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xs,
+          vertical: AppSpacing.sm,
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             _BottomAction(
               icon: Icons.copy_all_outlined,
@@ -594,7 +594,7 @@ class _BottomBar extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Один элемент нижней панели: иконка + подпись.
-/// Тап по всей области (иконка или подпись) вызывает [onTap].
+/// Тап по всей ячейке (иконка, подпись и пустое пространство) вызывает [onTap].
 class _BottomAction extends StatelessWidget {
   const _BottomAction({
     required this.icon,
@@ -613,27 +613,28 @@ class _BottomAction extends StatelessWidget {
     final palette = context.palette;
     final effectiveColor = color ?? palette.ink2;
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Semantics(
-        label: label,
-        button: true,
-        excludeSemantics: true, // дочерние Semantics не дублируются
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            GlassIconBtn(
-              icon: icon,
-              semanticLabel: label,
-              onPressed: onTap,
-              iconSize: AppSpacing.md,
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Semantics(
+          label: label,
+          button: true,
+          excludeSemantics: true,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 22, color: effectiveColor),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  label,
+                  style: AppTextStyles.label.copyWith(color: effectiveColor),
+                ),
+              ],
             ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              label,
-              style: AppTextStyles.label.copyWith(color: effectiveColor),
-            ),
-          ],
+          ),
         ),
       ),
     );
