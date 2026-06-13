@@ -8,6 +8,7 @@ import '../../core/providers/history_provider.dart';
 import '../../core/services/clipboard_service.dart';
 import '../../features/history/history_entry.dart';
 import '../widgets/glass_card.dart';
+import '../widgets/glass_confirm_dialog.dart';
 import '../widgets/glass_icon_btn.dart';
 import '../widgets/gradient_background.dart';
 
@@ -105,35 +106,14 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
   }
 
   Future<void> _onDeleteTap() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        final palette = ctx.palette;
-        return AlertDialog(
-          title: Text(
-            'Удалить запись?',
-            style: AppTextStyles.heading.copyWith(color: palette.ink1),
-          ),
-          content: Text(
-            'Это действие нельзя отменить.',
-            style: AppTextStyles.body.copyWith(color: palette.ink2),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Отмена'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: TextButton.styleFrom(foregroundColor: palette.bad),
-              child: const Text('Удалить'),
-            ),
-          ],
-        );
-      },
+    final confirmed = await GlassConfirmDialog.show(
+      context,
+      title: 'Удалить запись?',
+      body: 'Это действие нельзя отменить.',
+      confirmLabel: 'Удалить',
     );
 
-    if (confirmed != true) return;
+    if (!confirmed) return;
 
     // Захват repo ДО await — ref недоступен после dispose (Pitfall 4, T-03-04).
     final repo = ref.read(historyRepositoryProvider);

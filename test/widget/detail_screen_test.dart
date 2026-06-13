@@ -10,6 +10,7 @@ import 'package:ezctx/features/transcription/transcription_options.dart';
 import 'package:ezctx/ui/screens/detail_screen.dart';
 import 'package:ezctx/ui/screens/history_screen.dart';
 import 'package:ezctx/ui/widgets/glass_card.dart';
+import 'package:ezctx/ui/widgets/glass_confirm_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -334,13 +335,13 @@ void main() {
         await tester.pump(); // первый кадр — запуск showDialog
         await tester.pump(const Duration(milliseconds: 300)); // анимация диалога
 
-        // Должен появиться AlertDialog с заголовком.
+        // Должен появиться GlassConfirmDialog с заголовком.
         expect(find.text('Удалить запись?'), findsOneWidget);
 
-        // Подтверждаем удаление — нажимаем кнопку внутри AlertDialog.
+        // Подтверждаем удаление — нажимаем кнопку внутри GlassConfirmDialog.
         // Используем descendant чтобы точно найти кнопку внутри диалога.
         final dialogDeleteBtn = find.descendant(
-          of: find.byType(AlertDialog),
+          of: find.byType(GlassConfirmDialog),
           matching: find.text('Удалить'),
         );
         await tester.tap(dialogDeleteBtn);
