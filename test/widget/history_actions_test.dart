@@ -120,9 +120,9 @@ Widget _buildApp({
 
 void main() {
   group('HistoryScreen actions — Wave 3', () {
-    // ACT-04: свайп endToStart по карточке → repo.remove(entry.id) вызван.
+    // D-01/D-02: свайп влево фиксирует панель удаления; удаление — по тапу на панель.
     testWidgets(
-      'swipe_dismiss: свайп влево → repo.remove(entry.id)',
+      'swipe_dismiss: свайп влево фиксирует панель, тап по панели → repo.remove(entry.id)',
       (tester) async {
         final entry = _makeEntry(id: '77');
         final stub = _StubRepo(entries: [entry]);
@@ -133,8 +133,15 @@ void main() {
         // Находим карточку по тексту заголовка.
         expect(find.text('Тестовая запись'), findsOneWidget);
 
-        // Свайп endToStart (справа налево) на карточке.
+        // Свайп влево (справа налево) фиксирует красную панель удаления (D-01/D-02).
         await tester.drag(find.text('Тестовая запись'), const Offset(-500, 0));
+        await tester.pumpAndSettle();
+
+        // repo.remove() пока НЕ вызван — нужен явный тап по панели.
+        expect(stub.removedIds, isEmpty);
+
+        // Тап по панели удаления (Semantics: «Удалить запись»).
+        await tester.tap(find.bySemanticsLabel('Удалить запись'));
         await tester.pumpAndSettle();
 
         // repo.remove() должен быть вызван с id = '77'.
@@ -196,9 +203,9 @@ void main() {
       },
     );
 
-    // ACT-04: overflow «Очистить историю» → AlertDialog → confirm → repo.clear().
+    // ACT-04: overflow «Меню» → bottom sheet → «Очистить историю» → glass confirm → repo.clear().
     testWidgets(
-      'clear_all: overflow → AlertDialog → confirm → repo.clear()',
+      'clear_all: overflow → bottom sheet → showGlassConfirmDialog → confirm → repo.clear()',
       (tester) async {
         final entry = _makeEntry();
         final stub = _StubRepo(entries: [entry]);
@@ -206,29 +213,48 @@ void main() {
         await tester.pumpWidget(_buildApp(stub: stub, entries: [entry]));
         await tester.pumpAndSettle();
 
-        // Открываем overflow-меню (PopupMenuButton → три точки или значок).
-        final overflowBtn = find.byType(PopupMenuButton<String>);
+        // Открываем overflow-меню (GlassIconBtn с Semantics-лейблом «Меню»).
+        final overflowBtn = find.bySemanticsLabel('Меню');
         expect(overflowBtn, findsOneWidget);
         await tester.tap(overflowBtn);
         await tester.pumpAndSettle();
 
-        // Нажимаем «Очистить историю».
+        // Нажимаем «Очистить историю» в стеклянном bottom sheet.
         await tester.tap(find.text('Очистить историю'));
         await tester.pumpAndSettle();
 
-        // Появляется AlertDialog с подтверждением.
+        // Появляется стеклянный confirm-диалог (GlassCard, не AlertDialog).
         expect(find.text('Очистить историю?'), findsOneWidget);
+        expect(find.byType(AlertDialog), findsNothing);
 
-        // Подтверждаем.
-        final confirmBtn = find.descendant(
-          of: find.byType(AlertDialog),
-          matching: find.text('Очистить'),
-        );
+        // Подтверждаем — кнопка «Очистить всё».
+        final confirmBtn = find.text('Очистить всё');
+        expect(confirmBtn, findsOneWidget);
         await tester.tap(confirmBtn);
         await tester.pumpAndSettle();
 
         // repo.clear() должен быть вызван.
         expect(stub.clearCalled, isTrue);
+      },
+    );
+
+    // Баг #1: при активных фильтрах/поиске и пустой выдаче — _EmptyNoResults, не _EmptyHistory.
+    testWidgets(
+      'empty_state_filters: пустая выдача с активным поиском → _EmptyNoResults (не _EmptyHistory)',
+      (tester) async {
+        final stub = _StubRepo(entries: const []);
+
+        // searchTerm непустой, но searchResultsProvider отдаёт пустой список.
+        await tester.pumpWidget(_buildApp(
+          stub: stub,
+          entries: const [],
+          searchTerm: 'нет такого текста',
+        ));
+        await tester.pumpAndSettle();
+
+        // Показывается экран «Ничего не найдено», а не «Расшифровок пока нет».
+        expect(find.text('Ничего не найдено'), findsOneWidget);
+        expect(find.text('Расшифровок пока нет'), findsNothing);
       },
     );
   });
