@@ -97,10 +97,17 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
   /// Вызывает loadMore при приближении к концу скролла на 300px (BRWS-02).
   /// Guard _isLoadingMore предотвращает дублирующие вызовы за один кадр.
+  /// Guard reachedEnd (фикс #1): если уже отображено меньше записей, чем
+  /// запрошено всеми загруженными страницами (pageCount * pageSize) — данных
+  /// больше нет, loadMore() не вызывается (иначе offset рос бы бесконечно).
   void _onScroll() {
     if (_isLoadingMore) return;
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 300) {
+      final spec = ref.read(filterNotifierProvider);
+      final pageCount = spec.offset ~/ spec.pageSize + 1;
+      final entries = ref.read(searchResultsProvider).valueOrNull ?? const [];
+      if (entries.length < pageCount * spec.pageSize) return;
       _isLoadingMore = true;
       ref.read(filterNotifierProvider.notifier).loadMore();
       // Сбрасываем флаг после следующего кадра, чтобы данные успели прийти.
