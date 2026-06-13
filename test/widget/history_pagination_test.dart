@@ -112,5 +112,30 @@ void main() {
         expect(find.byType(ListView), findsOneWidget);
       },
     );
+
+    // Guard reachedEnd: список короче pageSize — скролл к концу не должен
+    // вызывать loadMore() вовсе (данных за пределами страницы 0 нет).
+    // Используем тот же loop-паттерн drag+pump, что и первый тест: единственный
+    // большой drag с pumpAndSettle не гарантированно пересекает порог
+    // (maxScrollExtent - 300) из-за overscroll-физики виджет-тестового окружения.
+    testWidgets(
+      'guard reachedEnd: короткий список — скролл к концу не вызывает loadMore',
+      (tester) async {
+        final entries = List.generate(30, (i) => _makeEntry('$i'));
+        final repo = _OffsetPagedRepo({0: entries});
+
+        await tester.pumpWidget(_buildApp(repo));
+        await tester.pumpAndSettle();
+
+        for (var i = 0; i < 5; i++) {
+          if (find.byType(ListView).evaluate().isEmpty) break;
+          await tester.drag(find.byType(ListView), const Offset(0, -2000));
+          await tester.pump();
+        }
+        await tester.pumpAndSettle();
+
+        expect(repo.requestedOffsets, [0]);
+      },
+    );
   });
 }
