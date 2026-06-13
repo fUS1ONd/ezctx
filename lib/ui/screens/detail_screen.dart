@@ -7,7 +7,9 @@ import '../../core/constants/design_tokens.dart';
 import '../../core/providers/history_provider.dart';
 import '../../core/services/clipboard_service.dart';
 import '../../features/history/history_entry.dart';
+import '../../features/history/history_label_utils.dart';
 import '../widgets/glass_card.dart';
+import '../widgets/glass_confirm_dialog.dart';
 import '../widgets/glass_icon_btn.dart';
 import '../widgets/gradient_background.dart';
 
@@ -113,32 +115,13 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
   }
 
   Future<void> _onDeleteTap() async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassConfirmDialog(
       context: context,
-      builder: (ctx) {
-        final palette = ctx.palette;
-        return AlertDialog(
-          title: Text(
-            'Удалить запись?',
-            style: AppTextStyles.heading.copyWith(color: palette.ink1),
-          ),
-          content: Text(
-            'Это действие нельзя отменить.',
-            style: AppTextStyles.body.copyWith(color: palette.ink2),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Отмена'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: TextButton.styleFrom(foregroundColor: palette.bad),
-              child: const Text('Удалить'),
-            ),
-          ],
-        );
-      },
+      title: 'Удалить запись?',
+      body: 'Расшифровка будет удалена без возможности восстановления.',
+      confirmLabel: 'Удалить запись',
+      cancelLabel: 'Не удалять',
+      destructive: true,
     );
 
     if (confirmed != true) return;
@@ -486,9 +469,9 @@ class _MetadataStrip extends StatelessWidget {
     final chips = [
       (Icons.calendar_today_outlined, entry.relativeDate(now)),
       (Icons.timer_outlined, entry.durationFormatted),
-      (Icons.mic_none_outlined, entry.provider.name.toUpperCase()),
+      (Icons.mic_none_outlined, providerLabel(entry.provider.name)),
       (Icons.folder_outlined, entry.sizeFormatted),
-      (Icons.language_outlined, entry.language.isEmpty ? '—' : entry.language),
+      (Icons.language_outlined, languageLabel(entry.language)),
     ];
 
     return GlassCard(

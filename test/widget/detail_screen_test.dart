@@ -311,15 +311,21 @@ void main() {
         await tester.pump(); // первый кадр — запуск showDialog
         await tester.pump(const Duration(milliseconds: 300)); // анимация диалога
 
-        // Должен появиться стеклянный диалог (GlassCard) с заголовком.
+        // Должен появиться стеклянный диалог (GlassCard внутри Dialog) с заголовком.
         expect(find.text('Удалить запись?'), findsOneWidget);
-        expect(find.byType(GlassCard), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byType(Dialog),
+            matching: find.byType(GlassCard),
+          ),
+          findsOneWidget,
+        );
         expect(find.byType(AlertDialog), findsNothing);
 
-        // Подтверждаем удаление — нажимаем кнопку внутри GlassCard.
+        // Подтверждаем удаление — нажимаем кнопку внутри диалога.
         // Используем descendant чтобы точно найти кнопку внутри диалога.
         final dialogDeleteBtn = find.descendant(
-          of: find.byType(GlassCard),
+          of: find.byType(Dialog),
           matching: find.text('Удалить запись'),
         );
         await tester.tap(dialogDeleteBtn);
