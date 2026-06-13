@@ -364,7 +364,7 @@ void main() {
           overrides: [
             historyRepositoryProvider.overrideWithValue(stub),
             searchResultsProvider.overrideWith(
-              (ref) => Stream.value([entry]),
+              (ref) => AsyncValue.data([entry]),
             ),
             filterNotifierProvider.overrideWith(
               () => _FixedFilterNotifier(const FilterSpec()),

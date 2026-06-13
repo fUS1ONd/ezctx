@@ -99,7 +99,7 @@ Widget _buildApp({
     overrides: [
       historyRepositoryProvider.overrideWithValue(stub),
       searchResultsProvider.overrideWith(
-        (ref) => Stream.value(appEntries),
+        (ref) => AsyncValue.data(appEntries),
       ),
       filterNotifierProvider.overrideWith(
         () => _FixedFilterNotifier(FilterSpec(searchTerm: searchTerm)),
@@ -156,7 +156,7 @@ void main() {
           overrides: [
             historyRepositoryProvider.overrideWithValue(stub),
             searchResultsProvider.overrideWith(
-              (ref) => Stream.value([entry]),
+              (ref) => AsyncValue.data([entry]),
             ),
             filterNotifierProvider.overrideWith(
               () => _FixedFilterNotifier(const FilterSpec()),

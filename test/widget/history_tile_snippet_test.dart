@@ -74,7 +74,7 @@ Widget _buildApp({required List<HistoryEntry> entries, String searchTerm = 'со
       historyRepositoryProvider.overrideWithValue(_StubHistoryRepository(entries: entries)),
       // Переопределяем searchResultsProvider — возвращает переданные записи напрямую.
       searchResultsProvider.overrideWith(
-        (ref) => Stream.value(entries),
+        (ref) => AsyncValue.data(entries),
       ),
       // Фильтр с активным поиском — показывает сниппет.
       filterNotifierProvider.overrideWith(
