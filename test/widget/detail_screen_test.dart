@@ -9,6 +9,7 @@ import 'package:ezctx/features/history/history_repository.dart';
 import 'package:ezctx/features/transcription/transcription_options.dart';
 import 'package:ezctx/ui/screens/detail_screen.dart';
 import 'package:ezctx/ui/screens/history_screen.dart';
+import 'package:ezctx/ui/widgets/glass_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -262,6 +263,29 @@ void main() {
 
         // Главное — экран не упал.
         expect(find.byType(DetailScreen), findsOneWidget);
+      },
+    );
+
+    // UI-08: нижняя панель действий (Copy/Share/Delete) обёрнута в GlassCard —
+    // glass-стиль вместо дефолтного Container.
+    testWidgets(
+      'bottom_bar_glass: нижняя панель действий в GlassCard',
+      (tester) async {
+        final entry = _makeTestEntry();
+
+        await tester.pumpWidget(_buildApp(
+          home: DetailScreen(entry: entry),
+        ));
+        await tester.pumpAndSettle();
+
+        // Кнопка «Копировать» из нижней панели — потомок GlassCard.
+        expect(
+          find.ancestor(
+            of: find.text('Копировать'),
+            matching: find.byType(GlassCard),
+          ),
+          findsOneWidget,
+        );
       },
     );
 
