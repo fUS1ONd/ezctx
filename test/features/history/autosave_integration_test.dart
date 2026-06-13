@@ -113,6 +113,57 @@ void main() {
     );
   });
 
+  // Полностью детерминированный прогон: всё выполняется внутри ОДНОГО
+  // runAsync, чтобы реальная файловая I/O в _saveTranscripts успела
+  // завершиться (вне runAsync fake-async не двигает реальные Future).
+  // Затем ждём конкретный сигнал [until] (а не фиксированную паузу — она
+  // была причиной flaky-падений). Между ожиданиями делаем реальный «выдох»
+  // и pump, чтобы микротаски и setState отработали.
+  Future<void> pumpAndAwait(
+    WidgetTester tester, {
+    required Widget screen,
+    required Future<bool> Function() until,
+  }) async {
+    await tester.runAsync(() async {
+      await tester.pumpWidget(screen);
+      // Прогоняем кадры route-перехода: didChangeDependencies (и
+      // _saveTranscripts) срабатывает после установки маршрута, не на 1-м кадре.
+      for (var i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      await until();
+      // Дренируем оставшиеся микротаски/таймеры цепочки сохранения.
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    });
+    await tester.pump();
+  }
+
+  // Универсальное детерминированное ожидание: реальный «выдох» + pump в цикле.
+  Future<bool> awaitWithPump(
+    WidgetTester tester,
+    bool Function() condition, {
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
+    final deadline = DateTime.now().add(timeout);
+    while (!condition() && DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      await tester.pump();
+    }
+    return condition();
+  }
+
+  // Ждёт первый вызов add(): чередует реальный «выдох» и pump, пока сигнал
+  // репозитория не сработает либо не истечёт таймаут-страховка. Возвращает
+  // true, если дождались (false — таймаут; assert ниже всё равно проверит).
+  Future<bool> awaitFirstAdd(WidgetTester tester) =>
+      awaitWithPump(tester, () => fakeRepo.addCallCount >= 1);
+
+  // Ждёт полного завершения _saveTranscripts для входов БЕЗ add() (пустой
+  // текст): маркер «Сохранено в:». Файлы пишутся всегда (до guard'а на add),
+  // поэтому появление маркера достоверно сигналит о завершении цепочки.
+  Future<bool> awaitSaved(WidgetTester tester) => awaitWithPump(
+      tester, () => find.text('Сохранено в:').evaluate().isNotEmpty);
+
   // Вспомогательный метод сборки ResultScreen с переопределённым репозиторием.
   Widget buildScreen({required ResultArgs args}) {
     return ProviderScope(
@@ -159,13 +210,7 @@ void main() {
       (tester) async {
     final args = makeArgs(model: TranscriptionModel.nova3);
 
-    await tester.runAsync(() async {
-      await tester.pumpWidget(buildScreen(args: args));
-      await tester.pumpAndSettle();
-      // Даём time для завершения async операций файловой записи и repo.add().
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-      await tester.pump();
-    });
+    await pumpAndAwait(tester, screen: buildScreen(args: args), until: () => awaitFirstAdd(tester));
 
     // После отрисовки ResultScreen вызывает _saveTranscripts() → repo.add().
     expect(fakeRepo._entries, hasLength(1));
@@ -181,12 +226,7 @@ void main() {
       (tester) async {
     final args = makeArgs(model: TranscriptionModel.whisperLargeV3);
 
-    await tester.runAsync(() async {
-      await tester.pumpWidget(buildScreen(args: args));
-      await tester.pumpAndSettle();
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-      await tester.pump();
-    });
+    await pumpAndAwait(tester, screen: buildScreen(args: args), until: () => awaitFirstAdd(tester));
 
     expect(fakeRepo._entries, hasLength(1));
     expect(
@@ -201,12 +241,7 @@ void main() {
       (tester) async {
     final args = makeArgs();
 
-    await tester.runAsync(() async {
-      await tester.pumpWidget(buildScreen(args: args));
-      await tester.pumpAndSettle();
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-      await tester.pump();
-    });
+    await pumpAndAwait(tester, screen: buildScreen(args: args), until: () => awaitFirstAdd(tester));
 
     expect(fakeRepo.addCallCount, equals(1));
   });
@@ -217,15 +252,15 @@ void main() {
       (tester) async {
     final args = makeArgs();
 
-    await tester.runAsync(() async {
-      await tester.pumpWidget(buildScreen(args: args));
-      await tester.pumpAndSettle();
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-      await tester.pump();
-    });
+    await pumpAndAwait(tester, screen: buildScreen(args: args), until: () => awaitFirstAdd(tester));
 
     // Повторный pump имитирует пересборку виджета.
     await tester.pump();
+    await tester.pump();
+    // Дополнительный реальный «выдох» — даём шанс гипотетическому второму add().
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    );
     await tester.pump();
 
     // Несмотря на повторные pump, add() должен быть вызван не более 1 раза.
@@ -237,12 +272,13 @@ void main() {
       (tester) async {
     final args = makeArgs(plainText: '');
 
-    await tester.runAsync(() async {
-      await tester.pumpWidget(buildScreen(args: args));
-      await tester.pumpAndSettle();
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-      await tester.pump();
-    });
+    // Ждём полного завершения _saveTranscripts (маркер «Сохранено в:»),
+    // чтобы ловить даже поздний ошибочный add().
+    await pumpAndAwait(
+      tester,
+      screen: buildScreen(args: args),
+      until: () => awaitSaved(tester),
+    );
 
     expect(fakeRepo.addCallCount, equals(0));
     expect(fakeRepo._entries, isEmpty);
@@ -253,12 +289,11 @@ void main() {
       (tester) async {
     final args = makeArgs(plainText: '   \n  ');
 
-    await tester.runAsync(() async {
-      await tester.pumpWidget(buildScreen(args: args));
-      await tester.pumpAndSettle();
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-      await tester.pump();
-    });
+    await pumpAndAwait(
+      tester,
+      screen: buildScreen(args: args),
+      until: () => awaitSaved(tester),
+    );
 
     expect(fakeRepo.addCallCount, equals(0));
   });
