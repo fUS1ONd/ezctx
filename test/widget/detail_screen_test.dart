@@ -1,14 +1,12 @@
-// Widget-тесты detail-экрана (план 03-02, Wave 2) + swipe_delete (план 03-03).
+// Widget-тесты detail-экрана (план 03-02, Wave 2).
 // Стаб-репозиторий реализует весь контракт HistoryRepository (включая update()).
 
 import 'package:ezctx/core/providers/history_provider.dart';
-import 'package:ezctx/features/history/filter_notifier.dart';
 import 'package:ezctx/features/history/filter_spec.dart';
 import 'package:ezctx/features/history/history_entry.dart';
 import 'package:ezctx/features/history/history_repository.dart';
 import 'package:ezctx/features/transcription/transcription_options.dart';
 import 'package:ezctx/ui/screens/detail_screen.dart';
-import 'package:ezctx/ui/screens/history_screen.dart';
 import 'package:ezctx/ui/widgets/glass_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -336,55 +334,9 @@ void main() {
       },
     );
 
-    // ACT-04: свайп влево на карточке в HistoryScreen → repo.remove(entry.id).
-    // Реализован в plan 03-03: Dismissible добавлен в history_screen._HistoryList.
-    testWidgets(
-      'swipe_delete: свайп влево на карточке → repo.remove(entry.id)',
-      (tester) async {
-        final stub = _StubHistoryRepository();
-        final entry = _makeTestEntry(id: '55');
-
-        // Отображаем HistoryScreen с одной записью.
-        await tester.pumpWidget(ProviderScope(
-          overrides: [
-            historyRepositoryProvider.overrideWithValue(stub),
-            searchResultsProvider.overrideWith(
-              (ref) => Stream.value([entry]),
-            ),
-            filterNotifierProvider.overrideWith(
-              () => _FixedFilterNotifier(const FilterSpec()),
-            ),
-          ],
-          child: MaterialApp(
-            theme: ThemeData(
-              colorScheme: ColorScheme.fromSeed(seedColor: Colors.orange),
-              useMaterial3: true,
-            ),
-            home: const HistoryScreen(),
-          ),
-        ));
-        await tester.pumpAndSettle();
-
-        // Проверяем, что карточка отображается.
-        expect(find.text('Тестовая запись'), findsOneWidget);
-
-        // Свайп endToStart по карточке — удаление (D-05).
-        await tester.drag(
-            find.text('Тестовая запись'), const Offset(-500, 0));
-        await tester.pumpAndSettle();
-
-        // repo.remove() должен быть вызван с id = '55'.
-        expect(stub.removedIds, contains('55'));
-      },
-    );
+    // CR-01: свайп-удаление в HistoryScreen теперь двухшаговое (свайп раскрывает
+    // панель, тап по панели удаляет). Покрыто в history_actions_test.dart
+    // (swipe_dismiss) — здесь дублировать не нужно, к тому же тест относился бы
+    // к HistoryScreen, а не к DetailScreen.
   });
-}
-
-// Notifier с фиксированным состоянием FilterSpec.
-class _FixedFilterNotifier extends FilterNotifier {
-  final FilterSpec _fixedSpec;
-  _FixedFilterNotifier(this._fixedSpec);
-
-  @override
-  FilterSpec build() => _fixedSpec;
 }
