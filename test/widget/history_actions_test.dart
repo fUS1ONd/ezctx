@@ -203,9 +203,9 @@ void main() {
       },
     );
 
-    // ACT-04: overflow «Очистить историю» → AlertDialog → confirm → repo.clear().
+    // ACT-04: overflow «Меню» → bottom sheet → «Очистить историю» → glass confirm → repo.clear().
     testWidgets(
-      'clear_all: overflow → AlertDialog → confirm → repo.clear()',
+      'clear_all: overflow → bottom sheet → showGlassConfirmDialog → confirm → repo.clear()',
       (tester) async {
         final entry = _makeEntry();
         final stub = _StubRepo(entries: [entry]);
@@ -213,29 +213,48 @@ void main() {
         await tester.pumpWidget(_buildApp(stub: stub, entries: [entry]));
         await tester.pumpAndSettle();
 
-        // Открываем overflow-меню (PopupMenuButton → три точки или значок).
-        final overflowBtn = find.byType(PopupMenuButton<String>);
+        // Открываем overflow-меню (GlassIconBtn с Semantics-лейблом «Меню»).
+        final overflowBtn = find.bySemanticsLabel('Меню');
         expect(overflowBtn, findsOneWidget);
         await tester.tap(overflowBtn);
         await tester.pumpAndSettle();
 
-        // Нажимаем «Очистить историю».
+        // Нажимаем «Очистить историю» в стеклянном bottom sheet.
         await tester.tap(find.text('Очистить историю'));
         await tester.pumpAndSettle();
 
-        // Появляется AlertDialog с подтверждением.
+        // Появляется стеклянный confirm-диалог (GlassCard, не AlertDialog).
         expect(find.text('Очистить историю?'), findsOneWidget);
+        expect(find.byType(AlertDialog), findsNothing);
 
-        // Подтверждаем.
-        final confirmBtn = find.descendant(
-          of: find.byType(AlertDialog),
-          matching: find.text('Очистить'),
-        );
+        // Подтверждаем — кнопка «Очистить всё».
+        final confirmBtn = find.text('Очистить всё');
+        expect(confirmBtn, findsOneWidget);
         await tester.tap(confirmBtn);
         await tester.pumpAndSettle();
 
         // repo.clear() должен быть вызван.
         expect(stub.clearCalled, isTrue);
+      },
+    );
+
+    // Баг #1: при активных фильтрах/поиске и пустой выдаче — _EmptyNoResults, не _EmptyHistory.
+    testWidgets(
+      'empty_state_filters: пустая выдача с активным поиском → _EmptyNoResults (не _EmptyHistory)',
+      (tester) async {
+        final stub = _StubRepo(entries: const []);
+
+        // searchTerm непустой, но searchResultsProvider отдаёт пустой список.
+        await tester.pumpWidget(_buildApp(
+          stub: stub,
+          entries: const [],
+          searchTerm: 'нет такого текста',
+        ));
+        await tester.pumpAndSettle();
+
+        // Показывается экран «Ничего не найдено», а не «Расшифровок пока нет».
+        expect(find.text('Ничего не найдено'), findsOneWidget);
+        expect(find.text('Расшифровок пока нет'), findsNothing);
       },
     );
   });

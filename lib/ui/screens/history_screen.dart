@@ -13,6 +13,8 @@ import '../../features/history/filter_spec.dart';
 import '../../features/history/history_entry.dart';
 import '../../features/history/history_label_utils.dart';
 import '../widgets/glass_card.dart';
+import '../widgets/glass_confirm_dialog.dart';
+import '../widgets/glass_icon_btn.dart';
 import '../widgets/gradient_background.dart';
 import '../widgets/long_press_bottom_sheet.dart';
 import '../widgets/primary_button.dart';
@@ -48,11 +50,15 @@ Widget buildSnippet(String snippet, AppPalette palette) {
   for (var i = 0; i < outer.length; i++) {
     if (i == 0) {
       // Часть до первого \x02: всегда обычный текст.
-      if (outer[i].isNotEmpty) spans.add(TextSpan(text: outer[i], style: normal()));
+      if (outer[i].isNotEmpty) {
+        spans.add(TextSpan(text: outer[i], style: normal()));
+      }
     } else {
       // Часть после \x02: до \x03 — выделено, после \x03 — обычный текст.
       final inner = outer[i].split('\x03');
-      if (inner[0].isNotEmpty) spans.add(TextSpan(text: inner[0], style: highlight()));
+      if (inner[0].isNotEmpty) {
+        spans.add(TextSpan(text: inner[0], style: highlight()));
+      }
       if (inner.length > 1 && inner[1].isNotEmpty) {
         spans.add(TextSpan(text: inner[1], style: normal()));
       }
@@ -80,6 +86,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   late final ScrollController _scrollController;
   // Guard против накопления offset: loadMore вызывается однократно до следующего рендера.
   bool _isLoadingMore = false;
+
+  // Баг #1: последние непустые entries — показываем их во время пагинации,
+  // чтобы список не мигал _EmptyHistory/_EmptyNoResults между страницами.
+  List<HistoryEntry> _lastEntries = const [];
 
   @override
   void initState() {
@@ -111,43 +121,26 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     }
   }
 
-  /// Деструктивное удаление всей истории с подтверждением (ACT-04, T-03-09).
+  /// Деструктивное удаление всей истории с подтверждением (ACT-04, T-03-09, D-07).
   Future<void> _onClearAll() async {
     // Захват repo ДО await — ref недоступен после dispose (CR-01, T-03-08).
     final repo = ref.read(historyRepositoryProvider);
-    final confirmed = await showDialog<bool>(
+    // Стеклянный confirm-диалог (D-07, T-04-04).
+    final confirmed = await showGlassConfirmDialog(
       context: context,
-      builder: (ctx) {
-        final palette = ctx.palette;
-        return AlertDialog(
-          title: Text(
-            'Очистить историю?',
-            style: AppTextStyles.heading.copyWith(color: palette.ink1),
-          ),
-          content: Text(
-            'Все записи будут удалены безвозвратно.',
-            style: AppTextStyles.body.copyWith(color: palette.ink2),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Отмена'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: TextButton.styleFrom(foregroundColor: context.palette.bad),
-              child: const Text('Очистить'),
-            ),
-          ],
-        );
-      },
+      title: 'Очистить историю?',
+      body: 'Все расшифровки будут удалены без возможности восстановления.',
+      confirmLabel: 'Очистить всё',
+      cancelLabel: 'Оставить историю',
+      destructive: true,
     );
     if (confirmed != true) return;
     await repo.clear();
   }
 
   /// Открывает bottom sheet с действиями над записью по long-press (D-06, T-03-08).
-  void _showLongPressSheet(BuildContext ctx, WidgetRef widgetRef, HistoryEntry entry) {
+  void _showLongPressSheet(
+      BuildContext ctx, WidgetRef widgetRef, HistoryEntry entry) {
     showModalBottomSheet(
       context: ctx,
       backgroundColor: Colors.transparent,
@@ -197,39 +190,74 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         onDelete: () async {
           // Захват repo ДО await — widgetRef недоступен после dispose (CR-02, T-03-08).
           final repo = widgetRef.read(historyRepositoryProvider);
-          // Показываем AlertDialog подтверждения удаления (D-07, T-03-09).
-          final confirmed = await showDialog<bool>(
+          // Стеклянный confirm-диалог (D-07, T-03-09).
+          final confirmed = await showGlassConfirmDialog(
             context: ctx,
-            builder: (dialogCtx) {
-              final palette = dialogCtx.palette;
-              return AlertDialog(
-                title: Text(
-                  'Удалить запись?',
-                  style: AppTextStyles.heading.copyWith(color: palette.ink1),
-                ),
-                content: Text(
-                  'Это действие нельзя отменить.',
-                  style: AppTextStyles.body.copyWith(color: palette.ink2),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(dialogCtx, false),
-                    child: const Text('Отмена'),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.pop(dialogCtx, true),
-                    style: TextButton.styleFrom(
-                        foregroundColor: dialogCtx.palette.bad),
-                    child: const Text('Удалить'),
-                  ),
-                ],
-              );
-            },
+            title: 'Удалить запись?',
+            body: 'Расшифровка будет удалена без возможности восстановления.',
+            confirmLabel: 'Удалить запись',
+            cancelLabel: 'Не удалять',
           );
           if (confirmed != true) return;
           await repo.remove(entry.id);
         },
       ),
+    );
+  }
+
+  /// Открывает стеклянный bottom sheet overflow-меню с пунктом «Очистить историю» (D-08).
+  void _showOverflowMenuSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (sheetCtx) {
+        final palette = sheetCtx.palette;
+        return ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+            child: Container(
+              decoration: BoxDecoration(
+                color: palette.glassBgDeep,
+                border: Border(
+                  top: BorderSide(color: palette.glassRim, width: 0.5),
+                ),
+              ),
+              padding: const EdgeInsets.fromLTRB(0, 12, 0, 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // DragHandle — визуальный индикатор для свайпа вниз.
+                  Center(
+                    child: Container(
+                      width: 32,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      decoration: BoxDecoration(
+                        color: palette.inkLine,
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                      ),
+                    ),
+                  ),
+                  ListTile(
+                    leading: Icon(Icons.delete_sweep_outlined,
+                        size: AppSpacing.lg, color: palette.bad),
+                    title: Text(
+                      'Очистить историю',
+                      style: AppTextStyles.body.copyWith(color: palette.bad),
+                    ),
+                    onTap: () {
+                      Navigator.pop(sheetCtx);
+                      _onClearAll();
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -242,9 +270,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       builder: (ctx) => _FiltersSheet(
         initialSpec: ref.read(filterNotifierProvider),
         onApply: (dateRange, languages, providers) {
-          ref
-              .read(filterNotifierProvider.notifier)
-              .applySheetFilters(
+          ref.read(filterNotifierProvider.notifier).applySheetFilters(
                 dateRange: dateRange,
                 languages: languages,
                 providers: providers,
@@ -258,8 +284,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             providers: const {},
           );
         },
-        loadLanguages: () => ref.read(historyRepositoryProvider).distinctLanguages(),
-        loadProviders: () => ref.read(historyRepositoryProvider).distinctProviders(),
+        loadLanguages: () =>
+            ref.read(historyRepositoryProvider).distinctLanguages(),
+        loadProviders: () =>
+            ref.read(historyRepositoryProvider).distinctProviders(),
       ),
     );
   }
@@ -273,210 +301,228 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
+      // Баг #7: экран сам управляет инсетами клавиатуры (см. Padding ниже) —
+      // resize Scaffold'ом приводит к overflow списка под клавиатурой.
+      resizeToAvoidBottomInset: false,
       body: GradientBackground(
         child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Заголовок «История» + overflow-меню «Очистить историю» (ACT-04, Pitfall 7).
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 8, 8),
-                child: Row(
-                  children: [
-                    Text(
-                      'История',
-                      style: AppTextStyles.display.copyWith(
-                          color: palette.ink1, fontSize: 30),
-                    ),
-                    const Spacer(),
-                    // Overflow-меню: «Очистить историю» (D-07 Claude's Discretion).
-                    PopupMenuButton<String>(
-                      icon: Icon(Icons.more_vert, color: palette.ink2),
-                      tooltip: 'Дополнительно',
-                      onSelected: (value) {
-                        if (value == 'clear') _onClearAll();
-                      },
-                      itemBuilder: (_) => [
-                        const PopupMenuItem<String>(
-                          value: 'clear',
-                          child: Text('Очистить историю'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-              // Строка поиска (UI-SPEC §1): всегда видна, hint, trailing X.
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: GlassCard(
-                  flat: true,
-                  borderRadius: 14,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          child: Padding(
+            // Баг #7: компенсируем высоту клавиатуры, чтобы контент не уходил под неё.
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Заголовок «История» + overflow-меню «Очистить историю» (ACT-04, Pitfall 7).
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 8, 8),
                   child: Row(
                     children: [
-                      Icon(Icons.search_rounded,
-                          color: palette.ink3, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          controller: _searchController,
-                          style: AppTextStyles.body
-                              .copyWith(color: palette.ink1),
-                          decoration: InputDecoration(
-                            hintText: 'Поиск по расшифровкам',
-                            hintStyle: AppTextStyles.body
-                                .copyWith(color: palette.ink3),
-                            border: InputBorder.none,
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(
-                                vertical: 10),
-                          ),
-                          // Вызов setSearch — debounce 250 мс выполняется в FilterNotifier (не здесь — Pitfall).
-                          onChanged: (value) {
-                            ref
-                                .read(filterNotifierProvider.notifier)
-                                .setSearch(value);
-                          },
+                      Text(
+                        'История',
+                        style: AppTextStyles.display
+                            .copyWith(color: palette.ink1, fontSize: 30),
+                      ),
+                      const Spacer(),
+                      // Overflow-меню: «Очистить историю» — стеклянная кнопка + bottom sheet (D-08).
+                      Tooltip(
+                        message: 'Меню',
+                        child: GlassIconBtn(
+                          icon: Icons.more_vert,
+                          semanticLabel: 'Меню',
+                          onPressed: _showOverflowMenuSheet,
                         ),
                       ),
-                      // Кнопка очистки — видна только при непустом тексте (SRCH-03).
-                      if (spec.searchTerm.isNotEmpty ||
-                          _searchController.text.isNotEmpty)
-                        GestureDetector(
-                          onTap: () {
-                            _searchController.clear();
-                            ref
-                                .read(filterNotifierProvider.notifier)
-                                .setSearch('');
-                          },
-                          child: Icon(Icons.close_rounded,
-                              color: palette.ink2, size: 20),
-                        ),
                     ],
                   ),
                 ),
-              ),
 
-              // Ряд чипов + кнопка фильтров (UI-SPEC §2–3).
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 8, 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            // Чипы длительности (radio-группа, D-04).
-                            _FilterChip(
-                              label: '< 10 мин',
-                              isActive: spec.durationPreset ==
-                                  DurationPreset.short,
-                              onTap: () => ref
-                                  .read(filterNotifierProvider.notifier)
-                                  .setDurationPreset(
-                                    spec.durationPreset ==
-                                            DurationPreset.short
-                                        ? null
-                                        : DurationPreset.short,
-                                  ),
+                // Строка поиска (UI-SPEC §1): всегда видна, hint, trailing X.
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: GlassCard(
+                    flat: true,
+                    borderRadius: 14,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    child: Row(
+                      children: [
+                        Icon(Icons.search_rounded,
+                            color: palette.ink3, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _searchController,
+                            style: AppTextStyles.body
+                                .copyWith(color: palette.ink1),
+                            decoration: InputDecoration(
+                              hintText: 'Поиск по расшифровкам',
+                              hintStyle: AppTextStyles.body
+                                  .copyWith(color: palette.ink3),
+                              border: InputBorder.none,
+                              isDense: true,
+                              contentPadding:
+                                  const EdgeInsets.symmetric(vertical: 10),
                             ),
-                            const SizedBox(width: 8),
-                            _FilterChip(
-                              label: '10–60 мин',
-                              isActive: spec.durationPreset ==
-                                  DurationPreset.medium,
-                              onTap: () => ref
+                            // Вызов setSearch — debounce 250 мс выполняется в FilterNotifier (не здесь — Pitfall).
+                            onChanged: (value) {
+                              ref
                                   .read(filterNotifierProvider.notifier)
-                                  .setDurationPreset(
-                                    spec.durationPreset ==
-                                            DurationPreset.medium
-                                        ? null
-                                        : DurationPreset.medium,
-                                  ),
-                            ),
-                            const SizedBox(width: 8),
-                            _FilterChip(
-                              label: '> 1 ч',
-                              isActive: spec.durationPreset ==
-                                  DurationPreset.long,
-                              onTap: () => ref
+                                  .setSearch(value);
+                            },
+                          ),
+                        ),
+                        // Кнопка очистки — видна только при непустом тексте (SRCH-03).
+                        if (spec.searchTerm.isNotEmpty ||
+                            _searchController.text.isNotEmpty)
+                          GestureDetector(
+                            onTap: () {
+                              _searchController.clear();
+                              ref
                                   .read(filterNotifierProvider.notifier)
-                                  .setDurationPreset(
-                                    spec.durationPreset ==
-                                            DurationPreset.long
-                                        ? null
-                                        : DurationPreset.long,
-                                  ),
-                            ),
-                            const SizedBox(width: 8),
-                            // Тоггл «Сегодня» (D-05).
-                            _FilterChip(
-                              label: 'Сегодня',
-                              isActive: spec.todayOnly,
-                              onTap: () => ref
-                                  .read(filterNotifierProvider.notifier)
-                                  .setTodayOnly(!spec.todayOnly),
-                            ),
-                            const SizedBox(width: 8),
-                            // Тоггл «★ Избранное» (D-05).
-                            _FilterChip(
-                              label: '★ Избранное',
-                              isActive: spec.favoriteOnly,
-                              onTap: () => ref
-                                  .read(filterNotifierProvider.notifier)
-                                  .setFavoriteOnly(!spec.favoriteOnly),
-                            ),
-                          ],
+                                  .setSearch('');
+                            },
+                            child: Icon(Icons.close_rounded,
+                                color: palette.ink2, size: 20),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // Ряд чипов + кнопка фильтров (UI-SPEC §2–3).
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 8, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              // Чипы длительности (radio-группа, D-04).
+                              _FilterChip(
+                                label: '< 10 мин',
+                                isActive:
+                                    spec.durationPreset == DurationPreset.short,
+                                onTap: () => ref
+                                    .read(filterNotifierProvider.notifier)
+                                    .setDurationPreset(
+                                      spec.durationPreset ==
+                                              DurationPreset.short
+                                          ? null
+                                          : DurationPreset.short,
+                                    ),
+                              ),
+                              const SizedBox(width: 8),
+                              _FilterChip(
+                                label: '10–60 мин',
+                                isActive: spec.durationPreset ==
+                                    DurationPreset.medium,
+                                onTap: () => ref
+                                    .read(filterNotifierProvider.notifier)
+                                    .setDurationPreset(
+                                      spec.durationPreset ==
+                                              DurationPreset.medium
+                                          ? null
+                                          : DurationPreset.medium,
+                                    ),
+                              ),
+                              const SizedBox(width: 8),
+                              _FilterChip(
+                                label: '> 1 ч',
+                                isActive:
+                                    spec.durationPreset == DurationPreset.long,
+                                onTap: () => ref
+                                    .read(filterNotifierProvider.notifier)
+                                    .setDurationPreset(
+                                      spec.durationPreset == DurationPreset.long
+                                          ? null
+                                          : DurationPreset.long,
+                                    ),
+                              ),
+                              const SizedBox(width: 8),
+                              // Тоггл «Сегодня» (D-05).
+                              _FilterChip(
+                                label: 'Сегодня',
+                                isActive: spec.todayOnly,
+                                onTap: () => ref
+                                    .read(filterNotifierProvider.notifier)
+                                    .setTodayOnly(!spec.todayOnly),
+                              ),
+                              const SizedBox(width: 8),
+                              // Тоггл «★ Избранное» (D-05).
+                              _FilterChip(
+                                label: '★ Избранное',
+                                isActive: spec.favoriteOnly,
+                                onTap: () => ref
+                                    .read(filterNotifierProvider.notifier)
+                                    .setFavoriteOnly(!spec.favoriteOnly),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                    // Кнопка расширенных фильтров с бейджем (UI-SPEC §3).
-                    _FilterIconButton(
-                      activeCount: spec.activeSheetFilterCount,
-                      onPressed: _showFiltersSheet,
-                    ),
-                  ],
+                      // Кнопка расширенных фильтров с бейджем (UI-SPEC §3).
+                      _FilterIconButton(
+                        activeCount: spec.activeSheetFilterCount,
+                        onPressed: _showFiltersSheet,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
 
-              // Основное содержимое экрана.
-              Expanded(
-                child: asyncEntries.when(
-                  loading: () => const Center(
-                      child:
-                          CircularProgressIndicator(strokeWidth: 2)),
-                  error: (e, _) => _ErrorState(message: e.toString()),
-                  data: (entries) {
-                    // D-09: «Ничего не найдено» при активных фильтрах/поиске без результатов.
-                    if (entries.isEmpty &&
-                        (spec.searchTerm.isNotEmpty ||
-                            spec.hasActiveFilters)) {
-                      return _EmptyNoResults(
-                        onReset: () {
-                          _searchController.clear();
-                          ref
-                              .read(filterNotifierProvider.notifier)
-                              .resetAll();
-                        },
+                // Основное содержимое экрана.
+                Expanded(
+                  child: asyncEntries.when(
+                    loading: () {
+                      // Баг #1: во время пагинации показываем предыдущие entries,
+                      // а не лоадер на весь экран — список не мигает.
+                      if (_lastEntries.isNotEmpty) {
+                        return _HistoryList(
+                          entries: _lastEntries,
+                          scrollController: _scrollController,
+                          widgetRef: ref,
+                          spec: spec,
+                          onLongPress: _showLongPressSheet,
+                        );
+                      }
+                      return const Center(
+                          child: CircularProgressIndicator(strokeWidth: 2));
+                    },
+                    error: (e, _) => _ErrorState(message: e.toString()),
+                    data: (entries) {
+                      // Баг #1: запоминаем последние непустые entries для loading-ветки.
+                      if (entries.isNotEmpty) _lastEntries = entries;
+                      // D-09: «Ничего не найдено» при активных фильтрах/поиске без результатов.
+                      if (entries.isEmpty &&
+                          (spec.searchTerm.isNotEmpty ||
+                              spec.hasActiveFilters)) {
+                        return _EmptyNoResults(
+                          onReset: () {
+                            _searchController.clear();
+                            ref
+                                .read(filterNotifierProvider.notifier)
+                                .resetAll();
+                          },
+                        );
+                      }
+                      // _EmptyHistory — только при реально пустой истории, без
+                      // активных фильтров/поиска (Баг #1).
+                      if (entries.isEmpty) return const _EmptyHistory();
+                      return _HistoryList(
+                        entries: entries,
+                        scrollController: _scrollController,
+                        widgetRef: ref,
+                        spec: spec,
+                        onLongPress: _showLongPressSheet,
                       );
-                    }
-                    if (entries.isEmpty) return const _EmptyHistory();
-                    return _HistoryList(
-                      entries: entries,
-                      scrollController: _scrollController,
-                      widgetRef: ref,
-                      spec: spec,
-                      onLongPress: _showLongPressSheet,
-                    );
-                  },
+                    },
+                  ),
                 ),
-              ),
-              const SizedBox(height: 96),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -573,6 +619,8 @@ class _FilterChip extends StatelessWidget {
         constraints: const BoxConstraints(minHeight: 44),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          // Баг #3: вертикальное центрирование текста чипа.
+          alignment: Alignment.center,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppRadius.pill),
             // Активный: полупрозрачный accent, неактивный: glassBgFlat (UI-SPEC §2).
@@ -627,7 +675,14 @@ class _HistoryList extends StatelessWidget {
 
     return ListView.separated(
       controller: scrollController,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      // Баг #2: нижний padding учитывает safe area + высоту навбара,
+      // чтобы последняя карточка не уходила под системную навигацию.
+      padding: EdgeInsets.fromLTRB(
+        16,
+        8,
+        16,
+        16 + MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight,
+      ),
       itemCount: entries.length,
       separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (ctx, i) {
@@ -700,7 +755,7 @@ const double _kDeleteRevealWidth = 72.0;
 /// Hand-rolled slide-to-reveal карточка (заменяет Dismissible, D-01..D-03).
 ///
 /// Свайп влево фиксирует красную панель удаления справа — удаление только
-/// по тапу на панель (без AlertDialog). Свайп вправо — мгновенный toggle ★
+/// по тапу на панель (без диалога подтверждения). Свайп вправо — мгновенный toggle ★
 /// через onFavoriteToggle со snap-back. Порог скорости |velocity| > 300
 /// (UI-SPEC §Swipe Gesture Conflict rule).
 class _SlidableTile extends StatefulWidget {
@@ -791,8 +846,7 @@ class _SlidableTileState extends State<_SlidableTile>
                         width: _kDeleteRevealWidth,
                         decoration: BoxDecoration(
                           color: palette.bad,
-                          borderRadius:
-                              BorderRadius.circular(AppRadius.card),
+                          borderRadius: BorderRadius.circular(AppRadius.card),
                         ),
                         child: const Icon(Icons.delete_outline,
                             color: Colors.white, size: 24),
@@ -844,8 +898,7 @@ class _HistoryTile extends StatelessWidget {
               borderRadius: BorderRadius.circular(13),
               gradient: AppGradients.accent,
             ),
-            child:
-                const Icon(Icons.audiotrack, color: Colors.white, size: 22),
+            child: const Icon(Icons.audiotrack, color: Colors.white, size: 22),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -877,8 +930,7 @@ class _HistoryTile extends StatelessWidget {
           // Языковый пилл (D-04: нормализация через languageLabel).
           Container(
             margin: const EdgeInsets.only(left: 8),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(AppRadius.pill),
               color: palette.inkLine,
@@ -891,8 +943,7 @@ class _HistoryTile extends StatelessWidget {
           // Бейдж провайдера (D-05/D-06: нормализация через providerLabel).
           Container(
             margin: const EdgeInsets.only(left: AppSpacing.xs, right: 4),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(AppRadius.pill),
               color: palette.inkLine,
@@ -944,8 +995,8 @@ class _EmptyNoResults extends StatelessWidget {
                 borderRadius: BorderRadius.circular(22),
                 color: palette.inkLine,
               ),
-              child: Icon(Icons.search_off_rounded,
-                  size: 32, color: palette.ink3),
+              child:
+                  Icon(Icons.search_off_rounded, size: 32, color: palette.ink3),
             ),
             const SizedBox(height: 16),
             Text(
@@ -997,8 +1048,7 @@ class _EmptyHistory extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             Text('Расшифровок пока нет',
-                style:
-                    AppTextStyles.heading.copyWith(color: palette.ink1)),
+                style: AppTextStyles.heading.copyWith(color: palette.ink1)),
             const SizedBox(height: 6),
             Text(
               'Готовые транскрипции появятся здесь автоматически после первой обработки.',
@@ -1236,8 +1286,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                 if (_languages.isEmpty)
                   Text(
                     'Нет данных',
-                    style:
-                        AppTextStyles.label.copyWith(color: palette.ink3),
+                    style: AppTextStyles.label.copyWith(color: palette.ink3),
                   )
                 else
                   Wrap(
@@ -1247,8 +1296,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         .map((lang) => _FilterChip(
                               // D-06: лейбл отображения через languageLabel, фильтрация — по сырому lang.
                               label: languageLabel(lang),
-                              isActive:
-                                  _selectedLanguages.contains(lang),
+                              isActive: _selectedLanguages.contains(lang),
                               onTap: () {
                                 setState(() {
                                   if (_selectedLanguages.contains(lang)) {
@@ -1257,8 +1305,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                           ..remove(lang);
                                   } else {
                                     _selectedLanguages =
-                                        Set.from(_selectedLanguages)
-                                          ..add(lang);
+                                        Set.from(_selectedLanguages)..add(lang);
                                   }
                                 });
                               },
@@ -1274,8 +1321,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                 if (_providers.isEmpty)
                   Text(
                     'Нет данных',
-                    style:
-                        AppTextStyles.label.copyWith(color: palette.ink3),
+                    style: AppTextStyles.label.copyWith(color: palette.ink3),
                   )
                 else
                   Wrap(
@@ -1285,8 +1331,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         .map((prov) => _FilterChip(
                               // D-06: лейбл отображения через providerLabel, фильтрация — по сырому prov.
                               label: providerLabel(prov),
-                              isActive:
-                                  _selectedProviders.contains(prov),
+                              isActive: _selectedProviders.contains(prov),
                               onTap: () {
                                 setState(() {
                                   if (_selectedProviders.contains(prov)) {
@@ -1295,8 +1340,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                           ..remove(prov);
                                   } else {
                                     _selectedProviders =
-                                        Set.from(_selectedProviders)
-                                          ..add(prov);
+                                        Set.from(_selectedProviders)..add(prov);
                                   }
                                 });
                               },
