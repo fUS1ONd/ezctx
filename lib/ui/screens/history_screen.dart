@@ -87,8 +87,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   // Guard против накопления offset: loadMore вызывается однократно до следующего рендера.
   bool _isLoadingMore = false;
 
-  // Баг #1: последние непустые entries — показываем их во время пагинации,
-  // чтобы список не мигал _EmptyHistory/_EmptyNoResults между страницами.
+  // Баг #1 / WR-03: последний полученный список entries — показываем его во
+  // время пагинации (_isLoadingMore), чтобы список не мигал между страницами.
+  // Обновляется всегда (в т.ч. пустым списком), чтобы не показывать удалённые
+  // строки после очистки истории.
   List<HistoryEntry> _lastEntries = const [];
 
   @override
@@ -184,7 +186,15 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           try {
             await Share.share(entry.plainText);
           } catch (e, st) {
+            // WR-05: показываем фидбек, как на detail-экране, а не глотаем ошибку.
             debugPrint('share error: $e\n$st');
+            if (ctx.mounted) {
+              ScaffoldMessenger.of(ctx).showSnackBar(
+                const SnackBar(
+                  content: Text('Не удалось поделиться. Попробуйте ещё раз.'),
+                ),
+              );
+            }
           }
         },
         onDelete: () async {
@@ -479,9 +489,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 Expanded(
                   child: asyncEntries.when(
                     loading: () {
-                      // Баг #1: во время пагинации показываем предыдущие entries,
-                      // а не лоадер на весь экран — список не мигает.
-                      if (_lastEntries.isNotEmpty) {
+                      // Баг #1 / WR-03: предыдущие entries показываем ТОЛЬКО при
+                      // реальной пагинации (_isLoadingMore). Иначе (например,
+                      // reload после очистки) показали бы уже удалённые строки.
+                      if (_isLoadingMore && _lastEntries.isNotEmpty) {
                         return _HistoryList(
                           entries: _lastEntries,
                           scrollController: _scrollController,
@@ -495,8 +506,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                     },
                     error: (e, _) => _ErrorState(message: e.toString()),
                     data: (entries) {
-                      // Баг #1: запоминаем последние непустые entries для loading-ветки.
-                      if (entries.isNotEmpty) _lastEntries = entries;
+                      // WR-03: присваиваем всегда, в т.ч. пустой список — иначе
+                      // после очистки в _lastEntries остаются удалённые строки.
+                      _lastEntries = entries;
                       // D-09: «Ничего не найдено» при активных фильтрах/поиске без результатов.
                       if (entries.isEmpty &&
                           (spec.searchTerm.isNotEmpty ||
@@ -649,7 +661,8 @@ class _FilterChip extends StatelessWidget {
 }
 
 /// Список записей истории с поддержкой ленивой пагинации (BRWS-02),
-/// свайп-удаления (D-05) и long-press bottom sheet (D-06).
+/// свайпа: влево раскрывает панель удаления (тап по панели удаляет),
+/// вправо — toggle избранного; и long-press bottom sheet (D-06).
 class _HistoryList extends StatelessWidget {
   const _HistoryList({
     required this.entries,
@@ -754,6 +767,10 @@ class _HistoryList extends StatelessWidget {
 /// Ширина reveal-панели удаления (UI-SPEC §Swipe — 72px, фиксированный размер).
 const double _kDeleteRevealWidth = 72.0;
 
+/// Порог скорости свайпа для принятия решения о жесте (UI-SPEC §Swipe Gesture
+/// Conflict rule). IN-02: вынесено из инлайновых литералов ±300.
+const double _kSwipeVelocityThreshold = 300.0;
+
 /// Hand-rolled slide-to-reveal карточка (заменяет Dismissible, D-01..D-03).
 ///
 /// Свайп влево фиксирует красную панель удаления справа — удаление только
@@ -801,6 +818,18 @@ class _SlidableTileState extends State<_SlidableTile>
   }
 
   @override
+  void didUpdateWidget(_SlidableTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // WR-01: при пересборке строки (пагинация, смена фильтра/поиска,
+    // переиспользование id в другой позиции) сворачиваем раскрытую панель,
+    // чтобы деструктивная кнопка не «висела» под чужим визуальным контекстом.
+    if (_ctrl.value > 0) {
+      _ctrl.animateTo(0.0);
+      _dragExtent = 0;
+    }
+  }
+
+  @override
   void dispose() {
     _ctrl.dispose();
     super.dispose();
@@ -815,10 +844,16 @@ class _SlidableTileState extends State<_SlidableTile>
       onHorizontalDragUpdate: (details) => _dragExtent += details.delta.dx,
       onHorizontalDragEnd: (details) {
         final velocity = details.primaryVelocity ?? 0;
+        // WR-02: сбрасываем накопленный dx ДО принятия решения, чтобы остаток
+        // прошлого жеста не утёк в следующий (если onHorizontalDragStart не
+        // пришёл — fling/передача арены жестов).
+        final dx = _dragExtent;
+        _dragExtent = 0;
         // Свайп влево → фиксируем панель удаления (D-01/D-02).
-        if (velocity < -300 || _dragExtent < -_kDeleteRevealWidth) {
+        if (velocity < -_kSwipeVelocityThreshold || dx < -_kDeleteRevealWidth) {
           _ctrl.animateTo(1.0);
-        } else if (velocity > 300 || _dragExtent > _kDeleteRevealWidth) {
+        } else if (velocity > _kSwipeVelocityThreshold ||
+            dx > _kDeleteRevealWidth) {
           // Свайп вправо → мгновенный toggle ★, snap-back (D-03).
           widget.onFavoriteToggle();
           _ctrl.animateTo(0.0);
@@ -862,7 +897,15 @@ class _SlidableTileState extends State<_SlidableTile>
                 offset: Offset(-offset, 0),
                 child: GestureDetector(
                   onLongPress: widget.onLongPress,
-                  onTap: widget.onTap,
+                  // WR-01: первый тап по раскрытой карточке закрывает панель,
+                  // а не переходит на detail — защита от ошибочного удаления.
+                  onTap: () {
+                    if (_ctrl.value > 0) {
+                      _ctrl.animateTo(0.0);
+                      return;
+                    }
+                    widget.onTap();
+                  },
                   child: widget.child,
                 ),
               ),
