@@ -611,7 +611,7 @@ class _HistoryList extends StatelessWidget {
   final List<HistoryEntry> entries;
   final ScrollController scrollController;
 
-  /// ref из ConsumerStatefulWidget — нужен для Dismissible.onDismissed и навигации.
+  /// ref из ConsumerStatefulWidget — нужен для onDelete/onFavoriteToggle и навигации.
   final WidgetRef widgetRef;
 
   /// Текущий FilterSpec — для прокидывания searchTerm в DetailArgs.
@@ -623,7 +623,6 @@ class _HistoryList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    final palette = context.palette;
 
     return ListView.separated(
       controller: scrollController,
@@ -633,19 +632,11 @@ class _HistoryList extends StatelessWidget {
       itemBuilder: (ctx, i) {
         final entry = entries[i];
 
-        return Dismissible(
+        return _SlidableTile(
           // Уникальный ключ по id — обязателен (T-03-10, Pitfall 4).
           key: ValueKey(entry.id),
-          direction: DismissDirection.endToStart,
-          // Красный фон со значком удаления (UI-SPEC §Swipe-Dismiss).
-          background: Container(
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.only(right: 20),
-            color: palette.bad,
-            child: const Icon(Icons.delete_outline,
-                color: Colors.white, size: 24),
-          ),
-          onDismissed: (direction) async {
+          // Свайп влево → reveal+tap удаление (D-01/D-02, T-04-03).
+          onDelete: () async {
             // Захват repo и messenger ДО await: после await list rebuild снимает ctx с дерева
             // и ctx.mounted == false → SnackBar не показался бы (CR-03, T-03-08).
             final repo = widgetRef.read(historyRepositoryProvider);
@@ -667,25 +658,161 @@ class _HistoryList extends StatelessWidget {
               );
             }
           },
-          child: GestureDetector(
-            // Long-press → bottom sheet с действиями (D-06).
-            onLongPress: () => onLongPress(ctx, widgetRef, entry),
-            // Тап → переход на detail-экран с searchTerm (BRWS-03).
-            onTap: () {
-              Navigator.pushNamed(
-                ctx,
-                AppConstants.routeHistoryDetail,
-                arguments: DetailArgs(
-                  entry: entry,
-                  // Прокидываем searchTerm только если он непустой (D-08).
-                  searchTerm: spec.searchTerm.isEmpty ? null : spec.searchTerm,
-                ),
-              );
-            },
-            child: _HistoryTile(entry: entry, now: now),
-          ),
+          // Свайп вправо → мгновенный toggle ★ через repo.update, snap-back (D-03, T-04-05).
+          onFavoriteToggle: () async {
+            // Захват repo ДО await (CR-01..05).
+            final repo = widgetRef.read(historyRepositoryProvider);
+            try {
+              await repo.update(entry.copyWith(isFavorite: !entry.isFavorite));
+            } catch (e) {
+              if (ctx.mounted) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(content: Text('Не удалось сохранить')),
+                );
+              }
+            }
+          },
+          // Long-press → bottom sheet с действиями (D-06).
+          onLongPress: () => onLongPress(ctx, widgetRef, entry),
+          // Тап → переход на detail-экран с searchTerm (BRWS-03).
+          onTap: () {
+            Navigator.pushNamed(
+              ctx,
+              AppConstants.routeHistoryDetail,
+              arguments: DetailArgs(
+                entry: entry,
+                // Прокидываем searchTerm только если он непустой (D-08).
+                searchTerm: spec.searchTerm.isEmpty ? null : spec.searchTerm,
+              ),
+            );
+          },
+          child: _HistoryTile(entry: entry, now: now),
         );
       },
+    );
+  }
+}
+
+/// Ширина reveal-панели удаления (UI-SPEC §Swipe — 72px, фиксированный размер).
+const double _kDeleteRevealWidth = 72.0;
+
+/// Hand-rolled slide-to-reveal карточка (заменяет Dismissible, D-01..D-03).
+///
+/// Свайп влево фиксирует красную панель удаления справа — удаление только
+/// по тапу на панель (без AlertDialog). Свайп вправо — мгновенный toggle ★
+/// через onFavoriteToggle со snap-back. Порог скорости |velocity| > 300
+/// (UI-SPEC §Swipe Gesture Conflict rule).
+class _SlidableTile extends StatefulWidget {
+  const _SlidableTile({
+    super.key,
+    required this.child,
+    required this.onDelete,
+    required this.onFavoriteToggle,
+    required this.onTap,
+    required this.onLongPress,
+  });
+
+  final Widget child;
+  final VoidCallback onDelete;
+  final VoidCallback onFavoriteToggle;
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
+
+  @override
+  State<_SlidableTile> createState() => _SlidableTileState();
+}
+
+class _SlidableTileState extends State<_SlidableTile>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  /// Накопленное горизонтальное смещение за текущий жест (UI-SPEC §Swipe
+  /// Gesture Conflict rule — escalation на onHorizontalDragUpdate). Нужно
+  /// потому, что в widget-тестах `tester.drag()` отдаёт мгновенное
+  /// перемещение с velocity == 0, поэтому решение о направлении принимается
+  /// по накопленному dx, а не только по скорости.
+  double _dragExtent = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+
+    return GestureDetector(
+      onHorizontalDragStart: (_) => _dragExtent = 0,
+      onHorizontalDragUpdate: (details) => _dragExtent += details.delta.dx,
+      onHorizontalDragEnd: (details) {
+        final velocity = details.primaryVelocity ?? 0;
+        // Свайп влево → фиксируем панель удаления (D-01/D-02).
+        if (velocity < -300 || _dragExtent < -_kDeleteRevealWidth) {
+          _ctrl.animateTo(1.0);
+        } else if (velocity > 300 || _dragExtent > _kDeleteRevealWidth) {
+          // Свайп вправо → мгновенный toggle ★, snap-back (D-03).
+          widget.onFavoriteToggle();
+          _ctrl.animateTo(0.0);
+        } else {
+          // Ниже порога — возврат на место.
+          _ctrl.animateTo(0.0);
+        }
+      },
+      child: AnimatedBuilder(
+        animation: _ctrl,
+        builder: (context, _) {
+          final offset = _ctrl.value * _kDeleteRevealWidth;
+          return Stack(
+            children: [
+              // Красная панель удаления (видна при offset > 0).
+              Positioned.fill(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Semantics(
+                    label: 'Удалить запись',
+                    child: GestureDetector(
+                      onTap: () {
+                        _ctrl.animateTo(0.0);
+                        widget.onDelete();
+                      },
+                      child: Container(
+                        width: _kDeleteRevealWidth,
+                        decoration: BoxDecoration(
+                          color: palette.bad,
+                          borderRadius:
+                              BorderRadius.circular(AppRadius.card),
+                        ),
+                        child: const Icon(Icons.delete_outline,
+                            color: Colors.white, size: 24),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              // Карточка сдвигается влево при offset > 0.
+              Transform.translate(
+                offset: Offset(-offset, 0),
+                child: GestureDetector(
+                  onLongPress: widget.onLongPress,
+                  onTap: widget.onTap,
+                  child: widget.child,
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 }
@@ -765,6 +892,18 @@ class _HistoryTile extends StatelessWidget {
               ),
             ),
           ),
+          // Звезда ★ — статус избранного, обновляется реактивно (D-03).
+          Semantics(
+            label: entry.isFavorite
+                ? 'Убрать из избранного'
+                : 'Добавить в избранное',
+            child: Icon(
+              entry.isFavorite ? Icons.star : Icons.star_border,
+              color: entry.isFavorite ? palette.accent : palette.ink3,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 4),
           Icon(Icons.chevron_right_rounded, color: palette.ink3, size: 22),
         ],
       ),

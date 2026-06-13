@@ -120,9 +120,9 @@ Widget _buildApp({
 
 void main() {
   group('HistoryScreen actions — Wave 3', () {
-    // ACT-04: свайп endToStart по карточке → repo.remove(entry.id) вызван.
+    // D-01/D-02: свайп влево фиксирует панель удаления; удаление — по тапу на панель.
     testWidgets(
-      'swipe_dismiss: свайп влево → repo.remove(entry.id)',
+      'swipe_dismiss: свайп влево фиксирует панель, тап по панели → repo.remove(entry.id)',
       (tester) async {
         final entry = _makeEntry(id: '77');
         final stub = _StubRepo(entries: [entry]);
@@ -133,8 +133,15 @@ void main() {
         // Находим карточку по тексту заголовка.
         expect(find.text('Тестовая запись'), findsOneWidget);
 
-        // Свайп endToStart (справа налево) на карточке.
+        // Свайп влево (справа налево) фиксирует красную панель удаления (D-01/D-02).
         await tester.drag(find.text('Тестовая запись'), const Offset(-500, 0));
+        await tester.pumpAndSettle();
+
+        // repo.remove() пока НЕ вызван — нужен явный тап по панели.
+        expect(stub.removedIds, isEmpty);
+
+        // Тап по панели удаления (Semantics: «Удалить запись»).
+        await tester.tap(find.bySemanticsLabel('Удалить запись'));
         await tester.pumpAndSettle();
 
         // repo.remove() должен быть вызван с id = '77'.
