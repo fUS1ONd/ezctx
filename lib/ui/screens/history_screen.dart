@@ -176,15 +176,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         onCopy: () async {
           try {
             await ClipboardService.copyText(entry.plainText);
-            if (ctx.mounted) {
-              ScaffoldMessenger.of(ctx).showSnackBar(
-                SnackBar(
-                  content: const Text('Скопировано'),
-                  backgroundColor: ctx.palette.glassBgDeep,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            }
           } catch (e) {
             if (ctx.mounted) {
               ScaffoldMessenger.of(ctx).showSnackBar(

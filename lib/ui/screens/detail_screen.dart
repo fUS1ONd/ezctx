@@ -84,14 +84,6 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
   Future<void> _onCopyTap() async {
     try {
       await ClipboardService.copyText(_currentEntry.plainText);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Скопировано'),
-          backgroundColor: context.palette.glassBgDeep,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
