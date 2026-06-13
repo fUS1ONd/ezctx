@@ -270,5 +270,18 @@ void main() {
                 'При snippet==null сниппет-RichText (maxLines:2) не должен рендериться');
       },
     );
+
+    // D-05/D-06: бейдж провайдера отображается через providerLabel.
+    testWidgets(
+      'BRWS-01: _HistoryTile отображает бейдж провайдера "Groq"',
+      (tester) async {
+        final entry = _makeEntry(snippet: null);
+        await tester.pumpWidget(_buildApp(entries: [entry], searchTerm: ''));
+        await tester.pumpAndSettle();
+
+        // entry.provider == TranscriptionProviderId.groq → providerLabel('groq') == 'Groq'.
+        expect(find.text('Groq'), findsOneWidget);
+      },
+    );
   });
 }

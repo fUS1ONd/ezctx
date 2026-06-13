@@ -11,6 +11,7 @@ import '../../core/services/clipboard_service.dart';
 import '../../features/history/filter_notifier.dart';
 import '../../features/history/filter_spec.dart';
 import '../../features/history/history_entry.dart';
+import '../../features/history/history_label_utils.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/gradient_background.dart';
 import '../widgets/long_press_bottom_sheet.dart';
@@ -873,23 +874,32 @@ class _HistoryTile extends StatelessWidget {
               ],
             ),
           ),
-          // Языковый пилл.
+          // Языковый пилл (D-04: нормализация через languageLabel).
           Container(
-            margin: const EdgeInsets.only(left: 8, right: 4),
+            margin: const EdgeInsets.only(left: 8),
             padding:
                 const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(9999),
+              borderRadius: BorderRadius.circular(AppRadius.pill),
               color: palette.inkLine,
             ),
             child: Text(
-              entry.language.toUpperCase(),
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.05,
-                color: palette.ink2,
-              ),
+              languageLabel(entry.language),
+              style: AppTextStyles.label.copyWith(color: palette.ink2),
+            ),
+          ),
+          // Бейдж провайдера (D-05/D-06: нормализация через providerLabel).
+          Container(
+            margin: const EdgeInsets.only(left: AppSpacing.xs, right: 4),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+              color: palette.inkLine,
+            ),
+            child: Text(
+              providerLabel(entry.provider.name),
+              style: AppTextStyles.label.copyWith(color: palette.ink2),
             ),
           ),
           // Звезда ★ — статус избранного, обновляется реактивно (D-03).
@@ -1235,7 +1245,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                     runSpacing: 8,
                     children: _languages
                         .map((lang) => _FilterChip(
-                              label: lang,
+                              // D-06: лейбл отображения через languageLabel, фильтрация — по сырому lang.
+                              label: languageLabel(lang),
                               isActive:
                                   _selectedLanguages.contains(lang),
                               onTap: () {
@@ -1272,7 +1283,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                     runSpacing: 8,
                     children: _providers
                         .map((prov) => _FilterChip(
-                              label: prov,
+                              // D-06: лейбл отображения через providerLabel, фильтрация — по сырому prov.
+                              label: providerLabel(prov),
                               isActive:
                                   _selectedProviders.contains(prov),
                               onTap: () {
