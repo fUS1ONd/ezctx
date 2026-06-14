@@ -8,6 +8,7 @@ import '../../core/providers/history_provider.dart';
 import '../../core/services/clipboard_service.dart';
 import '../../core/utils/label_mappers.dart';
 import '../../features/history/history_entry.dart';
+import '../widgets/format_toggle.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_confirm_dialog.dart';
 import '../widgets/glass_icon_btn.dart';
@@ -42,7 +43,16 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
   /// Mutable-копия записи для optimistic UI (ACT-01, ACT-02, Pitfall 6).
   late HistoryEntry _currentEntry;
 
+  /// true — показывать текст с таймкодами; false — plain. По умолчанию plain (D3).
+  bool _showTimestamps = false;
+
   late ScrollController _scrollController;
+
+  /// Текст для показа/копирования/шеринга в текущем виде (D4, copy/share по виду).
+  String get _displayText =>
+      _showTimestamps && _currentEntry.hasTimestamps
+          ? _currentEntry.timestampedText!
+          : _currentEntry.plainText;
 
   @override
   void initState() {
@@ -85,7 +95,8 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
 
   Future<void> _onCopyTap() async {
     try {
-      await ClipboardService.copyText(_currentEntry.plainText);
+      // Используем текст текущего вида — plain или с таймкодами (D4, copy/share по виду).
+      await ClipboardService.copyText(_displayText);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -96,7 +107,8 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
 
   Future<void> _onShareTap() async {
     try {
-      await Share.share(_currentEntry.plainText);
+      // Шерим текст текущего вида — plain или с таймкодами (D4, copy/share по виду).
+      await Share.share(_displayText);
     } catch (e, st) {
       debugPrint('_onShareTap error: $e\n$st');
       if (!mounted) return;
@@ -227,6 +239,24 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
                           ),
                         ),
 
+                        // ── Переключатель вида — только при наличии меток (D2, D5) ──
+                        if (_currentEntry.hasTimestamps)
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(
+                                AppSpacing.md,
+                                AppSpacing.xs,
+                                AppSpacing.md,
+                                AppSpacing.xs,
+                              ),
+                              child: FormatToggle(
+                                showTimestamps: _showTimestamps,
+                                onChanged: (v) =>
+                                    setState(() => _showTimestamps = v),
+                              ),
+                            ),
+                          ),
+
                         // ── Полный текст расшифровки ────────────────────────────
                         // Нижний отступ увеличен (xxl*2), чтобы текст докручивался
                         // из-под плавающей пилюли _BottomBar.
@@ -239,7 +269,7 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
                           ),
                           sliver: SliverToBoxAdapter(
                             child: _buildHighlightedText(
-                              _currentEntry.plainText,
+                              _displayText,
                               widget.searchTerm,
                               palette,
                             ),

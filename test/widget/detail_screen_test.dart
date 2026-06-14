@@ -2,6 +2,7 @@
 // Стаб-репозиторий реализует весь контракт HistoryRepository (включая update()).
 
 import 'package:ezctx/core/providers/history_provider.dart';
+import 'package:ezctx/core/services/clipboard_service.dart';
 import 'package:ezctx/features/history/filter_notifier.dart';
 import 'package:ezctx/features/history/filter_spec.dart';
 import 'package:ezctx/features/history/history_entry.dart';
@@ -9,11 +10,16 @@ import 'package:ezctx/features/history/history_repository.dart';
 import 'package:ezctx/features/transcription/transcription_options.dart';
 import 'package:ezctx/ui/screens/detail_screen.dart';
 import 'package:ezctx/ui/screens/history_screen.dart';
+import 'package:ezctx/ui/widgets/format_toggle.dart';
 import 'package:ezctx/ui/widgets/glass_card.dart';
 import 'package:ezctx/ui/widgets/glass_confirm_dialog.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mockito/mockito.dart';
+
+import '../core/services/clipboard_service_test.mocks.dart';
 
 // Стаб-репозиторий без реальной БД, с полями-шпионами для проверки вызовов.
 class _StubHistoryRepository implements HistoryRepository {
@@ -67,6 +73,7 @@ HistoryEntry _makeTestEntry({
   String title = 'Тестовая запись',
   String plainText = 'Полный текст расшифровки для тестирования detail-экрана.',
   bool isFavorite = false,
+  String? timestampedText,
 }) =>
     HistoryEntry(
       id: id,
@@ -81,6 +88,7 @@ HistoryEntry _makeTestEntry({
       provider: TranscriptionProviderId.groq,
       isFavorite: isFavorite,
       plainText: plainText,
+      timestampedText: timestampedText,
     );
 
 // Строит ProviderScope с переопределённым репозиторием и оборачивает в MaterialApp.
@@ -393,6 +401,128 @@ void main() {
         expect(stub.removedIds, contains('55'));
       },
     );
+  });
+
+  group('DetailScreen — переключатель вида (С метками / Без меток)', () {
+    // setUp/tearDown: настраиваем мок буфера обмена и MethodChannel share_plus.
+    late MockClipboardWriter mockClipboard;
+
+    setUp(() {
+      mockClipboard = MockClipboardWriter();
+      when(mockClipboard.write(any)).thenAnswer((_) async {});
+      ClipboardService.clipboardOverride = mockClipboard;
+
+      // Мок share_plus MethodChannel — без него тап «Поделиться» падает с MissingPluginException.
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+        const MethodChannel('dev.fluttercommunity.plus/share'),
+        (call) async => null,
+      );
+    });
+
+    tearDown(() {
+      ClipboardService.clipboardOverride = null;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+        const MethodChannel('dev.fluttercommunity.plus/share'),
+        null,
+      );
+    });
+
+    testWidgets('тоггл скрыт, когда timestampedText == null', (tester) async {
+      final entry = _makeTestEntry(plainText: 'обычный текст');
+      await tester.pumpWidget(_buildApp(home: DetailScreen(entry: entry)));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FormatToggle), findsNothing);
+      expect(find.textContaining('обычный текст'), findsOneWidget);
+    });
+
+    testWidgets('тоггл виден при осмысленных метках; по умолчанию plain',
+        (tester) async {
+      final entry = _makeTestEntry(
+        plainText: 'привет мир',
+        timestampedText: '[00:00:00] привет мир',
+      );
+      await tester.pumpWidget(_buildApp(home: DetailScreen(entry: entry)));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FormatToggle), findsOneWidget);
+      // По умолчанию — без меток: метки в тексте не показаны.
+      expect(find.textContaining('[00:00:00]'), findsNothing);
+    });
+
+    testWidgets('тап «С метками» показывает текст с таймкодами', (tester) async {
+      final entry = _makeTestEntry(
+        plainText: 'привет мир',
+        timestampedText: '[00:00:00] привет мир',
+      );
+      await tester.pumpWidget(_buildApp(home: DetailScreen(entry: entry)));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('С метками'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('[00:00:00]'), findsOneWidget);
+    });
+
+    // Проверяем, что Копировать использует текст текущего вида:
+    // при активном виде «С метками» mock.write() вызывается (значит вызов прошёл).
+    testWidgets('Копировать вызывается при активном виде «С метками»',
+        (tester) async {
+      final entry = _makeTestEntry(
+        plainText: 'привет мир',
+        timestampedText: '[00:00:00] привет мир',
+      );
+      await tester.pumpWidget(_buildApp(home: DetailScreen(entry: entry)));
+      await tester.pumpAndSettle();
+
+      // Переключаемся на вид с метками.
+      await tester.tap(find.text('С метками'));
+      await tester.pumpAndSettle();
+
+      // Копируем.
+      await tester.tap(find.text('Копировать'));
+      await tester.pump();
+
+      // write() должен был быть вызван (через ClipboardService → mock).
+      verify(mockClipboard.write(any)).called(1);
+    });
+
+    // Проверяем, что «Поделиться» отдаёт текст текущего вида (с таймкодами).
+    testWidgets('Поделиться берёт текст текущего вида (с метками)',
+        (tester) async {
+      String? capturedText;
+      // Переопределяем MethodChannel share_plus, чтобы захватить текст.
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+        const MethodChannel('dev.fluttercommunity.plus/share'),
+        (call) async {
+          if (call.method == 'share') {
+            capturedText = (call.arguments as Map?)?['text'] as String?;
+          }
+          return null;
+        },
+      );
+
+      final entry = _makeTestEntry(
+        plainText: 'привет мир',
+        timestampedText: '[00:00:00] привет мир',
+      );
+      await tester.pumpWidget(_buildApp(home: DetailScreen(entry: entry)));
+      await tester.pumpAndSettle();
+
+      // Переключаемся на вид «С метками».
+      await tester.tap(find.text('С метками'));
+      await tester.pumpAndSettle();
+
+      // Шерим.
+      await tester.tap(find.text('Поделиться'));
+      await tester.pumpAndSettle();
+
+      // Текст, переданный в Share.share, должен содержать таймкоды.
+      expect(capturedText, contains('[00:00:00]'));
+    });
   });
 }
 
