@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../core/providers/history_provider.dart';
 import '../../core/services/clipboard_service.dart';
+import '../../core/utils/label_mappers.dart';
 
 import '../../core/constants/design_tokens.dart';
 import '../../features/history/history_entry.dart';
@@ -144,7 +145,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
           title: _fileNameWithoutExtension(_args!.file.name),
           sizeBytes: _args!.file.sizeBytes,
           durationSec: _args!.result.duration,
-          language: _args!.result.language,
+          language: languageLabel(_args!.result.language),
           provider: _args!.options.model.provider, // D-08: провайдер из ResultArgs.options
           isFavorite: false, // D-09
           createdAt: clock.now(),
