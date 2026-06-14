@@ -14,6 +14,10 @@ void main() {
       expect(languageLabel('zh-TW'), 'ZH');
     });
 
+    test('BCP-47 нижний регистр с регионом → uppercase', () {
+      expect(languageLabel('en-us'), 'EN');
+    });
+
     test('пустая строка → ?', () {
       expect(languageLabel(''), '?');
     });

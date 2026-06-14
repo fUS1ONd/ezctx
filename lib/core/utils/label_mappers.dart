@@ -6,7 +6,7 @@ import '../../features/transcription/transcription_options.dart';
 String languageLabel(String raw) {
   if (raw.isEmpty || raw == 'unknown') return '?';
   final code = raw.split('-').first;
-  if (code.length != 2) return '?';
+  if (code.length != 2) return '?'; // отклоняем ISO 639-2 трёхбуквенные коды
   return code.toUpperCase();
 }
 
