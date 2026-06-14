@@ -8,9 +8,11 @@ import '../../core/constants/app_constants.dart';
 import '../../core/constants/design_tokens.dart';
 import '../../core/providers/history_provider.dart';
 import '../../core/services/clipboard_service.dart';
+import '../../core/utils/label_mappers.dart';
 import '../../features/history/filter_notifier.dart';
 import '../../features/history/filter_spec.dart';
 import '../../features/history/history_entry.dart';
+import '../../features/transcription/transcription_options.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_confirm_dialog.dart';
 import '../widgets/glass_dropdown_menu.dart';
@@ -713,7 +715,7 @@ class _HistoryTile extends StatelessWidget {
               color: palette.inkLine,
             ),
             child: Text(
-              entry.language.toUpperCase(),
+              languageLabel(entry.language),
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
@@ -1053,7 +1055,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                     runSpacing: 8,
                     children: _languages
                         .map((lang) => _FilterChip(
-                              label: lang,
+                              label: languageLabel(lang),
                               isActive:
                                   _selectedLanguages.contains(lang),
                               onTap: () {
@@ -1090,7 +1092,13 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                     runSpacing: 8,
                     children: _providers
                         .map((prov) => _FilterChip(
-                              label: prov,
+                              label: prov == TranscriptionProviderId.groq.name
+                                  ? providerLabel(TranscriptionProviderId.groq)
+                                  : prov ==
+                                          TranscriptionProviderId.deepgram.name
+                                      ? providerLabel(
+                                          TranscriptionProviderId.deepgram)
+                                      : prov,
                               isActive:
                                   _selectedProviders.contains(prov),
                               onTap: () {
