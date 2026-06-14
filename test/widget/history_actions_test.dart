@@ -10,6 +10,7 @@ import 'package:ezctx/features/history/history_repository.dart';
 import 'package:ezctx/features/transcription/transcription_options.dart';
 import 'package:ezctx/ui/screens/history_screen.dart';
 import 'package:ezctx/ui/widgets/glass_confirm_dialog.dart';
+import 'package:ezctx/ui/widgets/glass_dropdown_menu.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -207,10 +208,10 @@ void main() {
         await tester.pumpWidget(_buildApp(stub: stub, entries: [entry]));
         await tester.pumpAndSettle();
 
-        // Открываем overflow-меню (PopupMenuButton → три точки или значок).
-        final overflowBtn = find.byType(PopupMenuButton<String>);
-        expect(overflowBtn, findsOneWidget);
-        await tester.tap(overflowBtn);
+        // Открываем стеклянный dropdown.
+        final dropdownBtn = find.byType(GlassDropdownMenu);
+        expect(dropdownBtn, findsOneWidget);
+        await tester.tap(dropdownBtn);
         await tester.pumpAndSettle();
 
         // Нажимаем «Очистить историю».

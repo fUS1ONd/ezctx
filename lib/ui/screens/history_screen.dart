@@ -13,6 +13,7 @@ import '../../features/history/filter_spec.dart';
 import '../../features/history/history_entry.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_confirm_dialog.dart';
+import '../widgets/glass_dropdown_menu.dart';
 import '../widgets/gradient_background.dart';
 import '../widgets/long_press_bottom_sheet.dart';
 import '../widgets/primary_button.dart';
@@ -243,17 +244,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                           color: palette.ink1, fontSize: 30),
                     ),
                     const Spacer(),
-                    // Overflow-меню: «Очистить историю» (D-07 Claude's Discretion).
-                    PopupMenuButton<String>(
-                      icon: Icon(Icons.more_vert, color: palette.ink2),
-                      tooltip: 'Дополнительно',
-                      onSelected: (value) {
-                        if (value == 'clear') _onClearAll();
-                      },
-                      itemBuilder: (_) => [
-                        const PopupMenuItem<String>(
-                          value: 'clear',
-                          child: Text('Очистить историю'),
+                    // Стеклянный dropdown: «Очистить историю» (D-07).
+                    GlassDropdownMenu(
+                      items: [
+                        GlassDropdownItem(
+                          label: 'Очистить историю',
+                          onTap: _onClearAll,
                         ),
                       ],
                     ),
