@@ -18,6 +18,25 @@ void main() {
       expect(languageLabel('en-us'), 'EN');
     });
 
+    test('полное название языка Groq Whisper → ISO uppercase', () {
+      expect(languageLabel('russian'), 'RU');
+      expect(languageLabel('english'), 'EN');
+      expect(languageLabel('german'), 'DE');
+      expect(languageLabel('ukrainian'), 'UK');
+      expect(languageLabel('chinese'), 'ZH');
+      expect(languageLabel('spanish'), 'ES');
+    });
+
+    test('название языка в смешанном регистре → ISO uppercase', () {
+      expect(languageLabel('Russian'), 'RU');
+      expect(languageLabel('ENGLISH'), 'EN');
+    });
+
+    test('алиас Whisper (mandarin/castilian) → ISO uppercase', () {
+      expect(languageLabel('mandarin'), 'ZH');
+      expect(languageLabel('castilian'), 'ES');
+    });
+
     test('пустая строка → ?', () {
       expect(languageLabel(''), '?');
     });

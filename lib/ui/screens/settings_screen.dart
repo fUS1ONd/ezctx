@@ -17,6 +17,7 @@ import '../../core/constants/design_tokens.dart';
 import '../../core/providers/repository_providers.dart';
 import '../../core/providers/service_providers.dart';
 import '../../core/providers/theme_provider.dart';
+import '../../core/utils/label_mappers.dart';
 import '../../features/transcription/transcription_options.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/gradient_background.dart';
@@ -125,10 +126,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     final liveCount = activePool.aliveKeyCount;
                     return _StatusCard(
                       modelLabel: _modelLabel(_options.model),
-                      providerLabel: _options.model.provider ==
-                              TranscriptionProviderId.deepgram
-                          ? 'Deepgram'
-                          : 'Groq',
+                      providerLabel: providerLabel(_options.model.provider),
                       keyCount: liveCount,
                     );
                   },
