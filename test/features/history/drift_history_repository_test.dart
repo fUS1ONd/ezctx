@@ -1,6 +1,7 @@
 import 'package:drift/native.dart';
 import 'package:ezctx/core/database/app_database.dart';
 import 'package:ezctx/features/history/drift_history_repository.dart';
+import 'package:ezctx/features/history/filter_spec.dart';
 import 'package:ezctx/features/history/history_entry.dart';
 import 'package:ezctx/features/transcription/transcription_options.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -17,6 +18,7 @@ HistoryEntry _makeEntry({
   String plainPath = '/data/transcripts/lecture.txt',
   String timestampedPath = '/data/transcripts/lecture_ts.txt',
   String plainText = 'Текст лекции для теста.',
+  String? timestampedText,
   DateTime? createdAt,
 }) =>
     HistoryEntry(
@@ -32,6 +34,7 @@ HistoryEntry _makeEntry({
       plainPath: plainPath,
       timestampedPath: timestampedPath,
       plainText: plainText,
+      timestampedText: timestampedText,
     );
 
 void main() {
@@ -265,6 +268,38 @@ void main() {
       await repo.clear();
       final entries = await repo.list();
       expect(entries, isEmpty);
+    });
+  });
+
+  // Проверка round-trip поля timestampedText через list() и watchSearch().
+  group('timestampedText round-trip', () {
+    test('add() с timestampedText → list() возвращает его', () async {
+      await repo.add(_makeEntry(
+        plainText: 'привет мир',
+        timestampedText: '[00:00:00] привет мир',
+      ));
+      final entries = await repo.list();
+      expect(entries.first.timestampedText, equals('[00:00:00] привет мир'));
+      expect(entries.first.hasTimestamps, isTrue);
+    });
+
+    test('add() без timestampedText → null после list()', () async {
+      await repo.add(_makeEntry(timestampedText: null));
+      final entries = await repo.list();
+      expect(entries.first.timestampedText, isNull);
+      expect(entries.first.hasTimestamps, isFalse);
+    });
+
+    test('watchSearch возвращает timestampedText', () async {
+      await repo.add(_makeEntry(
+        plainText: 'уникум',
+        timestampedText: '[00:00:01] уникум',
+      ));
+      final results = await repo
+          .watchSearch(const FilterSpec(searchTerm: 'уникум'))
+          .first;
+      expect(results, isNotEmpty);
+      expect(results.first.timestampedText, equals('[00:00:01] уникум'));
     });
   });
 }

@@ -60,6 +60,8 @@ class DriftHistoryRepository implements HistoryRepository {
           plainPath: entry.plainPath,
           timestampedPath: entry.timestampedPath,
           plainText: entry.plainText,
+          // Nullable-колонка: оборачиваем в Value() чтобы drift записал null явно.
+          timestampedText: Value(entry.timestampedText),
         ),
       );
 
@@ -109,7 +111,7 @@ class DriftHistoryRepository implements HistoryRepository {
       sql.write(
         'SELECT t.id, t.title, t.file_name, t.size_bytes, t.duration_sec, '
         't.language, t.provider, t.is_favorite, t.created_at, '
-        't.plain_path, t.timestamped_path, t.plain_text, '
+        't.plain_path, t.timestamped_path, t.plain_text, t.timestamped_text, '
         // CR-06: маркеры \x02/\x03 (STX/ETX) — не встречаются в тексте расшифровок,
         // исключают ложную подсветку натуральных «» из plainText.
         "snippet(transcripts_fts, 0, '\x02', '\x03', '…', 10) AS snippet "
@@ -211,6 +213,8 @@ class DriftHistoryRepository implements HistoryRepository {
         plainPath: row.read<String>('plain_path'),
         timestampedPath: row.read<String>('timestamped_path'),
         plainText: row.read<String>('plain_text'),
+        // Читаем nullable-колонку timestamped_text (null для старых записей).
+        timestampedText: row.readNullable<String>('timestamped_text'),
         // null при пустом searchTerm (обычный browse); маркеры «» при поиске (D-02).
         snippet: row.readNullable<String>('snippet'),
       );
@@ -254,5 +258,7 @@ class DriftHistoryRepository implements HistoryRepository {
         plainPath: row.plainPath,
         timestampedPath: row.timestampedPath,
         plainText: row.plainText,
+        // Читаем nullable-колонку из drift row (null для старых записей без таймкодов).
+        timestampedText: row.timestampedText,
       );
 }
