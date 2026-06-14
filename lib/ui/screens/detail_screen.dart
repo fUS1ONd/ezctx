@@ -6,6 +6,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/constants/design_tokens.dart';
 import '../../core/providers/history_provider.dart';
 import '../../core/services/clipboard_service.dart';
+import '../../core/utils/label_mappers.dart';
 import '../../features/history/history_entry.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_confirm_dialog.dart';
@@ -471,9 +472,9 @@ class _MetadataStrip extends StatelessWidget {
     final chips = [
       (Icons.calendar_today_outlined, entry.relativeDate(now)),
       (Icons.timer_outlined, entry.durationFormatted),
-      (Icons.mic_none_outlined, entry.provider.name.toUpperCase()),
+      (Icons.mic_none_outlined, providerLabel(entry.provider)),
       (Icons.folder_outlined, entry.sizeFormatted),
-      (Icons.language_outlined, entry.language.isEmpty ? '—' : entry.language),
+      (Icons.language_outlined, languageLabel(entry.language)),
     ];
 
     return GlassCard(
