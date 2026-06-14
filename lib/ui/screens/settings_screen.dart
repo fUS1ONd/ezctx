@@ -115,80 +115,77 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
 
-              // Мультипровайдерная реактивная StatusCard (ListenableBuilder, D-11..D-13)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: ListenableBuilder(
-                  // key: пересоздаём виджет при смене провайдера (Pitfall 3)
-                  key: ValueKey(_options.model.provider),
-                  listenable: activePool,
-                  builder: (context, _) {
-                    final liveCount = activePool.aliveKeyCount;
-                    return _StatusCard(
-                      modelLabel: _modelLabel(_options.model),
-                      providerLabel: providerLabel(_options.model.provider),
-                      keyCount: liveCount,
-                    );
-                  },
-                ),
-              ),
+              // StatusCard + секция «Подключение» в одном ListenableBuilder —
+              // чтобы detail строки «API-ключи» обновлялся реактивно при addKey/removeKey.
+              // key: пересоздаём при смене провайдера (Pitfall 3).
+              ListenableBuilder(
+                key: ValueKey(_options.model.provider),
+                listenable: activePool,
+                builder: (context, _) {
+                  final liveCount = activePool.aliveKeyCount;
+                  final isDeepgram = _options.model.provider ==
+                      TranscriptionProviderId.deepgram;
+                  return Column(children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                      child: _StatusCard(
+                        modelLabel: _modelLabel(_options.model),
+                        providerLabel: providerLabel(_options.model.provider),
+                        keyCount: liveCount,
+                      ),
+                    ),
 
-              // ── Подключение ──
-              const _SectionTitle('Подключение'),
-              _Group(children: [
-                _Row(
-                  icon: _IconKind.key,
-                  iconGradient: const [Color(0xFFFF8A4D), Color(0xFFFF5B3A)],
-                  title: 'API-ключи',
-                  // Показываем счётчик ключей активного провайдера
-                  detail: pluralizeKeys(activePool.aliveKeyCount),
-                  onTap: () {
-                    // D-09: открываем вкладку активного провайдера (аргумент для app.dart)
-                    final tab = _options.model.provider ==
-                            TranscriptionProviderId.deepgram
-                        ? 'deepgram'
-                        : 'groq';
-                    Navigator.pushNamed(
-                      context,
-                      AppConstants.routeApiKeys,
-                      arguments: tab,
-                    );
-                  },
-                ),
-                _Row(
-                  icon: _IconKind.wave,
-                  iconGradient: const [Color(0xFF9AA6FF), Color(0xFF6A4ADF)],
-                  title: 'Модель',
-                  detail: _modelLabel(_options.model),
-                  onTap: () => _pickOne<TranscriptionModel>(
-                    title: 'Модель',
-                    // D-14: nova3 включена — DeepgramProvider реализован в Phase 10
-                    options: TranscriptionModel.values,
-                    value: _options.model,
-                    label: _modelLabel,
-                    onChanged: (m) async {
-                      await _saveOptions(_options.copyWith(model: m));
-                      // D-05, D-06: при выборе модели без ключей её провайдера → диалог
-                      await _promptIfNoKeys(m);
-                    },
-                  ),
-                ),
-                _Row(
-                  icon: _IconKind.globe,
-                  iconGradient: const [Color(0xFF5DD1B5), Color(0xFF2DB585)],
-                  title: 'Язык распознавания',
-                  detail: _languageLabel(_options.language),
-                  isLast: true,
-                  onTap: () => _pickOne<TranscriptionLanguage>(
-                    title: 'Язык',
-                    options: TranscriptionLanguage.values,
-                    value: _options.language,
-                    label: _languageLabel,
-                    onChanged: (l) =>
-                        _saveOptions(_options.copyWith(language: l)),
-                  ),
-                ),
-              ]),
+                    // ── Подключение ──
+                    const _SectionTitle('Подключение'),
+                    _Group(children: [
+                      _Row(
+                        icon: _IconKind.key,
+                        iconGradient: const [Color(0xFFFF8A4D), Color(0xFFFF5B3A)],
+                        title: 'API-ключи',
+                        detail: pluralizeKeys(liveCount),
+                        onTap: () {
+                          Navigator.pushNamed(
+                            context,
+                            AppConstants.routeApiKeys,
+                            arguments: isDeepgram ? 'deepgram' : 'groq',
+                          );
+                        },
+                      ),
+                      _Row(
+                        icon: _IconKind.wave,
+                        iconGradient: const [Color(0xFF9AA6FF), Color(0xFF6A4ADF)],
+                        title: 'Модель',
+                        detail: _modelLabel(_options.model),
+                        onTap: () => _pickOne<TranscriptionModel>(
+                          title: 'Модель',
+                          options: TranscriptionModel.values,
+                          value: _options.model,
+                          label: _modelLabel,
+                          onChanged: (m) async {
+                            await _saveOptions(_options.copyWith(model: m));
+                            await _promptIfNoKeys(m);
+                          },
+                        ),
+                      ),
+                      _Row(
+                        icon: _IconKind.globe,
+                        iconGradient: const [Color(0xFF5DD1B5), Color(0xFF2DB585)],
+                        title: 'Язык распознавания',
+                        detail: _languageLabel(_options.language),
+                        isLast: true,
+                        onTap: () => _pickOne<TranscriptionLanguage>(
+                          title: 'Язык',
+                          options: TranscriptionLanguage.values,
+                          value: _options.language,
+                          label: _languageLabel,
+                          onChanged: (l) =>
+                              _saveOptions(_options.copyWith(language: l)),
+                        ),
+                      ),
+                    ]),
+                  ]);
+                },
+              ),
 
               // ── Приложение ──
               const _SectionTitle('Приложение'),

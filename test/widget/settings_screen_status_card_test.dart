@@ -144,4 +144,40 @@ void main() {
       },
     );
   });
+
+  group('SettingsScreen _Row «API-ключи» — реактивность счётчика', () {
+    testWidgets(
+      'счётчик обновляется без setState когда pool.addKey вызывается после рендера',
+      (tester) async {
+        _setPhoneViewport(tester);
+
+        // Пустой Groq-пул — счётчик «Нет ключей»
+        final groqPool = KeyPool(initialKeys: const []);
+
+        await tester.pumpWidget(
+          _wrap(
+            groqPool: groqPool,
+            deepgramPool: KeyPool(initialKeys: const []),
+            opts: const TranscriptionOptions(
+              model: TranscriptionModel.whisperLargeV3,
+              language: TranscriptionLanguage.auto,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Строка «API-ключи» показывает «Нет ключей» (точное совпадение,
+        // в отличие от StatusCard которая показывает «Groq · Нет ключей»)
+        expect(find.text('Нет ключей'), findsOneWidget);
+
+        // Имитируем добавление ключа (как это делает ApiKeysScreen)
+        groqPool.addKey('gsk_testkey_0000000001');
+        await tester.pump();
+
+        // Строка «API-ключи» должна обновиться реактивно без setState
+        expect(find.text('Нет ключей'), findsNothing);
+        expect(find.text('1 ключ'), findsOneWidget);
+      },
+    );
+  });
 }
