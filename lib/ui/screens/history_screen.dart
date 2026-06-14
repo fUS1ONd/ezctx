@@ -605,20 +605,25 @@ class _HistoryList extends StatelessWidget {
             // и ctx.mounted == false → SnackBar не показался бы (CR-03, T-03-08).
             final repo = widgetRef.read(historyRepositoryProvider);
             final messenger = ScaffoldMessenger.of(ctx);
-            final badColor = ctx.palette.glassBgDeep;
+            final errorBg = ctx.palette.bad;
             try {
               await repo.remove(entry.id);
-              messenger.showSnackBar(
-                SnackBar(
-                  content: const Text('Запись удалена'),
-                  backgroundColor: badColor,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
             } catch (e) {
               // При ошибке drift восстановит запись через watch() (Pitfall 1, T-03-07).
               messenger.showSnackBar(
-                const SnackBar(content: Text('Не удалось удалить')),
+                SnackBar(
+                  content: const Text(
+                    'Не удалось удалить',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  backgroundColor: errorBg,
+                  behavior: SnackBarBehavior.floating,
+                  shape: const StadiumBorder(),
+                  width: 210,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 20, vertical: 14),
+                ),
               );
             }
           },
