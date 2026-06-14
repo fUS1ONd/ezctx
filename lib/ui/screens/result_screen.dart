@@ -162,6 +162,8 @@ class ResultScreenState extends ConsumerState<ResultScreen> {
           plainPath: paths?.plainPath ?? '',
           timestampedPath: paths?.timestampedPath ?? '',
           plainText: _args!.result.plainText,
+          // Текст с таймкодами для переключателя вида в Истории (D1).
+          timestampedText: _args!.result.text,
         ));
       } catch (e, st) {
         debugPrint('_saveTranscripts history save error: $e\n$st');

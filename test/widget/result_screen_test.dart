@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:ezctx/core/providers/history_provider.dart';
 import 'package:ezctx/core/services/clipboard_service.dart';
 import 'package:ezctx/features/history/history_entry.dart';
@@ -11,11 +13,30 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/mockito.dart';
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 import '../core/services/clipboard_service_test.mocks.dart';
 
+// Заглушка path_provider — нужна для тестов, которые ждут autosaveFuture
+// (TranscriptWriter запрашивает каталог через path_provider).
+class _FakePathProvider extends PathProviderPlatform
+    with MockPlatformInterfaceMixin {
+  _FakePathProvider(this.documents);
+  final String documents;
+
+  @override
+  Future<String?> getApplicationDocumentsPath() async => documents;
+
+  @override
+  Future<String?> getExternalStoragePath() async => null;
+}
+
 // Минимальная заглушка репозитория — предотвращает обращение к реальной БД.
+// Записывает добавленные записи в [added] для проверки в тестах.
 class _StubHistoryRepository implements HistoryRepository {
+  final List<HistoryEntry> added = [];
+
   @override
   Stream<List<HistoryEntry>> watchAll() => const Stream.empty();
 
@@ -23,7 +44,9 @@ class _StubHistoryRepository implements HistoryRepository {
   Future<List<HistoryEntry>> list() async => [];
 
   @override
-  Future<void> add(HistoryEntry entry) async {}
+  Future<void> add(HistoryEntry entry) async {
+    added.add(entry);
+  }
 
   @override
   Future<void> remove(String id) async {}
@@ -89,6 +112,24 @@ void main() {
           words: [],
         ),
         // options: использует дефолт TranscriptionOptions.defaults() — обратная совместимость
+      );
+
+  // Фабрика для теста автозаписи timestampedText — отдельная, чтобы не ломать
+  // существующие тесты (у них transcriptText без таймкодов, вид plain по умолчанию).
+  ResultArgs makeArgsWithTimestamps() => const ResultArgs(
+        file: SelectedAudioFile(
+          path: '/tmp/test.mp3',
+          name: 'test.mp3',
+          sizeBytes: 1024 * 1024,
+          extension: 'mp3',
+        ),
+        result: TranscriptionResult(
+          text: '[00:00:00] Это тестовая расшифровка лекции для проверки буфера.',
+          plainText: 'Это тестовая расшифровка лекции для проверки буфера.',
+          language: 'russian',
+          duration: 4.2,
+          words: [],
+        ),
       );
 
   // ResultScreen теперь ConsumerStatefulWidget — нужен ProviderScope.
@@ -180,5 +221,48 @@ void main() {
 
     // Ошибок быть не должно; Share.share должен был вызваться с текстом расшифровки.
     expect(capturedText, equals(transcriptText));
+  });
+
+  testWidgets('Автозапись в историю сохраняет timestampedText (текст с метками)',
+      (tester) async {
+    final stub = _StubHistoryRepository();
+    final originalPathProvider = PathProviderPlatform.instance;
+
+    // Всё реальное I/O (createTemp, delete) должно быть внутри runAsync —
+    // за пределами FakeAsync-зоны testWidgets; иначе Dart I/O паркует навсегда.
+    await tester.runAsync(() async {
+      final tmpDir =
+          await Directory.systemTemp.createTemp('ezctx_ts_text_test_');
+      PathProviderPlatform.instance = _FakePathProvider(tmpDir.path);
+
+      await tester.pumpWidget(ProviderScope(
+        overrides: [historyRepositoryProvider.overrideWithValue(stub)],
+        child: MaterialApp(
+          onGenerateRoute: (settings) => MaterialPageRoute(
+            builder: (_) => const ResultScreen(),
+            settings: RouteSettings(arguments: makeArgsWithTimestamps()),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      // Ждём завершения автозаписи через тестовый хук autosaveFuture.
+      final state =
+          tester.state<ResultScreenState>(find.byType(ResultScreen));
+      await state.autosaveFuture;
+      await tester.pump();
+
+      await tmpDir.delete(recursive: true);
+    });
+
+    // Восстанавливаем глобальный path_provider после runAsync.
+    PathProviderPlatform.instance = originalPathProvider;
+
+    expect(stub.added, hasLength(1));
+    expect(
+      stub.added.first.timestampedText,
+      equals('[00:00:00] Это тестовая расшифровка лекции для проверки буфера.'),
+    );
+    expect(stub.added.first.hasTimestamps, isTrue);
   });
 }
