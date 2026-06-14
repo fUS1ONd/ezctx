@@ -1,14 +1,48 @@
+import 'package:ezctx/core/providers/history_provider.dart';
 import 'package:ezctx/core/services/clipboard_service.dart';
+import 'package:ezctx/features/history/history_entry.dart';
+import 'package:ezctx/features/history/history_repository.dart';
 import 'package:ezctx/features/transcription/result_args.dart';
 import 'package:ezctx/features/transcription/selected_audio_file.dart';
 import 'package:ezctx/features/transcription/transcription_result.dart';
 import 'package:ezctx/ui/screens/result_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/mockito.dart';
 
 import '../core/services/clipboard_service_test.mocks.dart';
+
+// Минимальная заглушка репозитория — предотвращает обращение к реальной БД.
+class _StubHistoryRepository implements HistoryRepository {
+  @override
+  Stream<List<HistoryEntry>> watchAll() => const Stream.empty();
+
+  @override
+  Future<List<HistoryEntry>> list() async => [];
+
+  @override
+  Future<void> add(HistoryEntry entry) async {}
+
+  @override
+  Future<void> remove(String id) async {}
+
+  @override
+  Future<void> clear() async {}
+
+  @override
+  Stream<List<HistoryEntry>> watchSearch(_) => const Stream.empty();
+
+  @override
+  Future<List<String>> distinctLanguages() async => [];
+
+  @override
+  Future<List<String>> distinctProviders() async => [];
+
+  @override
+  Future<void> update(HistoryEntry entry) async {}
+}
 
 void main() {
   const transcriptText = 'Это тестовая расшифровка лекции для проверки буфера.';
@@ -54,12 +88,20 @@ void main() {
           duration: 4.2,
           words: [],
         ),
+        // options: использует дефолт TranscriptionOptions.defaults() — обратная совместимость
       );
 
-  Widget buildScreen() => MaterialApp(
-        onGenerateRoute: (settings) => MaterialPageRoute(
-          builder: (_) => const ResultScreen(),
-          settings: RouteSettings(arguments: makeArgs()),
+  // ResultScreen теперь ConsumerStatefulWidget — нужен ProviderScope.
+  // Переопределяем historyRepositoryProvider на заглушку, чтобы не лезть в реальную БД.
+  Widget buildScreen() => ProviderScope(
+        overrides: [
+          historyRepositoryProvider.overrideWithValue(_StubHistoryRepository()),
+        ],
+        child: MaterialApp(
+          onGenerateRoute: (settings) => MaterialPageRoute(
+            builder: (_) => const ResultScreen(),
+            settings: RouteSettings(arguments: makeArgs()),
+          ),
         ),
       );
 
