@@ -17,3 +17,13 @@ String providerLabel(TranscriptionProviderId provider) {
     TranscriptionProviderId.deepgram => 'Deepgram',
   };
 }
+
+/// Возвращает читаемое название провайдера по его строковому имени из БД.
+/// Graceful fallback: возвращает само имя если провайдер не распознан.
+String providerLabelFromName(String name) {
+  return switch (name) {
+    'groq'     => 'Groq',
+    'deepgram' => 'Deepgram',
+    _          => name,
+  };
+}

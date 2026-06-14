@@ -47,4 +47,18 @@ void main() {
       expect(providerLabel(TranscriptionProviderId.deepgram), 'Deepgram');
     });
   });
+
+  group('providerLabelFromName', () {
+    test('groq → Groq', () {
+      expect(providerLabelFromName('groq'), 'Groq');
+    });
+
+    test('deepgram → Deepgram', () {
+      expect(providerLabelFromName('deepgram'), 'Deepgram');
+    });
+
+    test('неизвестный → сырое значение', () {
+      expect(providerLabelFromName('assemblyai'), 'assemblyai');
+    });
+  });
 }

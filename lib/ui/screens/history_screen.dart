@@ -12,7 +12,6 @@ import '../../core/utils/label_mappers.dart';
 import '../../features/history/filter_notifier.dart';
 import '../../features/history/filter_spec.dart';
 import '../../features/history/history_entry.dart';
-import '../../features/transcription/transcription_options.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_confirm_dialog.dart';
 import '../widgets/glass_dropdown_menu.dart';
@@ -1092,13 +1091,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                     runSpacing: 8,
                     children: _providers
                         .map((prov) => _FilterChip(
-                              label: prov == TranscriptionProviderId.groq.name
-                                  ? providerLabel(TranscriptionProviderId.groq)
-                                  : prov ==
-                                          TranscriptionProviderId.deepgram.name
-                                      ? providerLabel(
-                                          TranscriptionProviderId.deepgram)
-                                      : prov,
+                              label: providerLabelFromName(prov),
                               isActive:
                                   _selectedProviders.contains(prov),
                               onTap: () {
