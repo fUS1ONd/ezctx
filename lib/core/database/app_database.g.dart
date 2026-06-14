@@ -87,6 +87,12 @@ class $TranscriptsTable extends Transcripts
   late final GeneratedColumn<String> plainText = GeneratedColumn<String>(
       'plain_text', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _timestampedTextMeta =
+      const VerificationMeta('timestampedText');
+  @override
+  late final GeneratedColumn<String> timestampedText = GeneratedColumn<String>(
+      'timestamped_text', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -100,7 +106,8 @@ class $TranscriptsTable extends Transcripts
         createdAt,
         plainPath,
         timestampedPath,
-        plainText
+        plainText,
+        timestampedText
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -185,6 +192,12 @@ class $TranscriptsTable extends Transcripts
     } else if (isInserting) {
       context.missing(_plainTextMeta);
     }
+    if (data.containsKey('timestamped_text')) {
+      context.handle(
+          _timestampedTextMeta,
+          timestampedText.isAcceptableOrUnknown(
+              data['timestamped_text']!, _timestampedTextMeta));
+    }
     return context;
   }
 
@@ -218,6 +231,8 @@ class $TranscriptsTable extends Transcripts
           DriftSqlType.string, data['${effectivePrefix}timestamped_path'])!,
       plainText: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}plain_text'])!,
+      timestampedText: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}timestamped_text']),
     );
   }
 
@@ -240,6 +255,7 @@ class Transcript extends DataClass implements Insertable<Transcript> {
   final String plainPath;
   final String timestampedPath;
   final String plainText;
+  final String? timestampedText;
   const Transcript(
       {required this.id,
       required this.fileName,
@@ -252,7 +268,8 @@ class Transcript extends DataClass implements Insertable<Transcript> {
       required this.createdAt,
       required this.plainPath,
       required this.timestampedPath,
-      required this.plainText});
+      required this.plainText,
+      this.timestampedText});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -268,6 +285,9 @@ class Transcript extends DataClass implements Insertable<Transcript> {
     map['plain_path'] = Variable<String>(plainPath);
     map['timestamped_path'] = Variable<String>(timestampedPath);
     map['plain_text'] = Variable<String>(plainText);
+    if (!nullToAbsent || timestampedText != null) {
+      map['timestamped_text'] = Variable<String>(timestampedText);
+    }
     return map;
   }
 
@@ -285,6 +305,9 @@ class Transcript extends DataClass implements Insertable<Transcript> {
       plainPath: Value(plainPath),
       timestampedPath: Value(timestampedPath),
       plainText: Value(plainText),
+      timestampedText: timestampedText == null && nullToAbsent
+          ? const Value.absent()
+          : Value(timestampedText),
     );
   }
 
@@ -304,6 +327,7 @@ class Transcript extends DataClass implements Insertable<Transcript> {
       plainPath: serializer.fromJson<String>(json['plainPath']),
       timestampedPath: serializer.fromJson<String>(json['timestampedPath']),
       plainText: serializer.fromJson<String>(json['plainText']),
+      timestampedText: serializer.fromJson<String?>(json['timestampedText']),
     );
   }
   @override
@@ -322,6 +346,7 @@ class Transcript extends DataClass implements Insertable<Transcript> {
       'plainPath': serializer.toJson<String>(plainPath),
       'timestampedPath': serializer.toJson<String>(timestampedPath),
       'plainText': serializer.toJson<String>(plainText),
+      'timestampedText': serializer.toJson<String?>(timestampedText),
     };
   }
 
@@ -337,7 +362,8 @@ class Transcript extends DataClass implements Insertable<Transcript> {
           DateTime? createdAt,
           String? plainPath,
           String? timestampedPath,
-          String? plainText}) =>
+          String? plainText,
+          Value<String?> timestampedText = const Value.absent()}) =>
       Transcript(
         id: id ?? this.id,
         fileName: fileName ?? this.fileName,
@@ -351,6 +377,9 @@ class Transcript extends DataClass implements Insertable<Transcript> {
         plainPath: plainPath ?? this.plainPath,
         timestampedPath: timestampedPath ?? this.timestampedPath,
         plainText: plainText ?? this.plainText,
+        timestampedText: timestampedText.present
+            ? timestampedText.value
+            : this.timestampedText,
       );
   Transcript copyWithCompanion(TranscriptsCompanion data) {
     return Transcript(
@@ -370,6 +399,9 @@ class Transcript extends DataClass implements Insertable<Transcript> {
           ? data.timestampedPath.value
           : this.timestampedPath,
       plainText: data.plainText.present ? data.plainText.value : this.plainText,
+      timestampedText: data.timestampedText.present
+          ? data.timestampedText.value
+          : this.timestampedText,
     );
   }
 
@@ -387,7 +419,8 @@ class Transcript extends DataClass implements Insertable<Transcript> {
           ..write('createdAt: $createdAt, ')
           ..write('plainPath: $plainPath, ')
           ..write('timestampedPath: $timestampedPath, ')
-          ..write('plainText: $plainText')
+          ..write('plainText: $plainText, ')
+          ..write('timestampedText: $timestampedText')
           ..write(')'))
         .toString();
   }
@@ -405,7 +438,8 @@ class Transcript extends DataClass implements Insertable<Transcript> {
       createdAt,
       plainPath,
       timestampedPath,
-      plainText);
+      plainText,
+      timestampedText);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -421,7 +455,8 @@ class Transcript extends DataClass implements Insertable<Transcript> {
           other.createdAt == this.createdAt &&
           other.plainPath == this.plainPath &&
           other.timestampedPath == this.timestampedPath &&
-          other.plainText == this.plainText);
+          other.plainText == this.plainText &&
+          other.timestampedText == this.timestampedText);
 }
 
 class TranscriptsCompanion extends UpdateCompanion<Transcript> {
@@ -437,6 +472,7 @@ class TranscriptsCompanion extends UpdateCompanion<Transcript> {
   final Value<String> plainPath;
   final Value<String> timestampedPath;
   final Value<String> plainText;
+  final Value<String?> timestampedText;
   const TranscriptsCompanion({
     this.id = const Value.absent(),
     this.fileName = const Value.absent(),
@@ -450,6 +486,7 @@ class TranscriptsCompanion extends UpdateCompanion<Transcript> {
     this.plainPath = const Value.absent(),
     this.timestampedPath = const Value.absent(),
     this.plainText = const Value.absent(),
+    this.timestampedText = const Value.absent(),
   });
   TranscriptsCompanion.insert({
     this.id = const Value.absent(),
@@ -464,6 +501,7 @@ class TranscriptsCompanion extends UpdateCompanion<Transcript> {
     required String plainPath,
     required String timestampedPath,
     required String plainText,
+    this.timestampedText = const Value.absent(),
   })  : fileName = Value(fileName),
         sizeBytes = Value(sizeBytes),
         durationSec = Value(durationSec),
@@ -487,6 +525,7 @@ class TranscriptsCompanion extends UpdateCompanion<Transcript> {
     Expression<String>? plainPath,
     Expression<String>? timestampedPath,
     Expression<String>? plainText,
+    Expression<String>? timestampedText,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -501,6 +540,7 @@ class TranscriptsCompanion extends UpdateCompanion<Transcript> {
       if (plainPath != null) 'plain_path': plainPath,
       if (timestampedPath != null) 'timestamped_path': timestampedPath,
       if (plainText != null) 'plain_text': plainText,
+      if (timestampedText != null) 'timestamped_text': timestampedText,
     });
   }
 
@@ -516,7 +556,8 @@ class TranscriptsCompanion extends UpdateCompanion<Transcript> {
       Value<DateTime>? createdAt,
       Value<String>? plainPath,
       Value<String>? timestampedPath,
-      Value<String>? plainText}) {
+      Value<String>? plainText,
+      Value<String?>? timestampedText}) {
     return TranscriptsCompanion(
       id: id ?? this.id,
       fileName: fileName ?? this.fileName,
@@ -530,6 +571,7 @@ class TranscriptsCompanion extends UpdateCompanion<Transcript> {
       plainPath: plainPath ?? this.plainPath,
       timestampedPath: timestampedPath ?? this.timestampedPath,
       plainText: plainText ?? this.plainText,
+      timestampedText: timestampedText ?? this.timestampedText,
     );
   }
 
@@ -572,6 +614,9 @@ class TranscriptsCompanion extends UpdateCompanion<Transcript> {
     if (plainText.present) {
       map['plain_text'] = Variable<String>(plainText.value);
     }
+    if (timestampedText.present) {
+      map['timestamped_text'] = Variable<String>(timestampedText.value);
+    }
     return map;
   }
 
@@ -589,7 +634,8 @@ class TranscriptsCompanion extends UpdateCompanion<Transcript> {
           ..write('createdAt: $createdAt, ')
           ..write('plainPath: $plainPath, ')
           ..write('timestampedPath: $timestampedPath, ')
-          ..write('plainText: $plainText')
+          ..write('plainText: $plainText, ')
+          ..write('timestampedText: $timestampedText')
           ..write(')'))
         .toString();
   }
@@ -625,6 +671,7 @@ typedef $$TranscriptsTableCreateCompanionBuilder = TranscriptsCompanion
   required String plainPath,
   required String timestampedPath,
   required String plainText,
+  Value<String?> timestampedText,
 });
 typedef $$TranscriptsTableUpdateCompanionBuilder = TranscriptsCompanion
     Function({
@@ -640,6 +687,7 @@ typedef $$TranscriptsTableUpdateCompanionBuilder = TranscriptsCompanion
   Value<String> plainPath,
   Value<String> timestampedPath,
   Value<String> plainText,
+  Value<String?> timestampedText,
 });
 
 class $$TranscriptsTableFilterComposer
@@ -687,6 +735,10 @@ class $$TranscriptsTableFilterComposer
 
   ColumnFilters<String> get plainText => $composableBuilder(
       column: $table.plainText, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get timestampedText => $composableBuilder(
+      column: $table.timestampedText,
+      builder: (column) => ColumnFilters(column));
 }
 
 class $$TranscriptsTableOrderingComposer
@@ -734,6 +786,10 @@ class $$TranscriptsTableOrderingComposer
 
   ColumnOrderings<String> get plainText => $composableBuilder(
       column: $table.plainText, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get timestampedText => $composableBuilder(
+      column: $table.timestampedText,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$TranscriptsTableAnnotationComposer
@@ -780,6 +836,9 @@ class $$TranscriptsTableAnnotationComposer
 
   GeneratedColumn<String> get plainText =>
       $composableBuilder(column: $table.plainText, builder: (column) => column);
+
+  GeneratedColumn<String> get timestampedText => $composableBuilder(
+      column: $table.timestampedText, builder: (column) => column);
 }
 
 class $$TranscriptsTableTableManager extends RootTableManager<
@@ -817,6 +876,7 @@ class $$TranscriptsTableTableManager extends RootTableManager<
             Value<String> plainPath = const Value.absent(),
             Value<String> timestampedPath = const Value.absent(),
             Value<String> plainText = const Value.absent(),
+            Value<String?> timestampedText = const Value.absent(),
           }) =>
               TranscriptsCompanion(
             id: id,
@@ -831,6 +891,7 @@ class $$TranscriptsTableTableManager extends RootTableManager<
             plainPath: plainPath,
             timestampedPath: timestampedPath,
             plainText: plainText,
+            timestampedText: timestampedText,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -845,6 +906,7 @@ class $$TranscriptsTableTableManager extends RootTableManager<
             required String plainPath,
             required String timestampedPath,
             required String plainText,
+            Value<String?> timestampedText = const Value.absent(),
           }) =>
               TranscriptsCompanion.insert(
             id: id,
@@ -859,6 +921,7 @@ class $$TranscriptsTableTableManager extends RootTableManager<
             plainPath: plainPath,
             timestampedPath: timestampedPath,
             plainText: plainText,
+            timestampedText: timestampedText,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))

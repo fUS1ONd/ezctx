@@ -37,6 +37,10 @@ class Transcripts extends Table {
 
   // Тело plain-текста — источник правды для FTS5 (D-05).
   TextColumn get plainText => text()();
+
+  // Текст с таймкодами `[HH:MM:SS]`. nullable: старые записи (до миграции v3) → NULL.
+  // В FTS не индексируется — поиск только по plain_text.
+  TextColumn get timestampedText => text().nullable()();
 }
 
 @DriftDatabase(tables: [Transcripts])
@@ -44,7 +48,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -57,6 +61,11 @@ class AppDatabase extends _$AppDatabase {
           // Миграция 1→2: добавляем FTS5-индекс с backfill.
           if (from < 2) {
             await _createFts5Tables();
+          }
+          // Миграция 2→3: nullable-колонка с текстом таймкодов (D1).
+          // FTS-триггеры завязаны только на plain_text — addColumn их не ломает.
+          if (from < 3) {
+            await m.addColumn(transcripts, transcripts.timestampedText);
           }
         },
       );
