@@ -19,6 +19,7 @@ class HistoryEntry {
     required this.provider,
     this.isFavorite = false,
     required this.plainText,
+    this.timestampedText,
     this.snippet,
   });
 
@@ -43,6 +44,10 @@ class HistoryEntry {
   // Тело plain-текста расшифровки — источник правды для FTS5 (D-05).
   final String plainText;
 
+  // Тело текста с таймкодами `[HH:MM:SS]`. null для старых записей (до фичи)
+  // или когда таймкодов нет. Не индексируется в FTS (D1).
+  final String? timestampedText;
+
   // Сниппет FTS5 snippet() — присутствует только при активном поиске (BRWS-01).
   // null означает: поиск неактивен или запись не содержит совпадений.
   // Поле не хранится в БД — только в результатах customSelect.
@@ -65,6 +70,7 @@ class HistoryEntry {
     TranscriptionProviderId? provider,
     bool? isFavorite,
     String? plainText,
+    String? timestampedText,
     String? snippet,
   }) {
     return HistoryEntry(
@@ -80,6 +86,7 @@ class HistoryEntry {
       provider: provider ?? this.provider,
       isFavorite: isFavorite ?? this.isFavorite,
       plainText: plainText ?? this.plainText,
+      timestampedText: timestampedText ?? this.timestampedText,
       snippet: snippet ?? this.snippet,
     );
   }
@@ -89,6 +96,13 @@ class HistoryEntry {
     if (sizeBytes < 1024 * 1024) return '${(sizeBytes / 1024).toStringAsFixed(1)} КБ';
     return '${(sizeBytes / 1024 / 1024).toStringAsFixed(1)} МБ';
   }
+
+  /// true, если есть осмысленная версия с таймкодами, отличная от plain (D2).
+  /// Управляет видимостью переключателя «С метками / Без меток».
+  bool get hasTimestamps =>
+      timestampedText != null &&
+      timestampedText!.isNotEmpty &&
+      timestampedText != plainText;
 
   String get durationFormatted {
     final total = durationSec.toInt();
