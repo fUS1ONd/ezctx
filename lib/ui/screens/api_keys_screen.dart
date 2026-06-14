@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -11,6 +9,7 @@ import '../../core/providers/service_providers.dart';
 import '../../features/settings/api_key_repository.dart';
 import '../../features/transcription/key_pool.dart';
 import '../widgets/glass_card.dart';
+import '../widgets/glass_confirm_dialog.dart';
 import '../widgets/glass_icon_btn.dart';
 import '../widgets/glass_tile.dart';
 import '../widgets/gradient_background.dart';
@@ -222,83 +221,13 @@ class _KeysTabContentState extends ConsumerState<_KeysTabContent> {
 
   /// Диалог подтверждения удаления ключа.
   Future<void> _confirmDelete(ApiKeyView key) async {
-    final confirmed = await showGeneralDialog<bool>(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: 'Закрыть',
-      barrierColor: Colors.black.withValues(alpha: 0.45),
-      transitionDuration: const Duration(milliseconds: 260),
-      transitionBuilder: (ctx, anim, _, child) => FadeTransition(
-        opacity: CurvedAnimation(parent: anim, curve: Curves.easeOut),
-        child: child,
-      ),
-      pageBuilder: (ctx, _, __) {
-        final palette = ctx.palette;
-        return Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
-            child: Material(
-              color: Colors.transparent,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(28),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: palette.glassBgDeep,
-                      borderRadius: BorderRadius.circular(28),
-                      border: Border.all(color: palette.glassRim, width: 0.5),
-                      boxShadow: [palette.shadowDeep],
-                    ),
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(
-                          'Удалить ключ?',
-                          style: AppTextStyles.heading.copyWith(color: palette.ink1),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Это действие нельзя отменить.',
-                          style: AppTextStyles.body.copyWith(color: palette.ink2),
-                        ),
-                        const SizedBox(height: 24),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextButton(
-                                onPressed: () => Navigator.pop(ctx, false),
-                                child: Text(
-                                  'Отмена',
-                                  style: AppTextStyles.label.copyWith(color: palette.ink1),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TextButton(
-                                onPressed: () => Navigator.pop(ctx, true),
-                                child: Text(
-                                  'Удалить',
-                                  style: AppTextStyles.label.copyWith(color: palette.bad),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
+    final confirmed = await GlassConfirmDialog.show(
+      context,
+      title: 'Удалить ключ?',
+      body: 'Это действие нельзя отменить.',
+      confirmLabel: 'Удалить',
     );
-    if (confirmed == true) {
+    if (confirmed) {
       // CR-01: проверяем mounted после await диалога перед обращением к ref/setState
       if (!mounted) return;
       // Удаляем из хранилища и из пула ротации текущей вкладки

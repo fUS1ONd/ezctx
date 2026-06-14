@@ -163,7 +163,11 @@ void main() {
       await tester.pumpWidget(buildScreen(args: args));
       await tester.pumpAndSettle();
       // Даём time для завершения async операций файловой записи и repo.add().
-      await Future<void>.delayed(const Duration(milliseconds: 200));
+      // Детерминированно ждём завершения автосейва (файлы + история),
+      // вместо неустойчивого ожидания по таймеру (флак на медленном диске).
+      await tester
+          .state<ResultScreenState>(find.byType(ResultScreen))
+          .autosaveFuture;
       await tester.pump();
     });
 
@@ -184,7 +188,11 @@ void main() {
     await tester.runAsync(() async {
       await tester.pumpWidget(buildScreen(args: args));
       await tester.pumpAndSettle();
-      await Future<void>.delayed(const Duration(milliseconds: 200));
+      // Детерминированно ждём завершения автосейва (файлы + история),
+      // вместо неустойчивого ожидания по таймеру (флак на медленном диске).
+      await tester
+          .state<ResultScreenState>(find.byType(ResultScreen))
+          .autosaveFuture;
       await tester.pump();
     });
 
@@ -204,7 +212,11 @@ void main() {
     await tester.runAsync(() async {
       await tester.pumpWidget(buildScreen(args: args));
       await tester.pumpAndSettle();
-      await Future<void>.delayed(const Duration(milliseconds: 200));
+      // Детерминированно ждём завершения автосейва (файлы + история),
+      // вместо неустойчивого ожидания по таймеру (флак на медленном диске).
+      await tester
+          .state<ResultScreenState>(find.byType(ResultScreen))
+          .autosaveFuture;
       await tester.pump();
     });
 
@@ -220,7 +232,11 @@ void main() {
     await tester.runAsync(() async {
       await tester.pumpWidget(buildScreen(args: args));
       await tester.pumpAndSettle();
-      await Future<void>.delayed(const Duration(milliseconds: 200));
+      // Детерминированно ждём завершения автосейва (файлы + история),
+      // вместо неустойчивого ожидания по таймеру (флак на медленном диске).
+      await tester
+          .state<ResultScreenState>(find.byType(ResultScreen))
+          .autosaveFuture;
       await tester.pump();
     });
 
@@ -240,7 +256,11 @@ void main() {
     await tester.runAsync(() async {
       await tester.pumpWidget(buildScreen(args: args));
       await tester.pumpAndSettle();
-      await Future<void>.delayed(const Duration(milliseconds: 200));
+      // Детерминированно ждём завершения автосейва (файлы + история),
+      // вместо неустойчивого ожидания по таймеру (флак на медленном диске).
+      await tester
+          .state<ResultScreenState>(find.byType(ResultScreen))
+          .autosaveFuture;
       await tester.pump();
     });
 
@@ -256,7 +276,11 @@ void main() {
     await tester.runAsync(() async {
       await tester.pumpWidget(buildScreen(args: args));
       await tester.pumpAndSettle();
-      await Future<void>.delayed(const Duration(milliseconds: 200));
+      // Детерминированно ждём завершения автосейва (файлы + история),
+      // вместо неустойчивого ожидания по таймеру (флак на медленном диске).
+      await tester
+          .state<ResultScreenState>(find.byType(ResultScreen))
+          .autosaveFuture;
       await tester.pump();
     });
 

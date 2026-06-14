@@ -31,7 +31,7 @@ class _TranscriptViewState extends State<_TranscriptView> {
   @override
   void initState() {
     super.initState();
-    _segments = _ResultScreenState._splitSegments(widget.text);
+    _segments = ResultScreenState._splitSegments(widget.text);
   }
 
   @override
@@ -39,7 +39,7 @@ class _TranscriptViewState extends State<_TranscriptView> {
     super.didUpdateWidget(oldWidget);
     // Пересчитываем сегменты при смене текста (переключатель plain/timestamp).
     if (oldWidget.text != widget.text) {
-      _segments = _ResultScreenState._splitSegments(widget.text);
+      _segments = ResultScreenState._splitSegments(widget.text);
     }
   }
 
@@ -67,11 +67,20 @@ class ResultScreen extends ConsumerStatefulWidget {
   const ResultScreen({super.key});
 
   @override
-  ConsumerState<ResultScreen> createState() => _ResultScreenState();
+  ConsumerState<ResultScreen> createState() => ResultScreenState();
 }
 
-class _ResultScreenState extends ConsumerState<ResultScreen> {
+class ResultScreenState extends ConsumerState<ResultScreen> {
   ResultArgs? _args;
+
+  /// Future последнего запущенного автосохранения (файлы + история).
+  /// Само автосохранение fire-and-forget; ссылку держим, чтобы тесты могли
+  /// детерминированно дождаться завершения через [autosaveFuture].
+  Future<void>? _saveFuture;
+
+  /// Тестовый хук: future текущего автосохранения. В проде не используется.
+  @visibleForTesting
+  Future<void>? get autosaveFuture => _saveFuture;
   bool _copied = false;
   String? _savedPath;
 
@@ -91,8 +100,9 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
         _args = raw;
         // Если таймкодов нет (single-shot plain), стартуем в plain-режиме.
         _showTimestamps = _hasTimestamps(raw.result.text);
-        // OUT-02: автоматически сохраняем txt после открытия экрана
-        _saveTranscripts();
+        // OUT-02: автоматически сохраняем txt после открытия экрана.
+        // Держим future, чтобы тесты могли дождаться завершения (autosaveFuture).
+        _saveFuture = _saveTranscripts();
       } else {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) Navigator.popUntil(context, (r) => r.isFirst);

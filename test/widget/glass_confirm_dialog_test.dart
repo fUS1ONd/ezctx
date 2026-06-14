@@ -30,6 +30,29 @@ void main() {
     );
 
     testWidgets(
+      'has_material_ancestor: текст под Material (нет жёлтого подчёркивания)',
+      (tester) async {
+        // Регрессия: без предка Material Text рисуется жёлтым с двойным
+        // подчёркиванием и системным шрифтом. MaterialApp(home:) сам Material
+        // не даёт, поэтому проверка падала бы до фикса.
+        await tester.pumpWidget(_wrap(
+          const GlassConfirmDialog(
+            title: 'Удалить?',
+            body: 'Это нельзя отменить.',
+            confirmLabel: 'Удалить',
+          ),
+        ));
+        expect(
+          find.ancestor(
+            of: find.text('Удалить?'),
+            matching: find.byType(Material),
+          ),
+          findsWidgets,
+        );
+      },
+    );
+
+    testWidgets(
       'cancel_returns_false: тап Отмена → show() возвращает false',
       (tester) async {
         bool? result;

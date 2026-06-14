@@ -41,6 +41,29 @@ void main() {
     );
 
     testWidgets(
+      'item_has_material_ancestor: пункт под Material (нет жёлтого подчёркивания)',
+      (tester) async {
+        // Регрессия: контент OverlayEntry — сиблинг Scaffold, его Material не
+        // является предком. Без своего Material пункт рисуется жёлтым с двойным
+        // подчёркиванием. Проверка падала бы до фикса.
+        await tester.pumpWidget(_wrap(
+          GlassDropdownMenu(
+            items: [GlassDropdownItem(label: 'Очистить историю', onTap: () {})],
+          ),
+        ));
+        await tester.tap(find.byType(GlassDropdownMenu));
+        await tester.pumpAndSettle();
+        expect(
+          find.ancestor(
+            of: find.text('Очистить историю'),
+            matching: find.byType(Material),
+          ),
+          findsWidgets,
+        );
+      },
+    );
+
+    testWidgets(
       'calls_callback: тап по пункту → onTap вызван',
       (tester) async {
         var called = false;

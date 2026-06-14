@@ -86,25 +86,31 @@ class _GlassDropdownMenuState extends State<GlassDropdownMenu>
           right: right,
           child: FadeTransition(
             opacity: _opacity,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                child: Container(
-                  constraints: const BoxConstraints(minWidth: 180),
-                  decoration: BoxDecoration(
-                    color: palette.glassBgDeep,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: palette.glassRim, width: 0.5),
-                    boxShadow: [palette.shadowDeep],
-                  ),
-                  child: IntrinsicWidth(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: widget.items
-                          .map((item) => _itemTile(item, palette))
-                          .toList(),
+            // Material с прозрачным фоном даёт корректный DefaultTextStyle:
+            // контент OverlayEntry лежит вне Scaffold, иначе Text жёлтый
+            // с двойным подчёркиванием.
+            child: Material(
+              type: MaterialType.transparency,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                  child: Container(
+                    constraints: const BoxConstraints(minWidth: 180),
+                    decoration: BoxDecoration(
+                      color: palette.glassBgDeep,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: palette.glassRim, width: 0.5),
+                      boxShadow: [palette.shadowDeep],
+                    ),
+                    child: IntrinsicWidth(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: widget.items
+                            .map((item) => _itemTile(item, palette))
+                            .toList(),
+                      ),
                     ),
                   ),
                 ),
