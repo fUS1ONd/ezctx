@@ -226,11 +226,18 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     final asyncEntries = ref.watch(searchResultsProvider);
     final spec = ref.watch(filterNotifierProvider);
     final palette = context.palette;
+    // Нижний inset (высота навбара + safe-area), инжектированный extendBody:true.
+    // Список уходит под бар и сам резервирует его в padding (#2); центрированные
+    // состояния отбиваем этим же отступом, чтобы не прятались под баром.
+    final mqBottom = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: GradientBackground(
+        // bottom:false — список тянется под плавающий навбар (scroll-under-glass),
+        // а инжектированный extendBody inset доходит до списка как padding.bottom (#2).
         child: SafeArea(
+          bottom: false,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -397,25 +404,39 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               // Основное содержимое экрана.
               Expanded(
                 child: asyncEntries.when(
-                  loading: () => const Center(
-                      child:
-                          CircularProgressIndicator(strokeWidth: 2)),
-                  error: (e, _) => _ErrorState(message: e.toString()),
+                  loading: () => Padding(
+                    padding: EdgeInsets.only(bottom: mqBottom),
+                    child: const Center(
+                        child:
+                            CircularProgressIndicator(strokeWidth: 2)),
+                  ),
+                  error: (e, _) => Padding(
+                    padding: EdgeInsets.only(bottom: mqBottom),
+                    child: _ErrorState(message: e.toString()),
+                  ),
                   data: (entries) {
                     // D-09: «Ничего не найдено» при активных фильтрах/поиске без результатов.
                     if (entries.isEmpty &&
                         (spec.searchTerm.isNotEmpty ||
                             spec.hasActiveFilters)) {
-                      return _EmptyNoResults(
-                        onReset: () {
-                          _searchController.clear();
-                          ref
-                              .read(filterNotifierProvider.notifier)
-                              .resetAll();
-                        },
+                      return Padding(
+                        padding: EdgeInsets.only(bottom: mqBottom),
+                        child: _EmptyNoResults(
+                          onReset: () {
+                            _searchController.clear();
+                            ref
+                                .read(filterNotifierProvider.notifier)
+                                .resetAll();
+                          },
+                        ),
                       );
                     }
-                    if (entries.isEmpty) return const _EmptyHistory();
+                    if (entries.isEmpty) {
+                      return Padding(
+                        padding: EdgeInsets.only(bottom: mqBottom),
+                        child: const _EmptyHistory(),
+                      );
+                    }
                     return _HistoryList(
                       entries: entries,
                       scrollController: _scrollController,
@@ -426,7 +447,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   },
                 ),
               ),
-              const SizedBox(height: 96),
             ],
           ),
         ),
@@ -580,7 +600,10 @@ class _HistoryList extends StatelessWidget {
 
     return ListView.separated(
       controller: scrollController,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      // Низ: inset навбара (через extendBody) + зазор, чтобы последняя карточка
+      // домоталась и встала над плавающим баром, а не пряталась под ним (#2).
+      padding: EdgeInsets.fromLTRB(
+          16, 8, 16, MediaQuery.of(context).padding.bottom + AppSpacing.md),
       itemCount: entries.length,
       separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (ctx, i) {
