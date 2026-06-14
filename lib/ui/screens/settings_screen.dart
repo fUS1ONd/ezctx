@@ -125,7 +125,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   final liveCount = activePool.aliveKeyCount;
                   final isDeepgram = _options.model.provider ==
                       TranscriptionProviderId.deepgram;
-                  return Column(children: [
+                  return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                       child: _StatusCard(
