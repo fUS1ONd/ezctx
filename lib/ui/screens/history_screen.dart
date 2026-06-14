@@ -233,6 +233,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
+      // Клавиатура наезжает поверх, body сохраняет высоту — иначе при поднятой
+      // клавиатуре Expanded сжимается и заглушка «Ничего не найдено» даёт
+      // overflow. Нужен также на внешнем ScaffoldWithNavBar (тот стрипает inset).
+      resizeToAvoidBottomInset: false,
       body: GradientBackground(
         // bottom:false — список тянется под плавающий навбар (scroll-under-glass),
         // а инжектированный extendBody inset доходит до списка как padding.bottom (#2).
@@ -292,6 +296,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                             contentPadding: const EdgeInsets.symmetric(
                                 vertical: 10),
                           ),
+                          // Тап вне поля убирает не только клавиатуру, но и фокус
+                          // (иначе курсор продолжает мерцать в поле поиска).
+                          onTapOutside: (_) =>
+                              FocusManager.instance.primaryFocus?.unfocus(),
                           // Вызов setSearch — debounce 250 мс выполняется в FilterNotifier (не здесь — Pitfall).
                           onChanged: (value) {
                             ref

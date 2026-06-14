@@ -34,6 +34,10 @@ class ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
       backgroundColor: Colors.transparent,
       // extendBody: true — чтобы под панелью просвечивал градиент/обои.
       extendBody: true,
+      // Клавиатура наезжает поверх, а не сжимает body. Иначе на вкладке
+      // «История» заглушка «Ничего не найдено» даёт overflow при поиске.
+      // Парный флаг на HistoryScreen.Scaffold — нужны оба (вложенные Scaffold).
+      resizeToAvoidBottomInset: false,
       body: IndexedStack(
         index: _currentIndex,
         children: const [
