@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 
-import '../transcription/transcription_options.dart';
 import '../../core/utils/byte_format.dart';
+import '../transcription/transcription_options.dart';
 
 // Модель одной записи в истории расшифровок.
 @immutable
