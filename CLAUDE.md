@@ -44,15 +44,6 @@ Architecture not yet mapped. Follow existing patterns found in the codebase.
 No project skills found. Add skills to any of: `.claude/skills/`, `.agents/skills/`, `.cursor/skills/`, `.github/skills/`, or `.codex/skills/` with a `SKILL.md` index file.
 <!-- GSD:skills-end -->
 
-## Context Window
-
-Для команд с большим выводом ВСЕГДА используй `mcp__plugin_context-mode_context-mode__ctx_batch_execute` или `ctx_execute`. Никогда не запускай через Bash напрямую:
-- `flutter test`, `flutter analyze`, `flutter build`, `flutter pub get`
-- `find`, `grep` на большом дереве файлов
-- `git log`, `git diff` с большим выводом
-
-Bash разрешён только для: `git add/commit/push/checkout`, `mkdir`, `mv`, `rm`, `cp`.
-
 ## Releases
 
 Релиз = push тега `vX.Y.Z` в `main`. Workflow `.github/workflows/release.yml` собирает 3 подписанных APK (по ABI) и публикует GitHub Release.
