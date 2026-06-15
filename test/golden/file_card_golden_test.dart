@@ -1,3 +1,4 @@
+// @Tags(['golden'])
 // Golden на FileCard — гарантирует, что размер·длительность не обрезаются
 // при длинном имени файла (issue #12). Запускать на Linux (шрифты macOS
 // дают сдвиг пикселей). Мягкий допуск 5%: карточка содержит градиент и тень.
@@ -11,8 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 // Кастомный comparator с допуском (как в scroll_screens_golden_test.dart).
 class TolerantGoldenComparator extends LocalFileComparator {
-  TolerantGoldenComparator(Uri testFile, this.toleranceFraction)
-      : super(testFile);
+  TolerantGoldenComparator(super.testFile, this.toleranceFraction);
   final double toleranceFraction;
 
   @override
@@ -38,6 +38,9 @@ void _setPhoneViewport(WidgetTester tester) {
   addTearDown(tester.view.resetDevicePixelRatio);
 }
 
+// _wrap добавляет Padding(16) внутри Scaffold — имитирует внутренний отступ
+// экрана, в котором живёт FileCard (в отличие от scroll_screens, где padding
+// задаётся в _uniformBg/_realisticBg, а не здесь).
 Widget _wrap(Widget child, Brightness brightness) => MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData(brightness: brightness),
@@ -52,7 +55,7 @@ Widget _wrap(Widget child, Brightness brightness) => MaterialApp(
 const _longName = '12.02 Основы Программирования (лямбда-исчисление)';
 const _bigSize = 150785228; // → "150.8 МБ"
 
-final _file = const SelectedAudioFile(
+const _file = SelectedAudioFile(
   path: '/storage/emulated/0/Recordings/$_longName.mp3',
   name: '$_longName.mp3',
   sizeBytes: _bigSize,
@@ -66,22 +69,22 @@ const _metadata = AudioMetadata(
 );
 
 void main() {
-  late GoldenFileComparator orig;
+  late GoldenFileComparator _orig;
 
   setUpAll(() {
     TestWidgetsFlutterBinding.ensureInitialized();
-    orig = goldenFileComparator;
+    _orig = goldenFileComparator;
   });
 
   setUp(() {
-    final basedir = (orig as LocalFileComparator).basedir;
+    final basedir = (_orig as LocalFileComparator).basedir;
     // Конструктору нужен FILE URI, иначе путь к goldens смещается.
     final fakeFile = basedir.resolve('file_card_golden_test.dart');
     goldenFileComparator = TolerantGoldenComparator(fakeFile, 0.05);
   });
 
   tearDown(() {
-    goldenFileComparator = orig;
+    goldenFileComparator = _orig;
   });
 
   for (final isDark in [false, true]) {
