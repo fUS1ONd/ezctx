@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../transcription/transcription_options.dart';
+import '../../core/utils/byte_format.dart';
 
 // Модель одной записи в истории расшифровок.
 @immutable
@@ -91,11 +92,7 @@ class HistoryEntry {
     );
   }
 
-  String get sizeFormatted {
-    if (sizeBytes < 1024) return '$sizeBytes Б';
-    if (sizeBytes < 1024 * 1024) return '${(sizeBytes / 1024).toStringAsFixed(1)} КБ';
-    return '${(sizeBytes / 1024 / 1024).toStringAsFixed(1)} МБ';
-  }
+  String get sizeFormatted => formatBytes(sizeBytes);
 
   /// true, если есть осмысленная версия с таймкодами, отличная от plain (D2).
   /// Управляет видимостью переключателя «С метками / Без меток».

@@ -1,3 +1,5 @@
+import '../../core/utils/byte_format.dart';
+
 /// Метаданные аудиофайла, полученные через ffprobe.
 class AudioMetadata {
   final String name;
@@ -30,17 +32,8 @@ class AudioMetadata {
     return '$mm:$ss';
   }
 
-  /// Форматированный размер файла: "123.4 МБ" или "45.6 КБ".
-  String get sizeFormatted {
-    if (sizeBytes >= 1024 * 1024) {
-      final mb = sizeBytes / (1024 * 1024);
-      return '${mb.toStringAsFixed(1)} МБ';
-    } else if (sizeBytes >= 1024) {
-      final kb = sizeBytes / 1024;
-      return '${kb.toStringAsFixed(1)} КБ';
-    }
-    return '$sizeBytes Б';
-  }
+  /// Человекочитаемый размер (десятичные единицы, см. byte_format.dart).
+  String get sizeFormatted => formatBytes(sizeBytes);
 
   /// Количество чанков при разбивке на сегменты заданной длительности.
   int chunkCount(double chunkDurationSeconds) {
