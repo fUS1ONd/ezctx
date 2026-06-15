@@ -1,9 +1,9 @@
 import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:share_plus/share_plus.dart';
 import '../../core/providers/history_provider.dart';
 import '../../core/services/clipboard_service.dart';
+import '../../core/services/share_service.dart';
 import '../../core/utils/label_mappers.dart';
 
 import '../../core/constants/design_tokens.dart';
@@ -194,11 +194,18 @@ class ResultScreenState extends ConsumerState<ResultScreen> {
     return _showTimestamps ? r.text : r.plainText;
   }
 
-  /// Открывает системный диалог «Поделиться» с текстом расшифровки.
+  /// Открывает системный диалог «Поделиться», отправляя .txt-файл текущего вида.
   Future<void> _onShareTap() async {
     if (_args == null) return;
     try {
-      await Share.share(_currentText);
+      final r = _args!.result;
+      // Суффикс _timestamped только если реально есть таймкоды и выбран этот вид.
+      final withTimestamps = _showTimestamps && r.text != r.plainText;
+      await const ShareService().shareTxt(
+        baseName: _args!.file.name,
+        text: _currentText,
+        withTimestamps: withTimestamps,
+      );
     } catch (e, st) {
       debugPrint('_onShareTap error: $e\n$st');
       if (!mounted) return;

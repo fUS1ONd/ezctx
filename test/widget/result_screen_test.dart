@@ -32,6 +32,22 @@ class _FakePathProvider extends PathProviderPlatform
   Future<String?> getExternalStoragePath() async => null;
 }
 
+// Заглушка path_provider для ShareService (нужен getTemporaryPath).
+class _FakeSharePathProvider extends PathProviderPlatform
+    with MockPlatformInterfaceMixin {
+  _FakeSharePathProvider(this.temp);
+  final String temp;
+
+  @override
+  Future<String?> getTemporaryPath() async => temp;
+
+  @override
+  Future<String?> getApplicationDocumentsPath() async => temp;
+
+  @override
+  Future<String?> getExternalStoragePath() async => null;
+}
+
 // Минимальная заглушка репозитория — предотвращает обращение к реальной БД.
 // Записывает добавленные записи в [added] для проверки в тестах.
 class _StubHistoryRepository implements HistoryRepository {
@@ -197,30 +213,48 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1600));
   });
 
-  testWidgets('Tap «Поделиться» не бросает исключение и вызывает share_plus',
-      (tester) async {
-    // Устанавливаем мок, захватывающий аргументы вызова Share.share.
-    String? capturedText;
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(
-      const MethodChannel('dev.fluttercommunity.plus/share'),
-      (call) async {
-        // share_plus передаёт текст через поле 'text' в arguments.
-        if (call.method == 'share') {
-          capturedText = (call.arguments as Map?)?['text'] as String?;
-        }
-        return null;
-      },
-    );
+  testWidgets('Tap «Поделиться» пишет .txt и вызывает shareFiles', (tester) async {
+    // Реальный file I/O share-сервиса должен идти вне FakeAsync-зоны.
+    await tester.runAsync(() async {
+      final tmpDir = Directory.systemTemp.createTempSync('result_share_test');
+      final originalPathProvider = PathProviderPlatform.instance;
+      PathProviderPlatform.instance = _FakeSharePathProvider(tmpDir.path);
 
-    await tester.pumpWidget(buildScreen());
-    await tester.pumpAndSettle();
+      List<dynamic>? capturedPaths;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+        const MethodChannel('dev.fluttercommunity.plus/share'),
+        (call) async {
+          if (call.method == 'shareFiles') {
+            capturedPaths = (call.arguments as Map)['paths'] as List<dynamic>?;
+          }
+          return null;
+        },
+      );
 
-    await tester.tap(find.text('Поделиться'));
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(buildScreen());
+      await tester.pumpAndSettle();
 
-    // Ошибок быть не должно; Share.share должен был вызваться с текстом расшифровки.
-    expect(capturedText, equals(transcriptText));
+      await tester.tap(find.text('Поделиться'));
+      // Реальный I/O (writeTempTxt) выполняется асинхронно вне FakeAsync-цикла;
+      // pumpAndSettle не дожидается dart:io-фьючеров.
+      // Ждём реального времени, затем качаем Flutter-цикл до захвата.
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      for (var i = 0; i < 20 && capturedPaths == null; i++) {
+        await tester.pump(const Duration(milliseconds: 10));
+      }
+
+      expect(capturedPaths, isNotNull);
+      // makeArgs() без таймкодов → имя без суффикса _timestamped.
+      expect(capturedPaths!.single, endsWith('/share/test.txt'));
+      expect(
+        await File(capturedPaths!.single as String).readAsString(),
+        equals(transcriptText),
+      );
+
+      PathProviderPlatform.instance = originalPathProvider;
+      tmpDir.deleteSync(recursive: true);
+    });
   });
 
   testWidgets('Автозапись в историю сохраняет timestampedText (текст с метками)',
