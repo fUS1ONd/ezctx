@@ -72,16 +72,40 @@ class FileCard extends StatelessWidget {
                       color: Colors.white, size: 28),
                 ),
                 const SizedBox(width: 14),
+                // Колонка имя+мета. Верхняя под-строка делит ширину с кнопкой
+                // «Заменить»; мета-строка вынесена ниже и занимает всю ширину —
+                // так длительность не обрезается (issue #12).
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        file.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTextStyles.heading
-                            .copyWith(color: palette.ink1, fontSize: 17),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              file.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.heading
+                                  .copyWith(color: palette.ink1, fontSize: 17),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: onReplace,
+                            style: TextButton.styleFrom(
+                              foregroundColor: palette.accent,
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 8),
+                              minimumSize: Size.zero,
+                              tapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: const Text(
+                              'Заменить',
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 2),
                       Row(
@@ -99,23 +123,13 @@ class FileCard extends StatelessWidget {
                             const SizedBox(
                               width: 12,
                               height: 12,
-                              child: CircularProgressIndicator(strokeWidth: 1.5),
+                              child:
+                                  CircularProgressIndicator(strokeWidth: 1.5),
                             ),
                           ],
                         ],
                       ),
                     ],
-                  ),
-                ),
-                TextButton(
-                  onPressed: onReplace,
-                  style: TextButton.styleFrom(
-                    foregroundColor: palette.accent,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                  ),
-                  child: const Text(
-                    'Заменить',
-                    style: TextStyle(fontWeight: FontWeight.w600),
                   ),
                 ),
               ],
