@@ -2,12 +2,11 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:share_plus/share_plus.dart';
-
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/design_tokens.dart';
 import '../../core/providers/history_provider.dart';
 import '../../core/services/clipboard_service.dart';
+import '../../core/services/share_service.dart';
 import '../../core/utils/label_mappers.dart';
 import '../../features/history/filter_notifier.dart';
 import '../../features/history/filter_spec.dart';
@@ -168,7 +167,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         },
         onShare: () async {
           try {
-            await Share.share(entry.plainText);
+            // В списке истории тоггла нет → всегда plain-файл.
+            await const ShareService().shareTxt(
+              baseName: entry.title,
+              text: entry.plainText,
+              withTimestamps: false,
+            );
           } catch (e, st) {
             debugPrint('share error: $e\n$st');
           }
