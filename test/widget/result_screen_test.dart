@@ -236,12 +236,13 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Поделиться'));
-      // Реальный I/O (writeTempTxt) выполняется асинхронно вне FakeAsync-цикла;
-      // pumpAndSettle не дожидается dart:io-фьючеров.
-      // Ждём реального времени, затем качаем Flutter-цикл до захвата.
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-      for (var i = 0; i < 20 && capturedPaths == null; i++) {
-        await tester.pump(const Duration(milliseconds: 10));
+      await tester.pump(); // доставить tap/onPressed
+      // Реальный I/O (writeTempTxt) идёт на реальном event-loop внутри runAsync;
+      // tester.pump НЕ продвигает реальное время, поэтому поллим реальными
+      // задержками — выходим сразу при захвате (потолок с запасом под нагрузку
+      // полного прогона, когда изоляты конкурируют за реальное время).
+      for (var i = 0; i < 200 && capturedPaths == null; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 25));
       }
 
       expect(capturedPaths, isNotNull);

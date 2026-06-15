@@ -542,10 +542,13 @@ void main() {
 
         // Шерим.
         await tester.tap(find.text('Поделиться'));
-        // Реальный I/O (writeTempTxt) идёт вне FakeAsync; pumpAndSettle не ждёт dart:io.
-        await Future<void>.delayed(const Duration(milliseconds: 200));
-        for (var i = 0; i < 20 && capturedPaths == null; i++) {
-          await tester.pump(const Duration(milliseconds: 10));
+        await tester.pump(); // доставить tap/onPressed
+        // Реальный I/O (writeTempTxt) идёт на реальном event-loop внутри runAsync;
+        // tester.pump НЕ продвигает реальное время, поэтому поллим реальными
+        // задержками — выходим сразу при захвате (потолок с запасом под нагрузку
+        // полного прогона, когда изоляты конкурируют за реальное время).
+        for (var i = 0; i < 200 && capturedPaths == null; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 25));
         }
 
         expect(capturedPaths, isNotNull);
