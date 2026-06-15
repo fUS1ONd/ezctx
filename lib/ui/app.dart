@@ -5,6 +5,7 @@ import '../core/constants/app_constants.dart';
 import '../core/constants/design_tokens.dart';
 import '../core/providers/theme_provider.dart';
 import 'screens/api_keys_screen.dart';
+import 'screens/detail_screen.dart';
 import 'screens/processing_screen.dart';
 import 'screens/result_screen.dart';
 import 'widgets/scaffold_with_nav_bar.dart';
@@ -35,6 +36,11 @@ class EzCtxApp extends ConsumerWidget {
             page = const ProcessingScreen();
           case AppConstants.routeResult:
             page = const ResultScreen();
+          case AppConstants.routeHistoryDetail:
+            // CR-04: type-guard вместо голого cast — защита от тестов и случайных pushNamed.
+            final args = settings.arguments;
+            if (args is! DetailArgs) return null;
+            page = DetailScreen(entry: args.entry, searchTerm: args.searchTerm);
           default:
             return null;
         }

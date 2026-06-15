@@ -1,4 +1,9 @@
+import 'package:flutter/foundation.dart';
+
+import '../transcription/transcription_options.dart';
+
 // Модель одной записи в истории расшифровок.
+@immutable
 class HistoryEntry {
   const HistoryEntry({
     required this.id,
@@ -9,6 +14,13 @@ class HistoryEntry {
     required this.createdAt,
     required this.plainPath,
     required this.timestampedPath,
+    // Новые поля фазы 01 (D-08, D-09, D-05).
+    required this.title,
+    required this.provider,
+    this.isFavorite = false,
+    required this.plainText,
+    this.timestampedText,
+    this.snippet,
   });
 
   final String id;
@@ -20,11 +32,77 @@ class HistoryEntry {
   final String plainPath;
   final String timestampedPath;
 
+  // Заголовок записи (по умолчанию — имя файла без расширения).
+  final String title;
+
+  // Провайдер транскрибации, которым создана запись (D-08).
+  final TranscriptionProviderId provider;
+
+  // Флаг избранного, по умолчанию false (D-09).
+  final bool isFavorite;
+
+  // Тело plain-текста расшифровки — источник правды для FTS5 (D-05).
+  final String plainText;
+
+  // Тело текста с таймкодами `[HH:MM:SS]`. null для старых записей (до фичи)
+  // или когда таймкодов нет. Не индексируется в FTS (D1).
+  final String? timestampedText;
+
+  // Сниппет FTS5 snippet() — присутствует только при активном поиске (BRWS-01).
+  // null означает: поиск неактивен или запись не содержит совпадений.
+  // Поле не хранится в БД — только в результатах customSelect.
+  final String? snippet;
+
+  /// Возвращает копию записи с заменёнными полями.
+  /// Незаданные параметры сохраняют значения текущего объекта.
+  /// Используется для optimistic UI при переименовании (ACT-01) и
+  /// тогглировании избранного (ACT-02) без перезаписи всех полей.
+  HistoryEntry copyWith({
+    String? id,
+    String? fileName,
+    int? sizeBytes,
+    double? durationSec,
+    String? language,
+    DateTime? createdAt,
+    String? plainPath,
+    String? timestampedPath,
+    String? title,
+    TranscriptionProviderId? provider,
+    bool? isFavorite,
+    String? plainText,
+    String? timestampedText,
+    String? snippet,
+  }) {
+    return HistoryEntry(
+      id: id ?? this.id,
+      fileName: fileName ?? this.fileName,
+      sizeBytes: sizeBytes ?? this.sizeBytes,
+      durationSec: durationSec ?? this.durationSec,
+      language: language ?? this.language,
+      createdAt: createdAt ?? this.createdAt,
+      plainPath: plainPath ?? this.plainPath,
+      timestampedPath: timestampedPath ?? this.timestampedPath,
+      title: title ?? this.title,
+      provider: provider ?? this.provider,
+      isFavorite: isFavorite ?? this.isFavorite,
+      plainText: plainText ?? this.plainText,
+      timestampedText: timestampedText ?? this.timestampedText,
+      snippet: snippet ?? this.snippet,
+    );
+  }
+
   String get sizeFormatted {
     if (sizeBytes < 1024) return '$sizeBytes Б';
     if (sizeBytes < 1024 * 1024) return '${(sizeBytes / 1024).toStringAsFixed(1)} КБ';
     return '${(sizeBytes / 1024 / 1024).toStringAsFixed(1)} МБ';
   }
+
+  /// true, если есть осмысленная версия с таймкодами, отличная от plain (D2).
+  /// Управляет видимостью переключателя «С метками / Без меток».
+  bool get hasTimestamps =>
+      timestampedText != null &&
+      timestampedText!.isNotEmpty &&
+      timestampedText != plainText;
 
   String get durationFormatted {
     final total = durationSec.toInt();
@@ -47,9 +125,10 @@ class HistoryEntry {
     if (diff == 0) return 'Сегодня · $time';
     if (diff == 1) return 'Вчера · $time';
     if (diff < 7) return '$diff дн. назад · $time';
+    // Родительный падеж: «12 мая», «3 октября» и т.д. (WR-04).
     const months = [
-      'янв', 'фев', 'мар', 'апр', 'мая', 'июн',
-      'июл', 'авг', 'сен', 'окт', 'ноя', 'дек',
+      'янв.', 'февр.', 'марта', 'апр.', 'мая', 'июня',
+      'июля', 'авг.', 'сент.', 'окт.', 'нояб.', 'дек.',
     ];
     return '${createdAt.day} ${months[createdAt.month - 1]} · $time';
   }

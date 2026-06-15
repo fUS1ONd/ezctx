@@ -1,10 +1,16 @@
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../core/providers/history_provider.dart';
 import '../../core/services/clipboard_service.dart';
+import '../../core/utils/label_mappers.dart';
 
 import '../../core/constants/design_tokens.dart';
+import '../../features/history/history_entry.dart';
 import '../../features/transcription/result_args.dart';
 import '../../features/transcription/transcript_writer.dart';
+import '../widgets/format_toggle.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_icon_btn.dart';
 import '../widgets/gradient_background.dart';
@@ -26,7 +32,7 @@ class _TranscriptViewState extends State<_TranscriptView> {
   @override
   void initState() {
     super.initState();
-    _segments = _ResultScreenState._splitSegments(widget.text);
+    _segments = ResultScreenState._splitSegments(widget.text);
   }
 
   @override
@@ -34,7 +40,7 @@ class _TranscriptViewState extends State<_TranscriptView> {
     super.didUpdateWidget(oldWidget);
     // Пересчитываем сегменты при смене текста (переключатель plain/timestamp).
     if (oldWidget.text != widget.text) {
-      _segments = _ResultScreenState._splitSegments(widget.text);
+      _segments = ResultScreenState._splitSegments(widget.text);
     }
   }
 
@@ -57,15 +63,25 @@ class _TranscriptViewState extends State<_TranscriptView> {
 /// Отображает текст, кнопку «Скопировать» с визуальным feedback, сохраняет txt.
 /// Переключатель «С метками / Без меток» (Bug-2): всегда виден; при отсутствии
 /// таймкодов оба режима показывают одинаковый текст — это ожидаемое поведение.
-class ResultScreen extends StatefulWidget {
+/// Конвертирован в ConsumerStatefulWidget для доступа к historyRepositoryProvider (HIST-01).
+class ResultScreen extends ConsumerStatefulWidget {
   const ResultScreen({super.key});
 
   @override
-  State<ResultScreen> createState() => _ResultScreenState();
+  ConsumerState<ResultScreen> createState() => ResultScreenState();
 }
 
-class _ResultScreenState extends State<ResultScreen> {
+class ResultScreenState extends ConsumerState<ResultScreen> {
   ResultArgs? _args;
+
+  /// Future последнего запущенного автосохранения (файлы + история).
+  /// Само автосохранение fire-and-forget; ссылку держим, чтобы тесты могли
+  /// детерминированно дождаться завершения через [autosaveFuture].
+  Future<void>? _saveFuture;
+
+  /// Тестовый хук: future текущего автосохранения. В проде не используется.
+  @visibleForTesting
+  Future<void>? get autosaveFuture => _saveFuture;
   bool _copied = false;
   String? _savedPath;
 
@@ -85,8 +101,9 @@ class _ResultScreenState extends State<ResultScreen> {
         _args = raw;
         // Если таймкодов нет (single-shot plain), стартуем в plain-режиме.
         _showTimestamps = _hasTimestamps(raw.result.text);
-        // OUT-02: автоматически сохраняем txt после открытия экрана
-        _saveTranscripts();
+        // OUT-02: автоматически сохраняем txt после открытия экрана.
+        // Держим future, чтобы тесты могли дождаться завершения (autosaveFuture).
+        _saveFuture = _saveTranscripts();
       } else {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) Navigator.popUntil(context, (r) => r.isFirst);
@@ -101,12 +118,21 @@ class _ResultScreenState extends State<ResultScreen> {
   }
 
   Future<void> _saveTranscripts() async {
-    // Защита от повторного сохранения при быстром navigate-back+forward.
+    // Защита от повторного сохранения при быстром navigate-back+forward (D-02).
     if (_transcriptsSaved) return;
     _transcriptsSaved = true;
+
+    // Захватываем репозиторий ДО первого await: ref недоступен после dispose
+    // ConsumerState (быстрый уход с экрана во время записи файлов бросил бы
+    // StateError), иначе автозапись в историю была бы молча потеряна.
+    final historyRepo = ref.read(historyRepositoryProvider);
+
+    // Запись файлов и автосохранение в историю — независимые блоки:
+    // ошибка при записи файлов не должна предотвращать сохранение в историю (HIST-01).
+    ({String plainPath, String timestampedPath})? paths;
     try {
       // Сохраняем оба формата: plain (для LLM) и с таймкодами (для истории).
-      final paths = await const TranscriptWriter().writeBoth(
+      paths = await const TranscriptWriter().writeBoth(
         baseName: _args!.file.name,
         plainText: _args!.result.plainText,
         timestampedText: _args!.result.text,
@@ -116,16 +142,48 @@ class _ResultScreenState extends State<ResultScreen> {
         baseName: _args!.file.name,
         segments: _args!.result.segments,
       );
-      if (mounted) {
-        // Показываем папку (не полный путь), так как файлов теперь несколько.
-        final sep = paths.plainPath.lastIndexOf('/');
-        final folderPath =
-            sep > 0 ? paths.plainPath.substring(0, sep) : paths.plainPath;
-        setState(() => _savedPath = folderPath);
-      }
     } catch (e, st) {
-      debugPrint('_saveTranscripts: $e\n$st');
+      debugPrint('_saveTranscripts file write error: $e\n$st');
     }
+
+    // Автозапись в историю (HIST-01, D-03: пустой текст не сохраняем).
+    // Выполняется независимо от успеха записи файлов.
+    if (_args!.result.plainText.trim().isNotEmpty) {
+      try {
+        await historyRepo.add(HistoryEntry(
+          id: '', // drift присваивает autoincrement id; игнорируется при INSERT
+          fileName: _args!.file.name,
+          title: _fileNameWithoutExtension(_args!.file.name),
+          sizeBytes: _args!.file.sizeBytes,
+          durationSec: _args!.result.duration,
+          language: languageLabel(_args!.result.language),
+          provider: _args!.options.model.provider, // D-08: провайдер из ResultArgs.options
+          isFavorite: false, // D-09
+          createdAt: clock.now(),
+          plainPath: paths?.plainPath ?? '',
+          timestampedPath: paths?.timestampedPath ?? '',
+          plainText: _args!.result.plainText,
+          // Текст с таймкодами для переключателя вида в Истории (D1).
+          timestampedText: _args!.result.text,
+        ));
+      } catch (e, st) {
+        debugPrint('_saveTranscripts history save error: $e\n$st');
+      }
+    }
+
+    if (mounted && paths != null) {
+      // Показываем папку (не полный путь), так как файлов теперь несколько.
+      final sep = paths.plainPath.lastIndexOf('/');
+      final folderPath =
+          sep > 0 ? paths.plainPath.substring(0, sep) : paths.plainPath;
+      setState(() => _savedPath = folderPath);
+    }
+  }
+
+  /// Возвращает имя файла без расширения (хелпер для title записи).
+  static String _fileNameWithoutExtension(String name) {
+    final dot = name.lastIndexOf('.');
+    return dot > 0 ? name.substring(0, dot) : name;
   }
 
   /// Возвращает текст в текущем режиме отображения (для копирования и показа).
@@ -244,7 +302,10 @@ class _ResultScreenState extends State<ResultScreen> {
                 const SizedBox(height: AppSpacing.sm),
 
                 // Переключатель формата (Bug-2): всегда виден.
-                _buildFormatToggle(),
+                FormatToggle(
+                  showTimestamps: _showTimestamps,
+                  onChanged: (v) => setState(() => _showTimestamps = v),
+                ),
                 const SizedBox(height: AppSpacing.sm),
 
                 // Текст расшифровки — ленивый рендеринг по сегментам
@@ -281,32 +342,6 @@ class _ResultScreenState extends State<ResultScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  /// Строит переключатель «С метками / Без меток».
-  Widget _buildFormatToggle() {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          'Вид:',
-          style: AppTextStyles.label.copyWith(color: context.palette.ink2),
-        ),
-        const SizedBox(width: AppSpacing.sm),
-        // Используем ChoiceChip-пару для наглядного переключения.
-        _FormatChip(
-          label: 'С метками',
-          selected: _showTimestamps,
-          onTap: () => setState(() => _showTimestamps = true),
-        ),
-        const SizedBox(width: AppSpacing.xs),
-        _FormatChip(
-          label: 'Без меток',
-          selected: !_showTimestamps,
-          onTap: () => setState(() => _showTimestamps = false),
-        ),
-      ],
     );
   }
 
@@ -356,49 +391,3 @@ class _ResultScreenState extends State<ResultScreen> {
   }
 }
 
-/// Минималистичный чип-переключатель для выбора формата отображения.
-class _FormatChip extends StatelessWidget {
-  const _FormatChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.xs,
-        ),
-        decoration: BoxDecoration(
-          color: selected
-              ? palette.accent.withValues(alpha: 0.15)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(
-            color: selected
-                ? palette.accent.withValues(alpha: 0.5)
-                : palette.inkLine,
-            width: 1,
-          ),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyles.label.copyWith(
-            color: selected ? palette.accent : palette.ink2,
-            fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
-          ),
-        ),
-      ),
-    );
-  }
-}

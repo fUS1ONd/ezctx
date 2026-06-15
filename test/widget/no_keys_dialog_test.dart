@@ -36,6 +36,33 @@ void main() {
       expect(find.text('Нужен ключ Groq'), findsOneWidget);
     });
 
+    testWidgets('заголовок под Material (нет жёлтого подчёркивания)', (tester) async {
+      // Регрессия: контент showGeneralDialog лежит вне Scaffold, без предка
+      // Material Text рисуется жёлтым с двойным подчёркиванием. Проверка
+      // падала бы до фикса.
+      _setPhoneViewport(tester);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (ctx) => ElevatedButton(
+              onPressed: () => NoKeysDialog.show(ctx),
+              child: const Text('Открыть диалог'),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Открыть диалог'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.ancestor(
+          of: find.text('Нужен ключ Groq'),
+          matching: find.byType(Material),
+        ),
+        findsWidgets,
+      );
+    });
+
     testWidgets('Deepgram-вариант: заголовок «Нужен ключ Deepgram» виден', (tester) async {
       _setPhoneViewport(tester);
       // Передаём Deepgram-параметры

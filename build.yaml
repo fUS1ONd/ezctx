@@ -1,0 +1,12 @@
+# Конфигурация drift_dev для codegen.
+# Включает анализатор FTS5 — нужен для виртуальных таблиц в фазе 02 (D-07).
+targets:
+  $default:
+    builders:
+      drift_dev:
+        options:
+          sql:
+            dialect: sqlite
+            options:
+              modules:
+                - fts5

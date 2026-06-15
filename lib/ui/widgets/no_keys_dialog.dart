@@ -88,82 +88,88 @@ class NoKeysDialog extends StatelessWidget {
     final palette = context.palette;
 
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(32),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 360),
-              decoration: BoxDecoration(
-                color: palette.glassBgDeep,
-                borderRadius: BorderRadius.circular(32),
-                border: Border.all(color: palette.glassRim, width: 0.5),
-                boxShadow: [palette.shadowDeep],
-              ),
-              padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Иконка общая для всех провайдеров (UI-SPEC §3)
-                  Container(
-                    width: 64,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(22),
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [palette.accent2, palette.accent],
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: palette.accent.withValues(alpha: 0.40),
-                          blurRadius: 22,
-                          offset: const Offset(0, 12),
+      // Material с прозрачным фоном даёт корректный DefaultTextStyle:
+      // без него Text вне Scaffold рисуется жёлтым с двойным подчёркиванием.
+      child: Material(
+        type: MaterialType.transparency,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(32),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 360),
+                decoration: BoxDecoration(
+                  color: palette.glassBgDeep,
+                  borderRadius: BorderRadius.circular(32),
+                  border: Border.all(color: palette.glassRim, width: 0.5),
+                  boxShadow: [palette.shadowDeep],
+                ),
+                padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Иконка общая для всех провайдеров (UI-SPEC §3)
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(22),
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [palette.accent2, palette.accent],
                         ),
-                      ],
+                        boxShadow: [
+                          BoxShadow(
+                            color: palette.accent.withValues(alpha: 0.40),
+                            blurRadius: 22,
+                            offset: const Offset(0, 12),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(Icons.key_off_outlined,
+                          color: Colors.white, size: 32),
                     ),
-                    child: const Icon(Icons.key_off_outlined,
-                        color: Colors.white, size: 32),
-                  ),
-                  const SizedBox(height: 16),
-                  // Заголовок из параметра (Groq или Deepgram)
-                  Text(
-                    title,
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.heading.copyWith(color: palette.ink1),
-                  ),
-                  const SizedBox(height: 8),
-                  // Текст-подсказка из параметра
-                  Text(
-                    bodyText,
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.body.copyWith(
-                      color: palette.ink2,
-                      fontSize: 14,
+                    const SizedBox(height: 16),
+                    // Заголовок из параметра (Groq или Deepgram)
+                    Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      style:
+                          AppTextStyles.heading.copyWith(color: palette.ink1),
                     ),
-                  ),
-                  const SizedBox(height: 22),
-                  PrimaryButton(
-                    label: 'Открыть настройки',
-                    onPressed: () {
-                      // Закрываем диалог с результатом true, затем вызываем callback
-                      Navigator.of(context).pop(true);
-                      onOpenSettings?.call();
-                    },
-                  ),
-                  const SizedBox(height: 4),
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(false),
-                    style: TextButton.styleFrom(
-                      foregroundColor: palette.ink2,
-                      minimumSize: const Size.fromHeight(48),
+                    const SizedBox(height: 8),
+                    // Текст-подсказка из параметра
+                    Text(
+                      bodyText,
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.body.copyWith(
+                        color: palette.ink2,
+                        fontSize: 14,
+                      ),
                     ),
-                    child: const Text('Не сейчас'),
-                  ),
-                ],
+                    const SizedBox(height: 22),
+                    PrimaryButton(
+                      label: 'Открыть настройки',
+                      onPressed: () {
+                        // Закрываем диалог с результатом true, затем вызываем callback
+                        Navigator.of(context).pop(true);
+                        onOpenSettings?.call();
+                      },
+                    ),
+                    const SizedBox(height: 4),
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      style: TextButton.styleFrom(
+                        foregroundColor: palette.ink2,
+                        minimumSize: const Size.fromHeight(48),
+                      ),
+                      child: const Text('Не сейчас'),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
