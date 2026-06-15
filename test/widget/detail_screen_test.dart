@@ -1,6 +1,8 @@
 // Widget-тесты detail-экрана (план 03-02, Wave 2) + swipe_delete (план 03-03).
 // Стаб-репозиторий реализует весь контракт HistoryRepository (включая update()).
 
+import 'dart:io';
+
 import 'package:ezctx/core/providers/history_provider.dart';
 import 'package:ezctx/core/services/clipboard_service.dart';
 import 'package:ezctx/features/history/filter_notifier.dart';
@@ -18,8 +20,26 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/mockito.dart';
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 import '../core/services/clipboard_service_test.mocks.dart';
+
+// Фейковый PathProvider для перехвата getTemporaryDirectory() в тестах шеринга.
+class _FakeSharePathProvider extends PathProviderPlatform
+    with MockPlatformInterfaceMixin {
+  _FakeSharePathProvider(this.temp);
+  final String temp;
+
+  @override
+  Future<String?> getTemporaryPath() async => temp;
+
+  @override
+  Future<String?> getApplicationDocumentsPath() async => temp;
+
+  @override
+  Future<String?> getExternalStoragePath() async => null;
+}
 
 // Стаб-репозиторий без реальной БД, с полями-шпионами для проверки вызовов.
 class _StubHistoryRepository implements HistoryRepository {
@@ -492,36 +512,53 @@ void main() {
     // Проверяем, что «Поделиться» отдаёт текст текущего вида (с таймкодами).
     testWidgets('Поделиться берёт текст текущего вида (с метками)',
         (tester) async {
-      String? capturedText;
-      // Переопределяем MethodChannel share_plus, чтобы захватить текст.
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(
-        const MethodChannel('dev.fluttercommunity.plus/share'),
-        (call) async {
-          if (call.method == 'share') {
-            capturedText = (call.arguments as Map?)?['text'] as String?;
-          }
-          return null;
-        },
-      );
+      await tester.runAsync(() async {
+        final tmpDir = Directory.systemTemp.createTempSync('detail_share_test');
+        final originalPathProvider = PathProviderPlatform.instance;
+        PathProviderPlatform.instance = _FakeSharePathProvider(tmpDir.path);
 
-      final entry = _makeTestEntry(
-        plainText: 'привет мир',
-        timestampedText: '[00:00:00] привет мир',
-      );
-      await tester.pumpWidget(_buildApp(home: DetailScreen(entry: entry)));
-      await tester.pumpAndSettle();
+        List<dynamic>? capturedPaths;
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(
+          const MethodChannel('dev.fluttercommunity.plus/share'),
+          (call) async {
+            if (call.method == 'shareFiles') {
+              capturedPaths = (call.arguments as Map)['paths'] as List<dynamic>?;
+            }
+            return null;
+          },
+        );
 
-      // Переключаемся на вид «С метками».
-      await tester.tap(find.text('С метками'));
-      await tester.pumpAndSettle();
+        final entry = _makeTestEntry(
+          plainText: 'привет мир',
+          timestampedText: '[00:00:00] привет мир',
+        );
+        await tester.pumpWidget(_buildApp(home: DetailScreen(entry: entry)));
+        await tester.pumpAndSettle();
 
-      // Шерим.
-      await tester.tap(find.text('Поделиться'));
-      await tester.pumpAndSettle();
+        // Переключаемся на вид «С метками».
+        await tester.tap(find.text('С метками'));
+        await tester.pumpAndSettle();
 
-      // Текст, переданный в Share.share, должен содержать таймкоды.
-      expect(capturedText, contains('[00:00:00]'));
+        // Шерим.
+        await tester.tap(find.text('Поделиться'));
+        // Реальный I/O (writeTempTxt) идёт вне FakeAsync; pumpAndSettle не ждёт dart:io.
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        for (var i = 0; i < 20 && capturedPaths == null; i++) {
+          await tester.pump(const Duration(milliseconds: 10));
+        }
+
+        expect(capturedPaths, isNotNull);
+        // entry.title формирует имя; вид с метками → суффикс _timestamped.
+        expect(capturedPaths!.single, endsWith('_timestamped.txt'));
+        expect(
+          await File(capturedPaths!.single as String).readAsString(),
+          contains('[00:00:00]'),
+        );
+
+        PathProviderPlatform.instance = originalPathProvider;
+        tmpDir.deleteSync(recursive: true);
+      });
     });
   });
 }
