@@ -1,3 +1,5 @@
+import '../../core/utils/byte_format.dart';
+
 /// Доменная модель выбранного аудиофайла.
 /// Метаданные ffprobe (duration, codec) появятся в Phase 2.
 class SelectedAudioFile {
@@ -13,9 +15,6 @@ class SelectedAudioFile {
     required this.extension,
   });
 
-  /// Размер в МБ с 1 знаком после запятой, для UI.
-  String get sizeFormatted {
-    final mb = sizeBytes / (1024 * 1024);
-    return '${mb.toStringAsFixed(1)} МБ';
-  }
+  /// Человекочитаемый размер (десятичные единицы, см. byte_format.dart).
+  String get sizeFormatted => formatBytes(sizeBytes);
 }
