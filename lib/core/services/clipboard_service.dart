@@ -27,8 +27,15 @@ final class ClipboardService {
       throw StateError('Clipboard API недоступен на этой платформе');
     }
 
+    // Временная диагностика issue #16: длина копируемого текста.
+    // Позволяет на устройстве сопоставить обрезку буфера с реальным размером (убрать после проверки).
+    debugPrint('copyText len=${text.length}');
+
     final item = DataWriterItem();
-    item.add(Formats.plainText(text));
+    // .lazy() создаёт DataRepresentation.lazy: данные отдаются нативно через ContentProvider (content-URI),
+    // минуя ~1 MB Binder-лимит. Синхронный Formats.plainText(text) → DataRepresentation.simple идёт inline
+    // в ClipData и потому обрезается на больших транскрипциях (issue #16).
+    item.add(Formats.plainText.lazy(() => text));
     await clipboard.write([item]);
   }
 }
