@@ -8,6 +8,7 @@ import '../../core/utils/label_mappers.dart';
 
 import '../../core/constants/design_tokens.dart';
 import '../../features/history/history_entry.dart';
+import '../../features/transcription/file_validator.dart';
 import '../../features/transcription/result_args.dart';
 import '../../features/transcription/transcript_writer.dart';
 import '../widgets/format_toggle.dart';
@@ -153,7 +154,7 @@ class ResultScreenState extends ConsumerState<ResultScreen> {
         await historyRepo.add(HistoryEntry(
           id: '', // drift присваивает autoincrement id; игнорируется при INSERT
           fileName: _args!.file.name,
-          title: _fileNameWithoutExtension(_args!.file.name),
+          title: FileValidator.stripKnownExtension(_args!.file.name),
           sizeBytes: _args!.file.sizeBytes,
           durationSec: _args!.result.duration,
           language: languageLabel(_args!.result.language),
@@ -181,11 +182,6 @@ class ResultScreenState extends ConsumerState<ResultScreen> {
   }
 
   /// Возвращает имя файла без расширения (хелпер для title записи).
-  static String _fileNameWithoutExtension(String name) {
-    final dot = name.lastIndexOf('.');
-    return dot > 0 ? name.substring(0, dot) : name;
-  }
-
   /// Возвращает текст в текущем режиме отображения (для копирования и показа).
   String get _currentText {
     final r = _args!.result;

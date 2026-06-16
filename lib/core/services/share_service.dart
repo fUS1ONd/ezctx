@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../features/transcription/file_validator.dart';
+
 /// Шеринг расшифровки как .txt-файла (а не строки текста).
 ///
 /// Пишет свежий temp-файл в `getTemporaryDirectory()/share` и открывает
@@ -55,10 +57,11 @@ class ShareService {
   /// Намеренно НЕ переиспользует `TranscriptWriter._sanitize`: тот строит имя
   /// через ASCII-only `\w` и калечит кириллицу («Лекция» → «_»). Здесь имя видно
   /// пользователю в системном share-листе, поэтому кириллицу нужно сохранить.
+  ///
+  /// Расширение срезаем только если оно реальное (`FileValidator.stripKnownExtension`):
+  /// иначе точка в имени (дата «14.05 ОП») принималась бы за расширение → «14».
   static String _sanitize(String name) {
-    var n = name;
-    final dot = n.lastIndexOf('.');
-    if (dot > 0) n = n.substring(0, dot);
+    var n = FileValidator.stripKnownExtension(name);
     // Запрещённые в FAT/NTFS/ext символы + управляющие (0x00–0x1F).
     n = n.replaceAll(RegExp(r'[/\\:*?"<>|\x00-\x1F]+'), '_').trim();
     if (n.isEmpty) n = 'transcript';

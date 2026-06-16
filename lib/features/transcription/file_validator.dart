@@ -47,4 +47,16 @@ class FileValidator {
     if (dotIndex < 0 || dotIndex == fileName.length - 1) return '';
     return fileName.substring(dotIndex + 1).toLowerCase();
   }
+
+  /// Срезает расширение, ТОЛЬКО если хвост после последней точки —
+  /// известное медиа-расширение из whitelist. Иначе возвращает имя как есть.
+  ///
+  /// Нужно, чтобы точка в имени (например, дата «14.05 ОП») не принималась
+  /// за разделитель расширения и не калечила имя при шеринге.
+  static String stripKnownExtension(String name) {
+    final ext = extractExtension(name);
+    if (!AppConstants.supportedAudioExtensions.contains(ext)) return name;
+    final dotIndex = name.lastIndexOf('.');
+    return name.substring(0, dotIndex);
+  }
 }

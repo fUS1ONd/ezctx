@@ -84,6 +84,37 @@ void main() {
     });
   });
 
+  group('FileValidator.stripKnownExtension', () {
+    test('режет известное медиа-расширение', () {
+      expect(FileValidator.stripKnownExtension('Лекция.m4a'), 'Лекция');
+    });
+
+    test('multi-dot: режет только реальное расширение', () {
+      expect(FileValidator.stripKnownExtension('lecture.final.m4a'),
+          'lecture.final');
+    });
+
+    test('верхний регистр расширения тоже режется', () {
+      expect(FileValidator.stripKnownExtension('запись.M4A'), 'запись');
+    });
+
+    test('неизвестный хвост после точки НЕ режется (report.2026)', () {
+      expect(FileValidator.stripKnownExtension('report.2026'), 'report.2026');
+    });
+
+    test('точка-дата без расширения сохраняется (14.05 ОП)', () {
+      expect(FileValidator.stripKnownExtension('14.05 ОП'), '14.05 ОП');
+    });
+
+    test('реальное имя файла с датой и расширением (14.05 ОП.m4a)', () {
+      expect(FileValidator.stripKnownExtension('14.05 ОП.m4a'), '14.05 ОП');
+    });
+
+    test('имя без точки возвращается как есть', () {
+      expect(FileValidator.stripKnownExtension('noext'), 'noext');
+    });
+  });
+
   group('FileValidator.validate — размер файла', () {
     test('19 МБ ровно — ok', () {
       expect(v.validate(path: 'a.mp3', sizeBytes: 19 * 1024 * 1024).isOk, isTrue);
