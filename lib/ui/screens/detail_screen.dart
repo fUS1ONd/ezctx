@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/design_tokens.dart';
 import '../../core/providers/history_provider.dart';
 import '../../core/services/clipboard_service.dart';
+import '../../core/services/share_service.dart';
 import '../../core/utils/label_mappers.dart';
 import '../../features/history/history_entry.dart';
 import '../widgets/format_toggle.dart';
@@ -107,8 +107,13 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
 
   Future<void> _onShareTap() async {
     try {
-      // Шерим текст текущего вида — plain или с таймкодами (D4, copy/share по виду).
-      await Share.share(_displayText);
+      // Суффикс _timestamped только если выбран вид с метками И таймкоды реально есть.
+      final withTimestamps = _showTimestamps && _currentEntry.hasTimestamps;
+      await const ShareService().shareTxt(
+        baseName: _currentEntry.title,
+        text: _displayText,
+        withTimestamps: withTimestamps,
+      );
     } catch (e, st) {
       debugPrint('_onShareTap error: $e\n$st');
       if (!mounted) return;

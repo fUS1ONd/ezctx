@@ -1,13 +1,14 @@
 import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:share_plus/share_plus.dart';
 import '../../core/providers/history_provider.dart';
 import '../../core/services/clipboard_service.dart';
+import '../../core/services/share_service.dart';
 import '../../core/utils/label_mappers.dart';
 
 import '../../core/constants/design_tokens.dart';
 import '../../features/history/history_entry.dart';
+import '../../features/transcription/file_validator.dart';
 import '../../features/transcription/result_args.dart';
 import '../../features/transcription/transcript_writer.dart';
 import '../widgets/format_toggle.dart';
@@ -153,7 +154,7 @@ class ResultScreenState extends ConsumerState<ResultScreen> {
         await historyRepo.add(HistoryEntry(
           id: '', // drift присваивает autoincrement id; игнорируется при INSERT
           fileName: _args!.file.name,
-          title: _fileNameWithoutExtension(_args!.file.name),
+          title: FileValidator.stripKnownExtension(_args!.file.name),
           sizeBytes: _args!.file.sizeBytes,
           durationSec: _args!.result.duration,
           language: languageLabel(_args!.result.language),
@@ -181,11 +182,6 @@ class ResultScreenState extends ConsumerState<ResultScreen> {
   }
 
   /// Возвращает имя файла без расширения (хелпер для title записи).
-  static String _fileNameWithoutExtension(String name) {
-    final dot = name.lastIndexOf('.');
-    return dot > 0 ? name.substring(0, dot) : name;
-  }
-
   /// Возвращает текст в текущем режиме отображения (для копирования и показа).
   String get _currentText {
     final r = _args!.result;
@@ -194,11 +190,18 @@ class ResultScreenState extends ConsumerState<ResultScreen> {
     return _showTimestamps ? r.text : r.plainText;
   }
 
-  /// Открывает системный диалог «Поделиться» с текстом расшифровки.
+  /// Открывает системный диалог «Поделиться», отправляя .txt-файл текущего вида.
   Future<void> _onShareTap() async {
     if (_args == null) return;
     try {
-      await Share.share(_currentText);
+      final r = _args!.result;
+      // Суффикс _timestamped только если реально есть таймкоды и выбран этот вид.
+      final withTimestamps = _showTimestamps && r.text != r.plainText;
+      await const ShareService().shareTxt(
+        baseName: _args!.file.name,
+        text: _currentText,
+        withTimestamps: withTimestamps,
+      );
     } catch (e, st) {
       debugPrint('_onShareTap error: $e\n$st');
       if (!mounted) return;
